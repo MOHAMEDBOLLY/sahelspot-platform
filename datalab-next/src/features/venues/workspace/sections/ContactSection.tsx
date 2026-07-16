@@ -2,9 +2,13 @@ import { Phone } from 'lucide-react'
 import type { Venue } from '../../../../types/venue'
 import { WorkspaceSection } from '../WorkspaceSection'
 import { WorkspaceField } from '../WorkspaceField'
+import { TextField } from '../fields/TextField'
+import type { WorkspaceMode } from '../types'
 
 type ContactSectionProps = {
   venue: Venue
+  mode: WorkspaceMode
+  onFieldChange: <K extends keyof Venue>(field: K, value: Venue[K]) => void
 }
 
 function ExternalLink({ href }: { href: string }) {
@@ -15,19 +19,53 @@ function ExternalLink({ href }: { href: string }) {
   )
 }
 
-export function ContactSection({ venue }: ContactSectionProps) {
+export function ContactSection({ venue, mode, onFieldChange }: ContactSectionProps) {
   return (
     <WorkspaceSection title="Contact" icon={Phone}>
       <dl className="grid grid-cols-2 gap-4">
-        <WorkspaceField label="Phone" value={venue.phone} />
-        <WorkspaceField label="WhatsApp" value={venue.whatsapp} />
-        <WorkspaceField
-          label="Website"
-          value={venue.website ? <ExternalLink href={venue.website} /> : null}
-        />
-        <WorkspaceField label="Instagram" value={venue.instagram_handle} />
-        <WorkspaceField label="Facebook" value={venue.facebook_handle} />
-        <WorkspaceField label="TikTok" value={venue.tiktok_handle} />
+        {mode === 'view' ? (
+          <>
+            <WorkspaceField label="Phone" value={venue.phone} />
+            <WorkspaceField label="WhatsApp" value={venue.whatsapp} />
+            <WorkspaceField
+              label="Website"
+              value={venue.website ? <ExternalLink href={venue.website} /> : null}
+            />
+            <WorkspaceField label="Instagram" value={venue.instagram_handle} />
+            <WorkspaceField label="Facebook" value={venue.facebook_handle} />
+            <WorkspaceField label="TikTok" value={venue.tiktok_handle} />
+          </>
+        ) : (
+          <>
+            <TextField label="Phone" value={venue.phone ?? ''} onChange={(v) => onFieldChange('phone', v)} />
+            <TextField
+              label="WhatsApp"
+              value={venue.whatsapp ?? ''}
+              onChange={(v) => onFieldChange('whatsapp', v)}
+            />
+            <TextField
+              label="Website"
+              type="url"
+              value={venue.website ?? ''}
+              onChange={(v) => onFieldChange('website', v)}
+            />
+            <TextField
+              label="Instagram"
+              value={venue.instagram_handle ?? ''}
+              onChange={(v) => onFieldChange('instagram_handle', v)}
+            />
+            <TextField
+              label="Facebook"
+              value={venue.facebook_handle ?? ''}
+              onChange={(v) => onFieldChange('facebook_handle', v)}
+            />
+            <TextField
+              label="TikTok"
+              value={venue.tiktok_handle ?? ''}
+              onChange={(v) => onFieldChange('tiktok_handle', v)}
+            />
+          </>
+        )}
       </dl>
     </WorkspaceSection>
   )

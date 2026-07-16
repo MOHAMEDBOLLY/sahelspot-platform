@@ -2,17 +2,23 @@ import { UploadCloud } from 'lucide-react'
 import type { Venue } from '../../../../types/venue'
 import { WorkspaceSection } from '../WorkspaceSection'
 import { WorkspaceField } from '../WorkspaceField'
+import { TextAreaField } from '../fields/TextAreaField'
 import { StatusBadge } from '../../../../components/StatusBadge'
 import { formatDateTime } from '../../../../lib/formatDate'
+import type { WorkspaceMode } from '../types'
 
 type PublishingStatusSectionProps = {
   venue: Venue
+  mode: WorkspaceMode
+  onFieldChange: <K extends keyof Venue>(field: K, value: Venue[K]) => void
 }
 
-export function PublishingStatusSection({ venue }: PublishingStatusSectionProps) {
+export function PublishingStatusSection({ venue, mode, onFieldChange }: PublishingStatusSectionProps) {
   return (
     <WorkspaceSection title="Publishing Status" icon={UploadCloud}>
       <dl className="grid grid-cols-2 gap-4">
+        {/* Status is workflow-controlled (see docs/ARCHITECTURE.md#publishing-architecture) —
+            it changes via Review/Publish actions, not a free-form field edit. Always read-only. */}
         <WorkspaceField label="Status" value={<StatusBadge status={venue.status} />} />
         <WorkspaceField
           label="Last Published"
@@ -23,7 +29,15 @@ export function PublishingStatusSection({ venue }: PublishingStatusSectionProps)
         <WorkspaceField label="Source" value={venue.source} />
       </dl>
       <div className="mt-4">
-        <WorkspaceField label="Internal Notes" value={venue.internal_notes} />
+        {mode === 'view' ? (
+          <WorkspaceField label="Internal Notes" value={venue.internal_notes} />
+        ) : (
+          <TextAreaField
+            label="Internal Notes"
+            value={venue.internal_notes ?? ''}
+            onChange={(v) => onFieldChange('internal_notes', v)}
+          />
+        )}
       </div>
     </WorkspaceSection>
   )

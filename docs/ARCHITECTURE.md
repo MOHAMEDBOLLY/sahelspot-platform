@@ -2,7 +2,7 @@
 
 ## Status
 
-Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration, applied and verified against a real Supabase database (Sprint 3), with a seed and three read-only smoke-test endpoints (Sprint 4). The frontend — SahelSpot Studio — has an application shell (Sprint 5), a Venues list reading live from the API (Sprint 6), and a two-panel Venue Workspace showing full read-only detail alongside the list (Sprint 7). As of Sprint 8, the venue read models are enriched — `GET /venues`/`GET /venues/{id}` return a resolved `destination: {id, name}` object instead of a raw `destination_id`, so the frontend never resolves an id into a name itself. Still entirely read-only — no editing, forms, or auth.
+Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration, applied and verified against a real Supabase database (Sprint 3), with a seed and three read-only smoke-test endpoints (Sprint 4). The frontend — SahelSpot Studio — has an application shell (Sprint 5), a Venues list reading live from the API (Sprint 6), and a two-panel Venue Workspace showing full detail alongside the list (Sprint 7), reading an enriched API contract (Sprint 8) that resolves `destination_id` into `destination: {id, name}` so the frontend never resolves an id itself. As of Sprint 9, the Workspace has an Edit Mode: most fields become inputs, held entirely in local React state, discarded on Cancel — no API mutation exists yet, this is UI architecture only, not a working editor.
 
 ## Known deviations
 
@@ -88,12 +88,15 @@ sahelspot-platform/
 │       │       ├── api.ts                # fetchVenues(), fetchVenue(id)
 │       │       ├── useVenues.ts          # TanStack Query hook — list
 │       │       ├── useVenue.ts           # TanStack Query hook — single venue, seeded from list cache
+│       │       ├── venueCategories.ts    # fixed category list, mirrors the API's CHECK constraint
 │       │       ├── VenueList.tsx         # presentational: clickable venue rows
 │       │       ├── VenueListPanel.tsx    # stateful: loading/error/empty + VenueList
 │       │       └── workspace/
-│       │           ├── VenueWorkspace.tsx     # stateful: no-selection/loading/error + sections
+│       │           ├── VenueWorkspace.tsx     # stateful: no-selection/loading/error + mode + draft + sections
+│       │           ├── WorkspaceToolbar.tsx    # Edit / Cancel button
 │       │           ├── WorkspaceSection.tsx    # shared section card chrome
-│       │           ├── WorkspaceField.tsx       # shared label/value row with placeholder
+│       │           ├── WorkspaceField.tsx       # view-mode label/value row with placeholder
+│       │           ├── fields/                   # edit-mode input atoms: TextField, TextAreaField, SelectField, CheckboxField
 │       │           └── sections/                # Basic Info, Location, Contact, Opening Hours, Images, Publishing Status
 │       ├── components/
 │       │   ├── Sidebar.tsx
@@ -111,7 +114,7 @@ sahelspot-platform/
 └── docs/                    # Project documentation
 ```
 
-`datalab-next/` has the application shell (Sprint 5), a read-only Venues list (Sprint 6), and, as of Sprint 7, a two-panel Venue Workspace — selecting a venue shows its full detail alongside the list, on the same page, with no navigation. Still no editing, forms, or auth. `api/` has app startup, config, logging, a live Supabase/PostgreSQL connection, a migrated and verified data model (Sprint 3), three read-only smoke-test endpoints reading directly from the draft tables (Sprint 4), and CORS configured for the Studio dev origin (Sprint 6) — the endpoints themselves are still not the final public API (see [Publishing architecture](#publishing-architecture) below).
+`datalab-next/` has the application shell (Sprint 5), a Venues list (Sprint 6), a two-panel Venue Workspace (Sprint 7), and, as of Sprint 9, an Edit Mode toggle on that Workspace — most fields become inputs, held in local React state only, discarded on Cancel. No API mutation exists to receive them yet. `api/` has app startup, config, logging, a live Supabase/PostgreSQL connection, a migrated and verified data model (Sprint 3), three read-only smoke-test endpoints reading directly from the draft tables and enriched to resolve `destination_id` server-side (Sprint 4, 8), and CORS configured for the Studio dev origin (Sprint 6) — the endpoints themselves are still not the final public API (see [Publishing architecture](#publishing-architecture) below).
 
 ## Publishing architecture
 
