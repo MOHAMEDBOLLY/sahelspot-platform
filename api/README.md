@@ -13,6 +13,18 @@ cp .env.example .env
 # then edit .env with a real Supabase DATABASE_URL
 ```
 
+## Database migrations
+
+Schema is managed with Alembic, reading the same `DATABASE_URL` as the app (no separate connection string to keep in sync):
+
+```bash
+alembic upgrade head        # apply all migrations
+alembic upgrade head --sql  # preview the SQL without connecting to a database
+alembic downgrade -1        # roll back the last migration
+```
+
+The first migration (`alembic/versions/0001_initial_schema.py`) creates the three tables described in [`../docs/DATABASE.md`](../docs/DATABASE.md): `destinations`, `venues`, `publish_revisions`. It hasn't been applied to any real database yet — that needs a live Supabase `DATABASE_URL` in `.env`.
+
 ## Run
 
 ```bash

@@ -49,11 +49,24 @@ If the database is unreachable, returns `503` with:
 }
 ```
 
+## Publishing architecture: two endpoint groups, not yet built
+
+The platform is **not live-edit** — see [`PRODUCT.md`](PRODUCT.md#content--publishing-model) and [`ARCHITECTURE.md`](ARCHITECTURE.md#publishing-architecture). This shapes the API into two logically separate groups, planned but **not implemented**:
+
+- **Public endpoints** (e.g. under `/destinations`, `/venues`) will read *only* from the current publish revision (see [`DATABASE.md`](DATABASE.md#publish_revisions)) — never from the `destinations`/`venues` working tables directly. No draft or in-review content can ever be returned by a public endpoint, by construction, not by a filter that could be forgotten.
+- **Editorial/admin endpoints** (e.g. under `/admin/...`, authenticated — auth approach still undecided) will manage the draft workflow: create/edit destinations and venues, run validation, move content through review, and trigger the two actions that don't exist in a live-edit system:
+  - **Publish** — snapshots all `approved` content into a new publish revision and makes it current.
+  - **Rollback** — makes a previous publish revision current again, instantly.
+  - Plus a read endpoint to list publish-revision history (for an admin "what's been published, and when" view).
+
+None of this is designed at the request/response level yet — routes, payload shapes, and auth are all open. This section exists so the *shape* of the API (public vs. editorial, and that Publish/Rollback are real actions, not implicit side effects) is decided before the endpoints themselves are.
+
 ## Open decisions
 
 - API style and endpoint conventions beyond the Sprint 1 foundation — not yet designed; FastAPI's built-in OpenAPI/REST conventions are the likely default.
-- Authentication/authorization approach — not yet decided (Supabase Auth is the likely default, to be confirmed).
+- Authentication/authorization approach — not yet decided (Supabase Auth is the likely default, to be confirmed). Now also needs to answer who can edit, review, publish, and roll back — these may end up as distinct permissions, not just "logged in or not."
 - Versioning strategy — not yet decided.
+- Exact shape of the public vs. editorial endpoint split above — not yet designed.
 
 ## Notes
 
