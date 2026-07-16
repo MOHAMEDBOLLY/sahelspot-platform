@@ -4,7 +4,7 @@ The editorial/admin frontend for SahelSpot Platform — where content is edited,
 
 ## Status
 
-**Shell + Venue Workspace** (Sprint 7), reading an enriched API contract (Sprint 8), with **Edit Mode** (Sprint 9): the workspace toggles between View and Edit, and most fields become inputs — but nothing is saved. No API mutations, no PATCH, no validation, no dirty tracking, no autosave, no authentication yet. State only ever exists in React; Cancel discards it completely.
+**Shell + Venue Workspace** (Sprint 7), reading an enriched API contract (Sprint 8), with **Edit Mode** (Sprint 9) and **draft/dirty-state management** (Sprint 10): the workspace knows when it has unsaved changes, shows an indicator, confirms before discarding them (venue switch), and warns on browser refresh/close. Still no API mutations, no PATCH, no validation, no autosave, no authentication. State only ever exists in React; Cancel discards it completely.
 
 ## Stack
 
@@ -38,6 +38,8 @@ src/
 ├── lib/
 │   ├── apiClient.ts          # fetch wrapper (base URL, ApiError) — the only place that talks HTTP
 │   └── formatDate.ts          # shared date formatting for display
+├── hooks/
+│   └── useDraft.ts            # generic mode/draft/dirty/beforeunload state — not venue-specific
 ├── types/
 │   └── venue.ts              # full Venue type (matches GET /venues and GET /venues/{id})
 ├── features/
@@ -75,7 +77,7 @@ src/
 │   └── StatusBadge.tsx         # colored badge for draft/review/approved/archived
 └── pages/
     ├── Dashboard.tsx        # welcome page
-    ├── Venues.tsx             # thin: owns selectedVenueId, composes VenueListPanel + VenueWorkspace
+    ├── Venues.tsx             # owns selectedVenueId + isWorkspaceDirty; confirms before switching venues while dirty
     ├── Destinations.tsx
     ├── Publishing.tsx
     └── Settings.tsx
@@ -88,4 +90,5 @@ src/
 - All business logic (validation, status meaning, filtering, id → name resolution) lives in the API — the frontend only fetches and displays what the API returns. As of Sprint 8, `GET /venues`/`GET /venues/{id}` return a resolved `destination: {id, name}` object (see [`../docs/API.md`](../docs/API.md#response-model-enrichment-sprint-8)) — the frontend reads `venue.destination.name` directly, no client-side lookup.
 - TanStack Query's `networkMode: 'always'` is set globally in `main.tsx` — the default `'online'` mode can leave a query stuck in a "paused" state (indistinguishable from loading) when the browser's connectivity/visibility signals are unreliable, which is worth knowing if a query ever seems to hang without erring.
 - `useVenue(id)` seeds its `initialData` from the already-fetched `['venues']` list cache, since `GET /venues` returns full venue objects (same shape as `GET /venues/{id}`). Selecting a venue already visible in the list renders instantly with no extra network round trip.
-- **Edit Mode (Sprint 9)**: `VenueWorkspace` holds `mode: 'view' | 'edit'` and a `draft` copy of the venue, created only when Edit is clicked. View mode always renders the real fetched `venue`; edit mode renders `draft`. Cancel drops the draft and returns to view — nothing is ever sent to the API. Not every field is editable: `Destination` (needs a real picker, i.e. an API call — deferred), `Slug` (structural/URL identity, needs its own validation later), and `Status`/timestamps/`Source` in Publishing Status (system- or workflow-managed, not generic text) stay read-only in both modes. Opening Hours and Images are view-only in both modes — they need dedicated editors (a time-range picker, an upload UI), not a text input.
+- **Edit Mode (Sprint 9)**: view/edit mode and a draft copy of the venue, created only when Edit is clicked. Cancel drops the draft and returns to view — nothing is ever sent to the API. Not every field is editable: `Destination` (needs a real picker, i.e. an API call — deferred), `Slug` (structural/URL identity, needs its own validation later), and `Status`/timestamps/`Source` in Publishing Status (system- or workflow-managed, not generic text) stay read-only in both modes. Opening Hours and Images are view-only in both modes — they need dedicated editors (a time-range picker, an upload UI), not a text input.
+- **Draft state management (Sprint 10)**: `useDraft<T>` (`hooks/useDraft.ts`) is a generic, entity-agnostic hook — not specific to venues — holding `mode`, `draft`, and a derived `isDirty` (`JSON.stringify(draft) !== JSON.stringify(original)`). `VenueWorkspace` uses it and reports `isDirty` up to `Venues.tsx` via a plain `onDirtyChange` callback, since "should switching venues ask for confirmation" is a page-level concern that spans the list and the workspace, not something either owns alone. The hook also self-registers a `beforeunload` listener while dirty, so any future entity workspace built on `useDraft` gets refresh protection for free without remembering to wire it up. Route-level navigation (e.g. clicking Destinations in the sidebar while a venue edit is dirty) is **not** guarded — only same-page venue switching and browser refresh/close, per this sprint's explicit scope.

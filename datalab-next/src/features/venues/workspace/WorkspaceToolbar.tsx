@@ -4,19 +4,28 @@ import type { WorkspaceMode } from './types'
 type WorkspaceToolbarProps = {
   venueName: string
   mode: WorkspaceMode
+  isDirty: boolean
   onEdit: () => void
   onCancel: () => void
 }
 
 /**
  * Mode switch only — no Save here yet. Save arrives once mutations exist
- * (see the "how this evolves" note in the Sprint 9 summary); this toolbar's
- * job right now is strictly View <-> Edit.
+ * (see the "how this evolves" note in the Sprint 9/10 summaries); this
+ * toolbar's job right now is View <-> Edit plus surfacing dirty state.
  */
-export function WorkspaceToolbar({ venueName, mode, onEdit, onCancel }: WorkspaceToolbarProps) {
+export function WorkspaceToolbar({ venueName, mode, isDirty, onEdit, onCancel }: WorkspaceToolbarProps) {
   return (
     <div className="flex items-center justify-between">
-      <h2 className="truncate text-lg font-semibold text-gray-900">{venueName}</h2>
+      <div className="flex items-center gap-2">
+        <h2 className="truncate text-lg font-semibold text-gray-900">{venueName}</h2>
+        {mode === 'edit' && isDirty && (
+          <span className="flex items-center gap-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            Unsaved changes
+          </span>
+        )}
+      </div>
       {mode === 'view' ? (
         <button
           type="button"

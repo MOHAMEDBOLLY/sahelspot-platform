@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { MousePointerClick } from 'lucide-react'
 import { useVenue } from '../useVenue'
+import { useDraft } from '../../../hooks/useDraft'
 import { LoadingState } from '../../../components/LoadingState'
 import { ErrorState } from '../../../components/ErrorState'
 import { PagePlaceholder } from '../../../components/PagePlaceholder'
@@ -12,24 +13,26 @@ import { OpeningHoursSection } from './sections/OpeningHoursSection'
 import { ImagesSection } from './sections/ImagesSection'
 import { PublishingStatusSection } from './sections/PublishingStatusSection'
 import type { Venue } from '../../../types/venue'
-import type { WorkspaceMode } from './types'
 
 type VenueWorkspaceProps = {
   venueId: string | null
+  onDirtyChange?: (isDirty: boolean) => void
 }
 
-export function VenueWorkspace({ venueId }: VenueWorkspaceProps) {
+export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) {
   const { data: venue, isPending, isError, error, refetch } = useVenue(venueId)
+  const {
+    mode,
+    value: displayedVenue,
+    isDirty,
+    startEditing,
+    cancelEditing,
+    updateField,
+  } = useDraft<Venue>(venue, venueId)
 
-  const [mode, setMode] = useState<WorkspaceMode>('view')
-  const [draft, setDraft] = useState<Venue | null>(null)
-
-  // Switching venues while editing should not carry a half-edited draft onto
-  // the newly selected venue — drop back to view mode.
   useEffect(() => {
-    setMode('view')
-    setDraft(null)
-  }, [venueId])
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
 
   if (!venueId) {
     return (
@@ -54,38 +57,25 @@ export function VenueWorkspace({ venueId }: VenueWorkspaceProps) {
     )
   }
 
-  const handleEdit = () => {
-    setDraft(venue)
-    setMode('edit')
+  if (!displayedVenue) {
+    return null
   }
-
-  const handleCancel = () => {
-    setDraft(null)
-    setMode('view')
-  }
-
-  const handleFieldChange = <K extends keyof Venue>(field: K, value: Venue[K]) => {
-    setDraft((current) => (current ? { ...current, [field]: value } : current))
-  }
-
-  // View mode always shows the fetched venue; edit mode shows the in-progress
-  // draft, which starts as a copy of it. Nothing here reaches the API.
-  const displayedVenue = mode === 'edit' && draft ? draft : venue
 
   return (
     <div className="flex flex-col gap-4">
       <WorkspaceToolbar
         venueName={displayedVenue.name}
         mode={mode}
-        onEdit={handleEdit}
-        onCancel={handleCancel}
+        isDirty={isDirty}
+        onEdit={startEditing}
+        onCancel={cancelEditing}
       />
-      <BasicInfoSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} />
-      <LocationSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} />
-      <ContactSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} />
+      <BasicInfoSection venue={displayedVenue} mode={mode} onFieldChange={updateField} />
+      <LocationSection venue={displayedVenue} mode={mode} onFieldChange={updateField} />
+      <ContactSection venue={displayedVenue} mode={mode} onFieldChange={updateField} />
       <OpeningHoursSection venue={displayedVenue} />
       <ImagesSection venue={displayedVenue} />
-      <PublishingStatusSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} />
+      <PublishingStatusSection venue={displayedVenue} mode={mode} onFieldChange={updateField} />
     </div>
   )
 }
