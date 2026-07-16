@@ -1,4 +1,4 @@
-import { Loader2, Pencil, Save, X } from 'lucide-react'
+import { CheckCheck, Loader2, Pencil, Save, X } from 'lucide-react'
 import type { WorkspaceMode } from './types'
 
 type WorkspaceToolbarProps = {
@@ -7,9 +7,12 @@ type WorkspaceToolbarProps = {
   isDirty: boolean
   isSaving: boolean
   saveError: string | null
+  hasFieldErrors: boolean
+  isValidating: boolean
   onEdit: () => void
   onCancel: () => void
   onSave: () => void
+  onValidate: () => void
 }
 
 export function WorkspaceToolbar({
@@ -18,9 +21,12 @@ export function WorkspaceToolbar({
   isDirty,
   isSaving,
   saveError,
+  hasFieldErrors,
+  isValidating,
   onEdit,
   onCancel,
   onSave,
+  onValidate,
 }: WorkspaceToolbarProps) {
   return (
     <div className="flex items-center justify-between gap-4">
@@ -38,37 +44,50 @@ export function WorkspaceToolbar({
           </span>
         )}
       </div>
-      {mode === 'view' ? (
+      <div className="flex shrink-0 items-center gap-2">
         <button
           type="button"
-          onClick={onEdit}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+          onClick={onValidate}
+          disabled={isValidating || isDirty}
+          title={isDirty ? 'Save Draft first — Validate checks the saved state, not unsaved edits.' : undefined}
+          className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Pencil size={14} />
-          Edit
+          {isValidating ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
+          {isValidating ? 'Validating…' : 'Validate'}
         </button>
-      ) : (
-        <div className="flex shrink-0 items-center gap-2">
+        {mode === 'view' ? (
           <button
             type="button"
-            onClick={onCancel}
-            disabled={isSaving}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={onEdit}
+            className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700"
           >
-            <X size={14} />
-            Cancel
+            <Pencil size={14} />
+            Edit
           </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={!isDirty || isSaving}
-            className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {isSaving ? 'Saving…' : 'Save Draft'}
-          </button>
-        </div>
-      )}
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <X size={14} />
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={!isDirty || isSaving || hasFieldErrors}
+              title={hasFieldErrors ? 'Fix the highlighted fields before saving.' : undefined}
+              className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {isSaving ? 'Saving…' : 'Save Draft'}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   )
 }

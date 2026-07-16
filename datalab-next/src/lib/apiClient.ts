@@ -33,3 +33,13 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
 
   return response.json() as Promise<T>
 }
+
+export async function apiPost<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, { method: 'POST' })
+
+  if (!response.ok) {
+    throw new ApiError(`${path} failed with status ${response.status}`, response.status)
+  }
+
+  return response.json() as Promise<T>
+}

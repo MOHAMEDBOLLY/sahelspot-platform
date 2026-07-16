@@ -1,5 +1,6 @@
-import { apiGet, apiPatch } from '../../lib/apiClient'
+import { apiGet, apiPatch, apiPost } from '../../lib/apiClient'
 import type { Venue } from '../../types/venue'
+import type { ValidationResult } from '../../types/validation'
 
 export function fetchVenues(): Promise<Venue[]> {
   return apiGet<Venue[]>('/venues')
@@ -61,4 +62,10 @@ export function toVenuePatch(venue: Venue): VenuePatch {
 
 export function updateVenue(id: string, patch: VenuePatch): Promise<Venue> {
   return apiPatch<Venue>(`/venues/${encodeURIComponent(id)}`, patch)
+}
+
+/** Runs the canonical Validate gate against the venue's persisted draft
+ * state (api/app/validation/venues.py) — read-only, doesn't change status. */
+export function validateVenue(id: string): Promise<ValidationResult> {
+  return apiPost<ValidationResult>(`/venues/${encodeURIComponent(id)}/validate`)
 }

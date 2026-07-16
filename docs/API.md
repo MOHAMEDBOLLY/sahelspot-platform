@@ -2,7 +2,7 @@
 
 ## Status
 
-Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. As of Sprint 11, the first write endpoint exists: `PATCH /venues/{venue_id}` (Save Draft). It writes straight to the draft `venues` row with no status transition — Publish, validation, and revisioning are still not implemented.
+Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. Sprint 11 added the first write endpoint, `PATCH /venues/{venue_id}` (Save Draft) — no validation, no status transition. Sprint 12 adds the "Validate" gate itself: `POST /venues/{venue_id}/validate`, a read-only canonical check the frontend cannot bypass or duplicate. Publish and revisioning are still not implemented.
 
 ## Stack
 
@@ -92,6 +92,33 @@ Request body (`VenueUpdate`) accepts a subset of `VenueOut`'s fields — exactly
 
 All fields are optional (partial update — only keys present in the body are written, via `.model_dump(exclude_unset=True)`). Fields the Studio doesn't yet expose as editable (`id`, `slug`, `destination`, `status`, `opening_hours`, `beach_details`, `cover_image_url`, `gallery_image_urls`, `source`, timestamps) aren't part of this schema at all — sending them is simply ignored, not rejected, since `VenueUpdate` doesn't declare them.
 
+Deliberately unchanged in Sprint 12: this endpoint still performs no business-rule validation — Save Draft can persist an incomplete or out-of-range venue, by design (see below).
+
+### `POST /venues/{venue_id}/validate`
+
+Added Sprint 12 — the **Validate** gate described in [`DATABASE.md`](DATABASE.md#editorial-status-one-shared-vocabulary-renamed-to-avoid-colliding-with-the-new-meaning-of-publish): the application-level check a row must pass before it can move from `draft` to `review`. Read-only — it reports whether the venue *would* pass, it doesn't move `status` itself (Review isn't built yet). `404` if the venue doesn't exist.
+
+Runs against the venue's **currently persisted** row, not a request body — there's nothing to submit, since Validate checks what's already saved (run Save Draft first if there are unsaved edits).
+
+Response (`ValidationResult`, from the new `app/validation/` package — a shape meant to be reused by every future entity's validator, not just venues):
+
+```json
+{
+  "valid": false,
+  "errors": [
+    { "field": "latitude", "message": "Latitude must be between 30.6 and 31.1." }
+  ]
+}
+```
+
+`valid: true` implies an empty `errors` array. This is the **canonical** validation — the backend's business rules, and the only place they're enforced:
+
+- `name` non-blank.
+- `category` one of the documented `VENUE_CATEGORIES` (already DB-enforced by a `CHECK` constraint at write time, but re-checked here too so a bad value produces this structured response instead of a raw constraint-violation error).
+- `latitude`/`longitude`, when present, within the observed North Coast range (`[30.6, 31.1]` / `[28.6, 29.4]`) — a sanity bound per `DATABASE.md`, not a DB constraint, which is exactly why it's enforced in application code rather than a `CHECK`.
+
+The frontend's Edit Mode runs its own lightweight checks (required-ness, character limits, URL/number format) for instant typing feedback and to gate the Save Draft button — see `datalab-next/src/lib/validation.ts` and `features/venues/venueValidation.ts`. Those are UX conveniences only; they never re-implement the rules above, and the backend never trusts them — every rule that decides whether a venue is actually fit to publish is checked here and only here.
+
 ## Response model enrichment (Sprint 8)
 
 The frontend is meant to receive presentation-ready data — it shouldn't have to resolve an id into a name, or otherwise derive a display value from raw fields. `venues.destination_id` (a foreign key, e.g. `"marassi"`) forced exactly that: the Studio UI was displaying the raw id in place of a destination name.
@@ -127,7 +154,7 @@ None of this is designed at the request/response level yet — routes, payload s
 
 ## CORS
 
-As of Sprint 6, `GET` requests are allowed from the Studio dev origins (`http://localhost:5173`, `http://127.0.0.1:5173`) so the browser-based frontend can call this API directly — see `api/app/main.py`. As of Sprint 11, `PATCH` is allowed too, for Save Draft. Local dev only; revisit once Studio has a real deployed URL.
+As of Sprint 6, `GET` requests are allowed from the Studio dev origins (`http://localhost:5173`, `http://127.0.0.1:5173`) so the browser-based frontend can call this API directly — see `api/app/main.py`. As of Sprint 11, `PATCH` is allowed too, for Save Draft; as of Sprint 12, `POST` is allowed, for Validate. Local dev only; revisit once Studio has a real deployed URL.
 
 ## Open decisions
 

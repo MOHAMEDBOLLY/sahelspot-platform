@@ -1,4 +1,5 @@
-import { FieldLabel, FIELD_INPUT_CLASSNAME } from './FieldLabel'
+import { FieldLabel } from './FieldLabel'
+import { FIELD_INPUT_CLASSNAME } from './fieldStyles'
 
 type SelectFieldProps = {
   label: string

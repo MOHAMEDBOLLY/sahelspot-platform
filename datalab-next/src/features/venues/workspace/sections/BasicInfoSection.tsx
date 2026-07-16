@@ -8,21 +8,28 @@ import { SelectField } from '../fields/SelectField'
 import { CheckboxField } from '../fields/CheckboxField'
 import type { WorkspaceMode } from '../types'
 import { VENUE_CATEGORIES } from '../../venueCategories'
+import type { FieldErrors } from '../../../../lib/validation'
 
 type BasicInfoSectionProps = {
   venue: Venue
   mode: WorkspaceMode
   onFieldChange: <K extends keyof Venue>(field: K, value: Venue[K]) => void
+  errors?: FieldErrors
 }
 
-export function BasicInfoSection({ venue, mode, onFieldChange }: BasicInfoSectionProps) {
+export function BasicInfoSection({ venue, mode, onFieldChange, errors = {} }: BasicInfoSectionProps) {
   return (
     <WorkspaceSection title="Basic Information" icon={Info}>
       <dl className="grid grid-cols-2 gap-4">
         {mode === 'view' ? (
           <WorkspaceField label="Name" value={venue.name} />
         ) : (
-          <TextField label="Name" value={venue.name} onChange={(v) => onFieldChange('name', v)} />
+          <TextField
+            label="Name"
+            value={venue.name}
+            onChange={(v) => onFieldChange('name', v)}
+            error={errors.name}
+          />
         )}
 
         {/* Slug is a structural/URL identity, not a generic text field — left read-only until
@@ -82,6 +89,7 @@ export function BasicInfoSection({ venue, mode, onFieldChange }: BasicInfoSectio
             label="Short Description"
             value={venue.short_description ?? ''}
             onChange={(v) => onFieldChange('short_description', v)}
+            error={errors.short_description}
           />
         )}
       </div>

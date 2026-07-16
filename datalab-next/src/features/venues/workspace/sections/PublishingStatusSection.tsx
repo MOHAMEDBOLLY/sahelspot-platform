@@ -6,14 +6,21 @@ import { TextAreaField } from '../fields/TextAreaField'
 import { StatusBadge } from '../../../../components/StatusBadge'
 import { formatDateTime } from '../../../../lib/formatDate'
 import type { WorkspaceMode } from '../types'
+import type { FieldErrors } from '../../../../lib/validation'
 
 type PublishingStatusSectionProps = {
   venue: Venue
   mode: WorkspaceMode
   onFieldChange: <K extends keyof Venue>(field: K, value: Venue[K]) => void
+  errors?: FieldErrors
 }
 
-export function PublishingStatusSection({ venue, mode, onFieldChange }: PublishingStatusSectionProps) {
+export function PublishingStatusSection({
+  venue,
+  mode,
+  onFieldChange,
+  errors = {},
+}: PublishingStatusSectionProps) {
   return (
     <WorkspaceSection title="Publishing Status" icon={UploadCloud}>
       <dl className="grid grid-cols-2 gap-4">
@@ -36,6 +43,7 @@ export function PublishingStatusSection({ venue, mode, onFieldChange }: Publishi
             label="Internal Notes"
             value={venue.internal_notes ?? ''}
             onChange={(v) => onFieldChange('internal_notes', v)}
+            error={errors.internal_notes}
           />
         )}
       </div>

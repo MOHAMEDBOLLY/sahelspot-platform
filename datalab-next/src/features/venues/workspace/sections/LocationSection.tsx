@@ -4,14 +4,16 @@ import { WorkspaceSection } from '../WorkspaceSection'
 import { WorkspaceField } from '../WorkspaceField'
 import { TextField } from '../fields/TextField'
 import type { WorkspaceMode } from '../types'
+import type { FieldErrors } from '../../../../lib/validation'
 
 type LocationSectionProps = {
   venue: Venue
   mode: WorkspaceMode
   onFieldChange: <K extends keyof Venue>(field: K, value: Venue[K]) => void
+  errors?: FieldErrors
 }
 
-export function LocationSection({ venue, mode, onFieldChange }: LocationSectionProps) {
+export function LocationSection({ venue, mode, onFieldChange, errors = {} }: LocationSectionProps) {
   return (
     <WorkspaceSection title="Location" icon={MapPin}>
       <dl className="grid grid-cols-2 gap-4">
@@ -26,11 +28,13 @@ export function LocationSection({ venue, mode, onFieldChange }: LocationSectionP
               label="Latitude"
               value={venue.latitude ?? ''}
               onChange={(v) => onFieldChange('latitude', v)}
+              error={errors.latitude}
             />
             <TextField
               label="Longitude"
               value={venue.longitude ?? ''}
               onChange={(v) => onFieldChange('longitude', v)}
+              error={errors.longitude}
             />
           </>
         )}
@@ -57,6 +61,7 @@ export function LocationSection({ venue, mode, onFieldChange }: LocationSectionP
               type="url"
               value={venue.maps_url ?? ''}
               onChange={(v) => onFieldChange('maps_url', v)}
+              error={errors.maps_url}
             />
           )}
         </div>

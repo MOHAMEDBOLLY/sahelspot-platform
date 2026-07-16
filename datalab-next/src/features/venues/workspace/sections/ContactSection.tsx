@@ -4,11 +4,13 @@ import { WorkspaceSection } from '../WorkspaceSection'
 import { WorkspaceField } from '../WorkspaceField'
 import { TextField } from '../fields/TextField'
 import type { WorkspaceMode } from '../types'
+import type { FieldErrors } from '../../../../lib/validation'
 
 type ContactSectionProps = {
   venue: Venue
   mode: WorkspaceMode
   onFieldChange: <K extends keyof Venue>(field: K, value: Venue[K]) => void
+  errors?: FieldErrors
 }
 
 function ExternalLink({ href }: { href: string }) {
@@ -19,7 +21,7 @@ function ExternalLink({ href }: { href: string }) {
   )
 }
 
-export function ContactSection({ venue, mode, onFieldChange }: ContactSectionProps) {
+export function ContactSection({ venue, mode, onFieldChange, errors = {} }: ContactSectionProps) {
   return (
     <WorkspaceSection title="Contact" icon={Phone}>
       <dl className="grid grid-cols-2 gap-4">
@@ -48,6 +50,7 @@ export function ContactSection({ venue, mode, onFieldChange }: ContactSectionPro
               type="url"
               value={venue.website ?? ''}
               onChange={(v) => onFieldChange('website', v)}
+              error={errors.website}
             />
             <TextField
               label="Instagram"
