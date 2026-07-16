@@ -2,7 +2,7 @@
 
 ## Status
 
-Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration (Sprint 3), but not yet applied to any real database.
+Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration, applied and verified against a real Supabase database (Sprint 3), with a seed and three read-only smoke-test endpoints (Sprint 4). The frontend shell — SahelSpot Studio — exists as of Sprint 5: application shell, routing, and page structure only, not connected to the API.
 
 ## Known deviations
 
@@ -20,15 +20,15 @@ These principles govern every architectural decision in this project:
 
 ## Technology stack
 
-### Frontend — DataLab Next (`datalab-next/`)
+### Frontend — SahelSpot Studio (`datalab-next/`)
 
 - **React** — UI library.
 - **Vite** — build tool and dev server.
 - **TypeScript** — static typing.
 - **Tailwind CSS** — styling.
 - **React Router** — client-side routing.
-- **React Hook Form** — form state and validation.
-- **TanStack Query** — server-state management / data fetching.
+- **React Hook Form** — form state and validation. Not yet installed — no forms exist yet (Sprint 5 is shell-only).
+- **TanStack Query** — server-state management / data fetching. Wired up (`QueryClientProvider`) but unused — no API connection yet.
 - **Lucide Icons** — icon set.
 
 ### Backend — API (`api/`)
@@ -67,11 +67,31 @@ sahelspot-platform/
 │           ├── router.py    # aggregates route modules
 │           └── routes/
 │               └── system.py  # GET / and GET /health
-├── datalab-next/            # Frontend — React / Vite / TypeScript (not yet started)
+├── datalab-next/            # Frontend — SahelSpot Studio — React / Vite / TypeScript / Tailwind
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.ts       # Vite + Tailwind v4 plugin
+│   └── src/
+│       ├── main.tsx          # QueryClientProvider + BrowserRouter + App
+│       ├── App.tsx            # route definitions
+│       ├── config/
+│       │   └── navigation.ts   # sidebar item list (path, label, icon) — shared by Sidebar + Header
+│       ├── layouts/
+│       │   └── AppShell.tsx    # Sidebar + Header + <Outlet />
+│       ├── components/
+│       │   ├── Sidebar.tsx
+│       │   ├── Header.tsx
+│       │   └── PagePlaceholder.tsx
+│       └── pages/
+│           ├── Dashboard.tsx    # welcome page
+│           ├── Venues.tsx
+│           ├── Destinations.tsx
+│           ├── Publishing.tsx
+│           └── Settings.tsx
 └── docs/                    # Project documentation
 ```
 
-`datalab-next/` contains no application code, dependencies, or scaffolding yet — the stack is decided, but frontend implementation has not started. `api/` has app startup, config, logging, a Supabase/PostgreSQL connection, two endpoints (`/` and `/health`), and the full data model (Sprint 3) as SQLAlchemy models plus a first migration — not yet applied to a real database. No CRUD endpoints, business logic, or authentication exist yet.
+`datalab-next/` (Sprint 5) has the application shell — sidebar, header, routing between five pages — with no API connection, no forms, no auth, and no business logic yet. `api/` has app startup, config, logging, a live Supabase/PostgreSQL connection, a migrated and verified data model (Sprint 3), and three read-only smoke-test endpoints reading directly from the draft tables (Sprint 4) — not yet the final public API (see [Publishing architecture](#publishing-architecture) below).
 
 ## Publishing architecture
 

@@ -58,3 +58,12 @@ This roadmap tracks sprints as they happen. Each entry is added when a sprint co
 - Implemented three read-only endpoints — `GET /destinations`, `GET /venues`, `GET /venues/{venue_id}` — backed by a new SQLAlchemy session dependency (`app/db/session.get_db`) and Pydantic response schemas (`app/api/schemas.py`). No POST/PATCH/DELETE, no auth, no Studio UI, per instruction.
 - Verified the full chain end-to-end against the real Supabase database: seed → SQLAlchemy → FastAPI → Swagger UI ("Try it out", not just curl) → JSON response, for all three endpoints, including a 404 case for an unknown venue id.
 - **Architecture note, flagged not resolved**: these endpoints read directly from the draft `destinations`/`venues` tables, not from `publish_revisions`. That's correct for this sprint's purpose (a plumbing smoke test) but is explicitly *not* the final public API contract described in `ARCHITECTURE.md` — the real public read path (bound to the current publish revision) still needs to be built once publish/rollback endpoints exist.
+
+## Sprint 5 — Studio Foundation ✅
+
+- Scaffolded the frontend in `datalab-next/` (reserved for it since Sprint 0.5) using Vite's React + TypeScript template, then added React Router, TanStack Query, Lucide Icons, and Tailwind CSS v4 (via `@tailwindcss/vite`, no separate PostCSS config needed).
+- Named/branded the app **SahelSpot Studio** — the editorial tool implied by the draft → publish architecture (`ARCHITECTURE.md#publishing-architecture`). Updated `PRODUCT.md` and `ARCHITECTURE.md` to reflect this; previously those referred to the frontend generically as "DataLab Next."
+- Built the shell: `AppShell` layout (`Sidebar` + `Header` + routed content area), five routes (Dashboard, Venues, Destinations, Publishing, Settings) wired through React Router, a shared `navigation.ts` config so the sidebar and header title don't duplicate the route list, and a shared `PagePlaceholder` component for the four not-yet-built sections. Dashboard shows a real welcome page; the rest show a minimal "coming soon" state.
+- `QueryClientProvider` is wired up in `main.tsx` per the required stack, but nothing queries anything yet — no API connection.
+- Verified in-browser: production build succeeds, dev server runs, all five sidebar links navigate correctly with the right page rendering, active-state highlighting, and header title, and lint is clean. No console errors.
+- No business features, no CRUD, no forms, no authentication, no API connection — shell and routing only, per instruction.

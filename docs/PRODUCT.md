@@ -4,7 +4,7 @@
 
 SahelSpot Platform is a new, modern platform being built to eventually replace the current SahelSpot DataLab. It is being developed independently, from a clean foundation, with no shared code or infrastructure with any existing system.
 
-The frontend application is named **DataLab Next**.
+The frontend application (housed in `datalab-next/`) is the editorial/admin tool where content is created, reviewed, and published — as of Sprint 5 it's branded and referred to as **SahelSpot Studio**.
 
 ## Why
 
