@@ -23,7 +23,15 @@ alembic upgrade head --sql  # preview the SQL without connecting to a database
 alembic downgrade -1        # roll back the last migration
 ```
 
-The first migration (`alembic/versions/0001_initial_schema.py`) creates the three tables described in [`../docs/DATABASE.md`](../docs/DATABASE.md): `destinations`, `venues`, `publish_revisions`. It hasn't been applied to any real database yet — that needs a live Supabase `DATABASE_URL` in `.env`.
+The first migration (`alembic/versions/0001_initial_schema.py`) creates the three tables described in [`../docs/DATABASE.md`](../docs/DATABASE.md): `destinations`, `venues`, `publish_revisions`. Applied and verified against a real Supabase database as of Sprint 3.
+
+## Seed data
+
+```bash
+python -m scripts.seed
+```
+
+Inserts one destination (`marassi`) and one venue (`v00001` — The Smokery), for local/smoke testing. Safe to re-run — uses `session.merge()` (insert-or-update by primary key), not a plain insert.
 
 ## Run
 
@@ -35,10 +43,15 @@ uvicorn app.main:app --reload
 - Swagger UI: http://127.0.0.1:8000/docs
 - ReDoc: http://127.0.0.1:8000/redoc
 
-## Endpoints (Sprint 1)
+## Endpoints
 
 - `GET /` — API name and version.
 - `GET /health` — `{"status": "ok", "database": "connected"}`, or a `503` if the database is unreachable.
+- `GET /destinations` — list all destinations, read directly from the `destinations` table.
+- `GET /venues` — list all venues, read directly from the `venues` table.
+- `GET /venues/{venue_id}` — a single venue by id, or `404`.
+
+**Note**: the three business endpoints above read straight from the draft/editorial tables — they're a Sprint 4 smoke test proving the DB → API → Swagger → JSON pipeline end-to-end, not the final public API. Per [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md#publishing-architecture), the real public API will read only from `publish_revisions` once the publish/rollback endpoints exist — that hasn't been built yet.
 
 ## Note on Python version
 
