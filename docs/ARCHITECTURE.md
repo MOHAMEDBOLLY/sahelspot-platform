@@ -2,7 +2,7 @@
 
 ## Status
 
-Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration, applied and verified against a real Supabase database (Sprint 3), with a seed and three read-only smoke-test endpoints (Sprint 4). The frontend — SahelSpot Studio — has an application shell (Sprint 5), a Venues list reading live from the API (Sprint 6), and a two-panel Venue Workspace showing full detail alongside the list (Sprint 7), reading an enriched API contract (Sprint 8) that resolves `destination_id` into `destination: {id, name}` so the frontend never resolves an id itself. As of Sprint 9, the Workspace has an Edit Mode: most fields become inputs, held entirely in local React state, discarded on Cancel. Sprint 10 adds draft/dirty-state management on top — an unsaved-changes indicator, a confirmation before discarding an edit to switch venues, and a browser-refresh warning while dirty — built as a generic hook (`useDraft`) rather than Venue-specific state, since it's meant to be the foundation Save and Publish build on later. Still no API mutation exists — this is UI architecture only, not a working editor.
+Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration, applied and verified against a real Supabase database (Sprint 3), with a seed and three read-only smoke-test endpoints (Sprint 4). The frontend — SahelSpot Studio — has an application shell (Sprint 5), a Venues list reading live from the API (Sprint 6), and a two-panel Venue Workspace showing full detail alongside the list (Sprint 7), reading an enriched API contract (Sprint 8) that resolves `destination_id` into `destination: {id, name}` so the frontend never resolves an id itself. As of Sprint 9, the Workspace has an Edit Mode: most fields become inputs, held entirely in local React state, discarded on Cancel. Sprint 10 adds draft/dirty-state management on top — an unsaved-changes indicator, a confirmation before discarding an edit to switch venues, and a browser-refresh warning while dirty — built as a generic hook (`useDraft`) rather than Venue-specific state, since it's meant to be the foundation Save and Publish build on later. Sprint 10.5 is a milestone architecture review and cleanup pass (stale docs, duplicated constants, dirty-check correctness) before the Write Phase begins — still no API mutation exists.
 
 ## Known deviations
 
@@ -27,8 +27,8 @@ These principles govern every architectural decision in this project:
 - **TypeScript** — static typing.
 - **Tailwind CSS** — styling.
 - **React Router** — client-side routing.
-- **React Hook Form** — form state and validation. Not yet installed — no forms exist yet (Sprint 5 is shell-only).
-- **TanStack Query** — server-state management / data fetching. Wired up (`QueryClientProvider`) but unused — no API connection yet.
+- **React Hook Form** — form state and validation. Still not installed as of Sprint 10.5 — Edit Mode (Sprint 9) uses plain controlled inputs, not this library. Whether the eventual Save form adopts it or continues the current pattern is an open decision for the Write Phase, not made by default.
+- **TanStack Query** — server-state management / data fetching. In active use since Sprint 6 (`useVenues`, `useVenue`) for all API reads.
 - **Lucide Icons** — icon set.
 
 ### Backend — API (`api/`)
@@ -98,7 +98,7 @@ sahelspot-platform/
 │       │           ├── WorkspaceToolbar.tsx    # Edit / Cancel + unsaved-changes indicator
 │       │           ├── WorkspaceSection.tsx    # shared section card chrome
 │       │           ├── WorkspaceField.tsx       # view-mode label/value row with placeholder
-│       │           ├── fields/                   # edit-mode input atoms: TextField, TextAreaField, SelectField, CheckboxField
+│       │           ├── fields/                   # edit-mode input atoms: FieldLabel (shared), TextField, TextAreaField, SelectField, CheckboxField
 │       │           └── sections/                # Basic Info, Location, Contact, Opening Hours, Images, Publishing Status
 │       ├── components/
 │       │   ├── Sidebar.tsx

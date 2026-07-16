@@ -18,17 +18,28 @@ export function useDraft<T>(original: T | undefined, resetKey: unknown) {
   const [mode, setMode] = useState<DraftMode>('view')
   const [draft, setDraft] = useState<T | null>(null)
 
+  // The value editing started from, frozen at the moment Edit was clicked.
+  // Dirty-checking compares against this, not the live `original` — if the
+  // underlying query refetches while someone is mid-edit (e.g. on window
+  // refocus), that must not silently change what "dirty" means partway
+  // through an edit session. This is also the natural baseline a future
+  // conflict check ("did someone else change this while I was editing?")
+  // would compare against the latest `original` — a different comparison
+  // than dirty-checking, and one this snapshot already sets up for.
+  const [baseline, setBaseline] = useState<T | null>(null)
+
   // A different entity was selected (e.g. a different venue) — any
   // in-progress draft belongs to the old one, so drop it.
   useEffect(() => {
     setMode('view')
     setDraft(null)
+    setBaseline(null)
   }, [resetKey])
 
   const isDirty = useMemo(() => {
-    if (mode !== 'edit' || draft === null || original === undefined) return false
-    return JSON.stringify(draft) !== JSON.stringify(original)
-  }, [mode, draft, original])
+    if (mode !== 'edit' || draft === null || baseline === null) return false
+    return JSON.stringify(draft) !== JSON.stringify(baseline)
+  }, [mode, draft, baseline])
 
   // Standard beforeunload pattern: browsers show their own generic prompt
   // (the custom message text is ignored everywhere modern), but calling
@@ -48,11 +59,13 @@ export function useDraft<T>(original: T | undefined, resetKey: unknown) {
   function startEditing() {
     if (original === undefined) return
     setDraft(original)
+    setBaseline(original)
     setMode('edit')
   }
 
   function cancelEditing() {
     setDraft(null)
+    setBaseline(null)
     setMode('view')
   }
 

@@ -4,7 +4,7 @@ The editorial/admin frontend for SahelSpot Platform — where content is edited,
 
 ## Status
 
-**Shell + Venue Workspace** (Sprint 7), reading an enriched API contract (Sprint 8), with **Edit Mode** (Sprint 9) and **draft/dirty-state management** (Sprint 10): the workspace knows when it has unsaved changes, shows an indicator, confirms before discarding them (venue switch), and warns on browser refresh/close. Still no API mutations, no PATCH, no validation, no autosave, no authentication. State only ever exists in React; Cancel discards it completely.
+**Shell + Venue Workspace** (Sprint 7), reading an enriched API contract (Sprint 8), with **Edit Mode** (Sprint 9) and **draft/dirty-state management** (Sprint 10): the workspace knows when it has unsaved changes, shows an indicator, confirms before discarding them (venue switch), and warns on browser refresh/close. Sprint 10.5 was an architecture cleanup pass (no behavior change) before the Write Phase begins. Still no API mutations, no PATCH, no validation, no autosave, no authentication. State only ever exists in React; Cancel discards it completely.
 
 ## Stack
 
@@ -57,10 +57,11 @@ src/
 │           ├── WorkspaceField.tsx     # view-mode "label / value" row, with placeholder
 │           ├── types.ts               # WorkspaceMode = 'view' | 'edit'
 │           ├── fields/                # edit-mode input atoms — each does exactly one control type
+│           │   ├── FieldLabel.tsx       # shared label wrapper + base input className
 │           │   ├── TextField.tsx        # text / url / tel
 │           │   ├── TextAreaField.tsx
 │           │   ├── SelectField.tsx
-│           │   └── CheckboxField.tsx
+│           │   └── CheckboxField.tsx    # different layout (inline), doesn't use FieldLabel
 │           └── sections/
 │               ├── BasicInfoSection.tsx     # editable: Name, Category, District, Featured, Verified, Short Description
 │               ├── LocationSection.tsx      # editable: Latitude, Longitude, Maps Link
@@ -91,4 +92,5 @@ src/
 - TanStack Query's `networkMode: 'always'` is set globally in `main.tsx` — the default `'online'` mode can leave a query stuck in a "paused" state (indistinguishable from loading) when the browser's connectivity/visibility signals are unreliable, which is worth knowing if a query ever seems to hang without erring.
 - `useVenue(id)` seeds its `initialData` from the already-fetched `['venues']` list cache, since `GET /venues` returns full venue objects (same shape as `GET /venues/{id}`). Selecting a venue already visible in the list renders instantly with no extra network round trip.
 - **Edit Mode (Sprint 9)**: view/edit mode and a draft copy of the venue, created only when Edit is clicked. Cancel drops the draft and returns to view — nothing is ever sent to the API. Not every field is editable: `Destination` (needs a real picker, i.e. an API call — deferred), `Slug` (structural/URL identity, needs its own validation later), and `Status`/timestamps/`Source` in Publishing Status (system- or workflow-managed, not generic text) stay read-only in both modes. Opening Hours and Images are view-only in both modes — they need dedicated editors (a time-range picker, an upload UI), not a text input.
-- **Draft state management (Sprint 10)**: `useDraft<T>` (`hooks/useDraft.ts`) is a generic, entity-agnostic hook — not specific to venues — holding `mode`, `draft`, and a derived `isDirty` (`JSON.stringify(draft) !== JSON.stringify(original)`). `VenueWorkspace` uses it and reports `isDirty` up to `Venues.tsx` via a plain `onDirtyChange` callback, since "should switching venues ask for confirmation" is a page-level concern that spans the list and the workspace, not something either owns alone. The hook also self-registers a `beforeunload` listener while dirty, so any future entity workspace built on `useDraft` gets refresh protection for free without remembering to wire it up. Route-level navigation (e.g. clicking Destinations in the sidebar while a venue edit is dirty) is **not** guarded — only same-page venue switching and browser refresh/close, per this sprint's explicit scope.
+- **Draft state management (Sprint 10)**: `useDraft<T>` (`hooks/useDraft.ts`) is a generic, entity-agnostic hook — not specific to venues — holding `mode`, `draft`, and a derived `isDirty`. `VenueWorkspace` uses it and reports `isDirty` up to `Venues.tsx` via a plain `onDirtyChange` callback, since "should switching venues ask for confirmation" is a page-level concern that spans the list and the workspace, not something either owns alone. The hook also self-registers a `beforeunload` listener while dirty, so any future entity workspace built on `useDraft` gets refresh protection for free without remembering to wire it up. Route-level navigation (e.g. clicking Destinations in the sidebar while a venue edit is dirty) is **not** guarded — only same-page venue switching and browser refresh/close, per this sprint's explicit scope.
+- **Architecture cleanup (Sprint 10.5)**: `isDirty` now compares `draft` against a `baseline` snapshot frozen at the moment Edit was clicked, not the live `original` — if the underlying query refetches mid-edit (e.g. on window refocus), that can no longer silently change what "dirty" means partway through an edit session. Also extracted `FieldLabel` (label markup + base input styling) out of `TextField`/`TextAreaField`/`SelectField`, which previously repeated it three times.

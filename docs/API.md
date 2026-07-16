@@ -2,23 +2,23 @@
 
 ## Status
 
-Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. The API foundation exists as of Sprint 1: app startup, config, logging, a Supabase/PostgreSQL connection, and two system endpoints. No business logic, models, or CRUD endpoints exist yet.
+Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. Still read-only — no write endpoints (POST/PATCH/DELETE) exist yet; that's the upcoming Write Phase.
 
 ## Stack
 
 - **Python 3.12**
 - **FastAPI** — web framework serving the API.
 - **SQLAlchemy 2** — ORM / database toolkit.
-- **Alembic** — database migrations (not yet initialized — no models to migrate yet).
+- **Alembic** — database migrations. Initialized as of Sprint 3; the first migration (`0001_initial_schema`) is applied and verified against a real Supabase database.
 - **Database**: Supabase (PostgreSQL) — see [`DATABASE.md`](DATABASE.md).
 
 Interactive docs (Swagger UI) are available at `/docs`, ReDoc at `/redoc`, generated automatically by FastAPI.
 
-## Endpoints (Sprint 1)
+## Endpoints
 
 ### `GET /`
 
-Returns API name and version.
+Returns API name and version. Added Sprint 1.
 
 ```json
 {
@@ -29,7 +29,7 @@ Returns API name and version.
 
 ### `GET /health`
 
-Returns database connectivity status.
+Returns database connectivity status. Added Sprint 1.
 
 ```json
 {

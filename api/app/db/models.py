@@ -21,8 +21,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
-DESTINATION_STATUSES = ("draft", "review", "approved", "archived")
-VENUE_STATUSES = ("draft", "review", "approved", "archived")
+# Shared by destinations and venues alike — see docs/DATABASE.md's "Editorial
+# status" decision: this is deliberately one vocabulary, not two that happen
+# to match today. Keeping a single constant makes that impossible to miss.
+CONTENT_STATUSES = ("draft", "review", "approved", "archived")
 VENUE_CATEGORIES = (
     "Restaurant",
     "Cafe",
@@ -41,7 +43,7 @@ class Destination(Base):
 
     __tablename__ = "destinations"
     __table_args__ = (
-        CheckConstraint(f"status IN {DESTINATION_STATUSES}", name="ck_destinations_status"),
+        CheckConstraint(f"status IN {CONTENT_STATUSES}", name="ck_destinations_status"),
     )
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
@@ -67,7 +69,7 @@ class Venue(Base):
 
     __tablename__ = "venues"
     __table_args__ = (
-        CheckConstraint(f"status IN {VENUE_STATUSES}", name="ck_venues_status"),
+        CheckConstraint(f"status IN {CONTENT_STATUSES}", name="ck_venues_status"),
         CheckConstraint(f"category IN {VENUE_CATEGORIES}", name="ck_venues_category"),
         UniqueConstraint("destination_id", "slug", name="uq_venues_destination_id_slug"),
     )
