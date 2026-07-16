@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from app.db.models import VENUE_CATEGORIES, Venue
 
-from .schemas import FieldError, ValidationResult
+from .schemas import FieldError, ValidationResult, build_validation_result
 
 # The observed range of all current venue coordinates (see docs/DATABASE.md's
 # "Validation rules" section) — a sanity bound, not a hard DB constraint,
@@ -12,11 +12,15 @@ LONGITUDE_RANGE = (Decimal("28.6"), Decimal("29.4"))
 
 
 def validate_venue(venue: Venue) -> ValidationResult:
-    """The canonical "Validate" gate described in docs/DATABASE.md — required
-    fields present, category in the documented set, coordinates in range.
-    Business rules live here and only here; nothing on the frontend
-    duplicates this logic, it only mirrors the *shape* of the check for
-    instant UX feedback.
+    """The canonical Editorial Readiness check described in docs/DATABASE.md
+    — required fields present, category in the documented set, coordinates
+    in range. Business rules live here and only here; nothing on the
+    frontend duplicates this logic, it only mirrors the *shape* of the
+    check for instant UX feedback.
+
+    Still error-rules only as of Sprint 13 — no warnings/info producers
+    exist yet, but the result they'd feed into (`build_validation_result`)
+    is already in place.
     """
     errors: list[FieldError] = []
 
@@ -47,4 +51,6 @@ def validate_venue(venue: Venue) -> ValidationResult:
             )
         )
 
-    return ValidationResult(valid=len(errors) == 0, errors=errors)
+    # Sprint 13: no warnings/info rules exist yet — errors alone still decide
+    # validity and readiness (build_validation_result derives both).
+    return build_validation_result(errors)

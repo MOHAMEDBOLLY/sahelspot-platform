@@ -2,7 +2,7 @@
 
 ## Status
 
-Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. Sprint 11 added the first write endpoint, `PATCH /venues/{venue_id}` (Save Draft) — no validation, no status transition. Sprint 12 adds the "Validate" gate itself: `POST /venues/{venue_id}/validate`, a read-only canonical check the frontend cannot bypass or duplicate. Publish and revisioning are still not implemented.
+Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. Sprint 11 added the first write endpoint, `PATCH /venues/{venue_id}` (Save Draft) — no validation, no status transition. Sprint 12 adds the "Validate" gate itself: `POST /venues/{venue_id}/validate`, a read-only canonical check the frontend cannot bypass or duplicate. Sprint 13 evolves that same endpoint's response into an **Editorial Readiness** model (`valid`, `ready_for_review`, `errors`, `warnings`, `info`) — same endpoint, additive response shape, still no status transition. Review, Publish, and revisioning are still not implemented.
 
 ## Stack
 
@@ -96,28 +96,41 @@ Deliberately unchanged in Sprint 12: this endpoint still performs no business-ru
 
 ### `POST /venues/{venue_id}/validate`
 
-Added Sprint 12 — the **Validate** gate described in [`DATABASE.md`](DATABASE.md#editorial-status-one-shared-vocabulary-renamed-to-avoid-colliding-with-the-new-meaning-of-publish): the application-level check a row must pass before it can move from `draft` to `review`. Read-only — it reports whether the venue *would* pass, it doesn't move `status` itself (Review isn't built yet). `404` if the venue doesn't exist.
+Added Sprint 12 as the **Validate** gate described in [`DATABASE.md`](DATABASE.md#editorial-status-one-shared-vocabulary-renamed-to-avoid-colliding-with-the-new-meaning-of-publish); as of Sprint 13, its response is framed as an **Editorial Readiness** check — see [Editorial Readiness](#editorial-readiness-sprint-13) below for why that's a distinct concept from Review itself. Endpoint and request/response shape are unchanged from Sprint 12 in every way except the response body growing new fields — same route, same "no body, checks the persisted row" semantics, same `404` on an unknown id.
 
-Runs against the venue's **currently persisted** row, not a request body — there's nothing to submit, since Validate checks what's already saved (run Save Draft first if there are unsaved edits).
+Runs against the venue's **currently persisted** row, not a request body — there's nothing to submit, since it checks what's already saved (run Save Draft first if there are unsaved edits).
 
-Response (`ValidationResult`, from the new `app/validation/` package — a shape meant to be reused by every future entity's validator, not just venues):
+Response (`ValidationResult`, from `app/validation/schemas.py` — a shape meant to be reused by every future entity's readiness check, not just venues):
 
 ```json
 {
   "valid": false,
+  "ready_for_review": false,
   "errors": [
     { "field": "latitude", "message": "Latitude must be between 30.6 and 31.1." }
-  ]
+  ],
+  "warnings": [],
+  "info": []
 }
 ```
 
-`valid: true` implies an empty `errors` array. This is the **canonical** validation — the backend's business rules, and the only place they're enforced:
-
-- `name` non-blank.
-- `category` one of the documented `VENUE_CATEGORIES` (already DB-enforced by a `CHECK` constraint at write time, but re-checked here too so a bad value produces this structured response instead of a raw constraint-violation error).
-- `latitude`/`longitude`, when present, within the observed North Coast range (`[30.6, 31.1]` / `[28.6, 29.4]`) — a sanity bound per `DATABASE.md`, not a DB constraint, which is exactly why it's enforced in application code rather than a `CHECK`.
+- `errors` — unchanged from Sprint 12: the canonical business rules, and the only place they're enforced:
+  - `name` non-blank.
+  - `category` one of the documented `VENUE_CATEGORIES` (already DB-enforced by a `CHECK` constraint at write time, but re-checked here too so a bad value produces this structured response instead of a raw constraint-violation error).
+  - `latitude`/`longitude`, when present, within the observed North Coast range (`[30.6, 31.1]` / `[28.6, 29.4]`) — a sanity bound per `DATABASE.md`, not a DB constraint, which is exactly why it's enforced in application code rather than a `CHECK`.
+- `valid` — `true` iff `errors` is empty. Unchanged meaning from Sprint 12.
+- `ready_for_review` — as of Sprint 13, derived from `errors`/`warnings` by a single shared function, `build_validation_result()` (`app/validation/schemas.py`), rather than duplicated per entity. Currently identical to `valid` (no warning yet blocks readiness — deliberately, per this sprint's "don't invent business rules" instruction), but it's the field Review will actually consume later, not `valid` — see below.
+- `warnings` / `info` — new, additive extension points. Always empty today; no rule produces them yet. Same `FieldError {field, message}` shape as `errors`. Once a real warning-producing rule exists (e.g. "no cover image set" — informational, not blocking), it appends here without touching `errors` or the response shape.
 
 The frontend's Edit Mode runs its own lightweight checks (required-ness, character limits, URL/number format) for instant typing feedback and to gate the Save Draft button — see `datalab-next/src/lib/validation.ts` and `features/venues/venueValidation.ts`. Those are UX conveniences only; they never re-implement the rules above, and the backend never trusts them — every rule that decides whether a venue is actually fit to publish is checked here and only here.
+
+#### Editorial Readiness (Sprint 13)
+
+**Why Editorial Readiness is separate from Review.** Review (not yet built) is a *stateful transition*: a human decision that moves `venues.status` from `draft` to `review`, recorded in the database. Editorial Readiness is a *stateless question*: "if someone tried to move this row into Review right now, would it qualify?" Keeping them separate means a user (or a future automated check) can ask that question as many times as they want, at any point, with zero side effects — exactly what `POST /venues/{id}/validate` already does. Collapsing them into one endpoint would mean either every readiness check risks mutating `status` (dangerous — validation should never be a side-effecting action) or Review would need its own separate validation logic (duplicating the rules in `validate_venue()`). Keeping Editorial Readiness as its own concept means Review, whenever it's built, can *require* `ready_for_review: true` as a precondition without owning any of the rule logic itself.
+
+**How Review will later consume this state.** Review's implementation (not yet built) is expected to call this same endpoint's underlying `validate_venue()` (or the HTTP endpoint itself) as a precondition check before allowing the `draft → review` transition — reject the transition with a 4xx and the same `errors` list if `ready_for_review` is `false`, proceed if `true`. No new validation logic gets written for Review; it consumes the existing `ValidationResult`, which is the entire reason this sprint extended the response shape instead of building a parallel one.
+
+**How Publish will later depend on Review.** Per [`DATABASE.md`](DATABASE.md#editorial-status-one-shared-vocabulary-renamed-to-avoid-colliding-with-the-new-meaning-of-publish), only rows with `status = approved` are eligible for the next Publish snapshot, and `approved` is only reachable by passing through `review` first (`draft → review → approved`). So Publish's eventual eligibility check is transitively gated by this sprint's work: a row can't be `approved` without having passed Review, and Review (once built) won't allow the transition without `ready_for_review: true` from this endpoint. Editorial Readiness is therefore the first link in that chain, not a parallel or optional one.
 
 ## Response model enrichment (Sprint 8)
 
