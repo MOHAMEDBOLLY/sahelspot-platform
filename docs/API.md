@@ -61,6 +61,10 @@ The platform is **not live-edit** — see [`PRODUCT.md`](PRODUCT.md#content--pub
 
 None of this is designed at the request/response level yet — routes, payload shapes, and auth are all open. This section exists so the *shape* of the API (public vs. editorial, and that Publish/Rollback are real actions, not implicit side effects) is decided before the endpoints themselves are.
 
+## CORS
+
+As of Sprint 6, `GET` requests are allowed from the Studio dev origins (`http://localhost:5173`, `http://127.0.0.1:5173`) so the browser-based frontend can call this API directly — see `api/app/main.py`. Local dev only; revisit once Studio has a real deployed URL.
+
 ## Open decisions
 
 - API style and endpoint conventions beyond the Sprint 1 foundation — not yet designed; FastAPI's built-in OpenAPI/REST conventions are the likely default.

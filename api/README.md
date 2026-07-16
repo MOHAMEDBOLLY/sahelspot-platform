@@ -53,6 +53,10 @@ uvicorn app.main:app --reload
 
 **Note**: the three business endpoints above read straight from the draft/editorial tables — they're a Sprint 4 smoke test proving the DB → API → Swagger → JSON pipeline end-to-end, not the final public API. Per [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md#publishing-architecture), the real public API will read only from `publish_revisions` once the publish/rollback endpoints exist — that hasn't been built yet.
 
+## CORS
+
+`app/main.py` allows cross-origin `GET` requests from the Studio dev server (`http://localhost:5173`, `http://127.0.0.1:5173`) so the browser-based frontend can call this API directly. Local dev origins only for now — revisit when Studio has a real deployed URL.
+
 ## Note on Python version
 
 The finalized stack specifies Python 3.12. This machine currently has 3.11/3.13/3.14 available and Homebrew cannot install 3.12 without a permissions fix. Per project decision, development is proceeding on **3.13** temporarily; this is tracked as a known deviation in [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) and [`../docs/ROADMAP.md`](../docs/ROADMAP.md) until standardized.

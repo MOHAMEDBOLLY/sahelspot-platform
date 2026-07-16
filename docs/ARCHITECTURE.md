@@ -2,7 +2,7 @@
 
 ## Status
 
-Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration, applied and verified against a real Supabase database (Sprint 3), with a seed and three read-only smoke-test endpoints (Sprint 4). The frontend shell — SahelSpot Studio — exists as of Sprint 5: application shell, routing, and page structure only, not connected to the API.
+Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration, applied and verified against a real Supabase database (Sprint 3), with a seed and three read-only smoke-test endpoints (Sprint 4). The frontend — SahelSpot Studio — has an application shell (Sprint 5) and, as of Sprint 6, its first real feature: a Venues list reading live from the API (`GET /venues`), with loading/error/empty states. CORS is now configured on the API to allow the Studio dev origin.
 
 ## Known deviations
 
@@ -78,20 +78,32 @@ sahelspot-platform/
 │       │   └── navigation.ts   # sidebar item list (path, label, icon) — shared by Sidebar + Header
 │       ├── layouts/
 │       │   └── AppShell.tsx    # Sidebar + Header + <Outlet />
+│       ├── lib/
+│       │   └── apiClient.ts     # fetch wrapper — only place that talks HTTP to the API
+│       ├── types/
+│       │   └── venue.ts          # Venue TypeScript type
+│       ├── features/
+│       │   └── venues/
+│       │       ├── api.ts           # fetchVenues()
+│       │       ├── useVenues.ts     # TanStack Query hook
+│       │       └── VenueTable.tsx   # renders a list of venues
 │       ├── components/
 │       │   ├── Sidebar.tsx
 │       │   ├── Header.tsx
-│       │   └── PagePlaceholder.tsx
+│       │   ├── PagePlaceholder.tsx  # shared "not built"/empty state
+│       │   ├── LoadingState.tsx
+│       │   ├── ErrorState.tsx        # includes a retry action
+│       │   └── StatusBadge.tsx
 │       └── pages/
 │           ├── Dashboard.tsx    # welcome page
-│           ├── Venues.tsx
+│           ├── Venues.tsx        # live data: loading / error / empty / table states
 │           ├── Destinations.tsx
 │           ├── Publishing.tsx
 │           └── Settings.tsx
 └── docs/                    # Project documentation
 ```
 
-`datalab-next/` (Sprint 5) has the application shell — sidebar, header, routing between five pages — with no API connection, no forms, no auth, and no business logic yet. `api/` has app startup, config, logging, a live Supabase/PostgreSQL connection, a migrated and verified data model (Sprint 3), and three read-only smoke-test endpoints reading directly from the draft tables (Sprint 4) — not yet the final public API (see [Publishing architecture](#publishing-architecture) below).
+`datalab-next/` has the application shell (Sprint 5) plus its first live feature (Sprint 6): a read-only Venues list fetched via TanStack Query from `GET /venues`. No editing, forms, or auth yet. `api/` has app startup, config, logging, a live Supabase/PostgreSQL connection, a migrated and verified data model (Sprint 3), three read-only smoke-test endpoints reading directly from the draft tables (Sprint 4), and now CORS configured for the Studio dev origin (Sprint 6) — the endpoints themselves are still not the final public API (see [Publishing architecture](#publishing-architecture) below).
 
 ## Publishing architecture
 
