@@ -62,3 +62,28 @@ class VenueOut(BaseModel):
     last_published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class VenueUpdate(BaseModel):
+    """Save Draft payload — the fields Edit Mode currently exposes as editable
+    (see datalab-next Sprint 9/10 sections). Everything else on a venue
+    (id, slug, destination, status, timestamps, ...) is structural or
+    workflow-controlled and isn't part of this write path.
+    """
+
+    name: str | None = None
+    category: str | None = None
+    district: str | None = None
+    is_featured: bool | None = None
+    is_verified: bool | None = None
+    short_description: str | None = None
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
+    maps_url: str | None = None
+    phone: str | None = None
+    whatsapp: str | None = None
+    website: str | None = None
+    instagram_handle: str | None = None
+    facebook_handle: str | None = None
+    tiktok_handle: str | None = None
+    internal_notes: str | None = None

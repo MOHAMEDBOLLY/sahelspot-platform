@@ -2,7 +2,7 @@
 
 ## Status
 
-Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration, applied and verified against a real Supabase database (Sprint 3), with a seed and three read-only smoke-test endpoints (Sprint 4). The frontend — SahelSpot Studio — has an application shell (Sprint 5), a Venues list reading live from the API (Sprint 6), and a two-panel Venue Workspace showing full detail alongside the list (Sprint 7), reading an enriched API contract (Sprint 8) that resolves `destination_id` into `destination: {id, name}` so the frontend never resolves an id itself. As of Sprint 9, the Workspace has an Edit Mode: most fields become inputs, held entirely in local React state, discarded on Cancel. Sprint 10 adds draft/dirty-state management on top — an unsaved-changes indicator, a confirmation before discarding an edit to switch venues, and a browser-refresh warning while dirty — built as a generic hook (`useDraft`) rather than Venue-specific state, since it's meant to be the foundation Save and Publish build on later. Sprint 10.5 is a milestone architecture review and cleanup pass (stale docs, duplicated constants, dirty-check correctness) before the Write Phase begins — still no API mutation exists.
+Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration, applied and verified against a real Supabase database (Sprint 3), with a seed and three read-only smoke-test endpoints (Sprint 4). The frontend — SahelSpot Studio — has an application shell (Sprint 5), a Venues list reading live from the API (Sprint 6), and a two-panel Venue Workspace showing full detail alongside the list (Sprint 7), reading an enriched API contract (Sprint 8) that resolves `destination_id` into `destination: {id, name}` so the frontend never resolves an id itself. As of Sprint 9, the Workspace has an Edit Mode: most fields become inputs, held entirely in local React state, discarded on Cancel. Sprint 10 adds draft/dirty-state management on top — an unsaved-changes indicator, a confirmation before discarding an edit to switch venues, and a browser-refresh warning while dirty — built as a generic hook (`useDraft`) rather than Venue-specific state, since it's meant to be the foundation Save and Publish build on later. Sprint 10.5 is a milestone architecture review and cleanup pass (stale docs, duplicated constants, dirty-check correctness) before the Write Phase begins. Sprint 11 is the first write operation — Save Draft, `PATCH /venues/{venue_id}` — wired through a TanStack Query mutation that writes straight to the draft `venues` row and stays in Edit Mode afterward; still no Publish, validation, or revisioning.
 
 ## Known deviations
 
@@ -82,20 +82,21 @@ sahelspot-platform/
 │       │   ├── apiClient.ts      # fetch wrapper — only place that talks HTTP to the API
 │       │   └── formatDate.ts      # shared display formatting
 │       ├── hooks/
-│       │   └── useDraft.ts        # generic mode/draft/isDirty/beforeunload — not venue-specific
+│       │   └── useDraft.ts        # generic mode/draft/isDirty/beforeunload/commitSave — not venue-specific
 │       ├── types/
 │       │   └── venue.ts          # full Venue type (GET /venues and GET /venues/{id} share this shape)
 │       ├── features/
 │       │   └── venues/
-│       │       ├── api.ts                # fetchVenues(), fetchVenue(id)
+│       │       ├── api.ts                # fetchVenues(), fetchVenue(id), updateVenue(id, patch), toVenuePatch()
 │       │       ├── useVenues.ts          # TanStack Query hook — list
 │       │       ├── useVenue.ts           # TanStack Query hook — single venue, seeded from list cache
+│       │       ├── useUpdateVenue.ts      # TanStack Query mutation — Save Draft (PATCH /venues/{id})
 │       │       ├── venueCategories.ts    # fixed category list, mirrors the API's CHECK constraint
 │       │       ├── VenueList.tsx         # presentational: clickable venue rows
 │       │       ├── VenueListPanel.tsx    # stateful: loading/error/empty + VenueList
 │       │       └── workspace/
-│       │           ├── VenueWorkspace.tsx     # stateful: no-selection/loading/error + useDraft + sections
-│       │           ├── WorkspaceToolbar.tsx    # Edit / Cancel + unsaved-changes indicator
+│       │           ├── VenueWorkspace.tsx     # stateful: no-selection/loading/error + useDraft + useUpdateVenue + sections
+│       │           ├── WorkspaceToolbar.tsx    # Edit / Cancel / Save Draft + unsaved-changes + save-error indicator
 │       │           ├── WorkspaceSection.tsx    # shared section card chrome
 │       │           ├── WorkspaceField.tsx       # view-mode label/value row with placeholder
 │       │           ├── fields/                   # edit-mode input atoms: FieldLabel (shared), TextField, TextAreaField, SelectField, CheckboxField
@@ -116,7 +117,7 @@ sahelspot-platform/
 └── docs/                    # Project documentation
 ```
 
-`datalab-next/` has the application shell (Sprint 5), a Venues list (Sprint 6), a two-panel Venue Workspace (Sprint 7), an Edit Mode toggle on that Workspace (Sprint 9), and, as of Sprint 10, dirty-state awareness on top: an unsaved-changes indicator, a confirmation before discarding an edit to switch venues, and a `beforeunload` warning while dirty. All of it held in local React state only, discarded on Cancel. No API mutation exists to receive it yet. `api/` has app startup, config, logging, a live Supabase/PostgreSQL connection, a migrated and verified data model (Sprint 3), three read-only smoke-test endpoints reading directly from the draft tables and enriched to resolve `destination_id` server-side (Sprint 4, 8), and CORS configured for the Studio dev origin (Sprint 6) — the endpoints themselves are still not the final public API (see [Publishing architecture](#publishing-architecture) below).
+`datalab-next/` has the application shell (Sprint 5), a Venues list (Sprint 6), a two-panel Venue Workspace (Sprint 7), an Edit Mode toggle on that Workspace (Sprint 9), and, as of Sprint 10, dirty-state awareness on top: an unsaved-changes indicator, a confirmation before discarding an edit to switch venues, and a `beforeunload` warning while dirty. As of Sprint 11, a Save Draft button (`useUpdateVenue`, a TanStack Query mutation) sends the draft's editable fields to the API, updates the query cache from the server's response on success, and keeps the workspace in Edit Mode with `isDirty` reset to false — Cancel still discards to the last saved (or original) state, unchanged. `api/` has app startup, config, logging, a live Supabase/PostgreSQL connection, a migrated and verified data model (Sprint 3), three read endpoints reading directly from the draft tables and enriched to resolve `destination_id` server-side (Sprint 4, 8), CORS configured for the Studio dev origin including `PATCH` as of Sprint 11 (Sprint 6, 11), and one write endpoint — `PATCH /venues/{venue_id}` (Sprint 11) — the endpoints themselves are still not the final public API (see [Publishing architecture](#publishing-architecture) below).
 
 ## Publishing architecture
 

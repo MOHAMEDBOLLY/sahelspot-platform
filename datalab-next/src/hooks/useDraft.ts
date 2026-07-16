@@ -69,6 +69,14 @@ export function useDraft<T>(original: T | undefined, resetKey: unknown) {
     setMode('view')
   }
 
+  // Save Draft: the server's response becomes the new baseline, so isDirty
+  // goes back to false — but mode stays 'edit', per the product's "remain in
+  // Edit Mode after Save Draft" requirement (this is not Cancel or Publish).
+  function commitSave(saved: T) {
+    setDraft(saved)
+    setBaseline(saved)
+  }
+
   function updateField<K extends keyof T>(field: K, value: T[K]) {
     setDraft((current) => (current ? { ...current, [field]: value } : current))
   }
@@ -77,5 +85,5 @@ export function useDraft<T>(original: T | undefined, resetKey: unknown) {
   // in-progress draft, which starts as a copy of it.
   const value = mode === 'edit' && draft !== null ? draft : (original ?? null)
 
-  return { mode, value, isDirty, startEditing, cancelEditing, updateField }
+  return { mode, value, isDirty, startEditing, cancelEditing, commitSave, updateField }
 }

@@ -1,6 +1,9 @@
 import { useEffect } from 'react'
 import { MousePointerClick } from 'lucide-react'
 import { useVenue } from '../useVenue'
+import { useUpdateVenue } from '../useUpdateVenue'
+import { toVenuePatch } from '../api'
+import { ApiError } from '../../../lib/apiClient'
 import { useDraft } from '../../../hooks/useDraft'
 import { LoadingState } from '../../../components/LoadingState'
 import { ErrorState } from '../../../components/ErrorState'
@@ -27,12 +30,27 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
     isDirty,
     startEditing,
     cancelEditing,
+    commitSave,
     updateField,
   } = useDraft<Venue>(venue, venueId)
+  const { mutate: saveDraft, isPending: isSaving, error: saveError, reset: resetSaveError } = useUpdateVenue()
 
   useEffect(() => {
     onDirtyChange?.(isDirty)
   }, [isDirty, onDirtyChange])
+
+  function handleCancel() {
+    resetSaveError()
+    cancelEditing()
+  }
+
+  function handleSave() {
+    if (!venueId || !displayedVenue) return
+    saveDraft(
+      { id: venueId, patch: toVenuePatch(displayedVenue) },
+      { onSuccess: commitSave },
+    )
+  }
 
   if (!venueId) {
     return (
@@ -67,8 +85,11 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
         venueName={displayedVenue.name}
         mode={mode}
         isDirty={isDirty}
+        isSaving={isSaving}
+        saveError={saveError instanceof ApiError ? saveError.message : saveError ? 'Failed to save.' : null}
         onEdit={startEditing}
-        onCancel={cancelEditing}
+        onCancel={handleCancel}
+        onSave={handleSave}
       />
       <BasicInfoSection venue={displayedVenue} mode={mode} onFieldChange={updateField} />
       <LocationSection venue={displayedVenue} mode={mode} onFieldChange={updateField} />

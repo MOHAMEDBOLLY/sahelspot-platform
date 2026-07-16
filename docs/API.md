@@ -2,7 +2,7 @@
 
 ## Status
 
-Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. Still read-only — no write endpoints (POST/PATCH/DELETE) exist yet; that's the upcoming Write Phase.
+Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. As of Sprint 11, the first write endpoint exists: `PATCH /venues/{venue_id}` (Save Draft). It writes straight to the draft `venues` row with no status transition — Publish, validation, and revisioning are still not implemented.
 
 ## Stack
 
@@ -61,6 +61,37 @@ Returns all venues. Added Sprint 4; response model enriched Sprint 8 (see below)
 
 Returns a single venue, or `404`. Added Sprint 4; response model enriched Sprint 8 (see below).
 
+### `PATCH /venues/{venue_id}`
+
+Added Sprint 11 — **Save Draft**, the first write endpoint. Updates the draft `venues` row in place and returns the updated venue (`VenueOut`, same shape as the `GET` endpoints). `404` if the venue doesn't exist.
+
+This is not Publish: it never touches `status` or `publish_revisions`, and the row's `updated_at` changes but its editorial `status` does not. There is no request-body validation beyond Pydantic's own type coercion — the "Validate" workflow step (required fields, category/coordinate sanity checks) is a deliberately separate, not-yet-built gate between `draft` and `review` (see [`DATABASE.md`](DATABASE.md#editorial-status-one-shared-vocabulary-renamed-to-avoid-colliding-with-the-new-meaning-of-publish)), not something this endpoint enforces.
+
+Request body (`VenueUpdate`) accepts a subset of `VenueOut`'s fields — exactly the ones the Studio's Edit Mode currently exposes as editable:
+
+```json
+{
+  "name": "The Smokery",
+  "category": "Restaurant",
+  "district": "Marina",
+  "is_featured": true,
+  "is_verified": true,
+  "short_description": "...",
+  "latitude": "30.821785",
+  "longitude": "28.977455",
+  "maps_url": "...",
+  "phone": "...",
+  "whatsapp": "...",
+  "website": "...",
+  "instagram_handle": "...",
+  "facebook_handle": "...",
+  "tiktok_handle": "...",
+  "internal_notes": "..."
+}
+```
+
+All fields are optional (partial update — only keys present in the body are written, via `.model_dump(exclude_unset=True)`). Fields the Studio doesn't yet expose as editable (`id`, `slug`, `destination`, `status`, `opening_hours`, `beach_details`, `cover_image_url`, `gallery_image_urls`, `source`, timestamps) aren't part of this schema at all — sending them is simply ignored, not rejected, since `VenueUpdate` doesn't declare them.
+
 ## Response model enrichment (Sprint 8)
 
 The frontend is meant to receive presentation-ready data — it shouldn't have to resolve an id into a name, or otherwise derive a display value from raw fields. `venues.destination_id` (a foreign key, e.g. `"marassi"`) forced exactly that: the Studio UI was displaying the raw id in place of a destination name.
@@ -96,7 +127,7 @@ None of this is designed at the request/response level yet — routes, payload s
 
 ## CORS
 
-As of Sprint 6, `GET` requests are allowed from the Studio dev origins (`http://localhost:5173`, `http://127.0.0.1:5173`) so the browser-based frontend can call this API directly — see `api/app/main.py`. Local dev only; revisit once Studio has a real deployed URL.
+As of Sprint 6, `GET` requests are allowed from the Studio dev origins (`http://localhost:5173`, `http://127.0.0.1:5173`) so the browser-based frontend can call this API directly — see `api/app/main.py`. As of Sprint 11, `PATCH` is allowed too, for Save Draft. Local dev only; revisit once Studio has a real deployed URL.
 
 ## Open decisions
 
