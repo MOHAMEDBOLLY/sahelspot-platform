@@ -19,6 +19,16 @@ This roadmap tracks sprints as they happen. Each entry is added when a sprint co
 - All documentation updated to reflect the fixed stack; no items left marked TBD at the stack level.
 - Still no application code, dependencies, or scaffolding introduced.
 
-## Sprint 1 — TBD
+## Sprint 1 — API Foundation ✅
 
-Awaiting approval of Sprint 0.5 before scoping.
+- Clean FastAPI project scaffolded in `api/` (`app/main.py`, `app/core/`, `app/db/`, `app/api/`).
+- Application startup, environment-driven configuration, and logging configured.
+- SQLAlchemy engine connected to Supabase (PostgreSQL) via `DATABASE_URL`; connectivity verified through `GET /health`, not through any application tables.
+- Two endpoints implemented: `GET /` (API info) and `GET /health` (DB connectivity, `503` on failure).
+- Swagger UI (`/docs`) and ReDoc (`/redoc`) verified working.
+- No models, tables, migrations, CRUD, authentication, or business logic introduced.
+- **Known deviation**: running on Python 3.13 locally instead of the finalized 3.12, because 3.12 isn't installed and Homebrew can't install it without a `sudo` permissions fix. Tracked in [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations); to be standardized later.
+
+## Sprint 2 — TBD
+
+Awaiting approval of Sprint 1 before scoping.

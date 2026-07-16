@@ -2,7 +2,11 @@
 
 ## Status
 
-Technology stack is **finalized** as of Sprint 0.5. No application code has been implemented yet — that begins in a future sprint, built against the stack below.
+Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack.
+
+## Known deviations
+
+- **Python version**: the stack specifies Python 3.12. This is not installed on the current development machine, and Homebrew cannot install it without a permissions fix on `/usr/local` that requires explicit `sudo` approval. Per project decision, local development is proceeding on **Python 3.13** temporarily. This is a one-line fix (recreate the venv under 3.12) once the environment is sorted — no code depends on 3.13-specific behavior.
 
 ## Guiding principles
 
@@ -42,18 +46,31 @@ These principles govern every architectural decision in this project:
 
 ```
 sahelspot-platform/
-├── api/             # Backend — Python 3.12 / FastAPI / SQLAlchemy 2 / Alembic
-├── datalab-next/    # Frontend — React / Vite / TypeScript
-└── docs/            # Project documentation
+├── api/                     # Backend — Python 3.12 (currently 3.13, see deviation above) / FastAPI / SQLAlchemy 2 / Alembic
+│   ├── requirements.txt
+│   ├── .env.example
+│   └── app/
+│       ├── main.py          # FastAPI app creation + startup
+│       ├── core/
+│       │   ├── config.py    # environment-driven settings (pydantic-settings)
+│       │   └── logging.py   # logging setup
+│       ├── db/
+│       │   └── session.py   # SQLAlchemy engine (Supabase/Postgres)
+│       └── api/
+│           ├── router.py    # aggregates route modules
+│           └── routes/
+│               └── system.py  # GET / and GET /health
+├── datalab-next/            # Frontend — React / Vite / TypeScript (not yet started)
+└── docs/                    # Project documentation
 ```
 
-Neither `api/` nor `datalab-next/` contains application code, dependencies, or scaffolding yet — the stack is decided, but implementation has not started.
+`datalab-next/` contains no application code, dependencies, or scaffolding yet — the stack is decided, but frontend implementation has not started. `api/` now has a working foundation (Sprint 1): app startup, config, logging, a Supabase/PostgreSQL connection via SQLAlchemy, and two endpoints (`/` and `/health`). No models, tables, migrations, or business logic exist yet.
 
 ## Decisions still open
 
 The stack itself is fixed. The following implementation details remain open and will be addressed in future sprints as they come up:
 
 - Database schema design (see [`DATABASE.md`](DATABASE.md)).
-- API endpoint design and conventions (see [`API.md`](API.md)).
+- API endpoint design and conventions beyond the Sprint 1 foundation (see [`API.md`](API.md)).
 - Deployment/hosting model.
 - Authentication approach (Supabase Auth is the likely default, to be confirmed).

@@ -1,0 +1,33 @@
+# API
+
+Backend for SahelSpot Platform. Python 3.12 (currently running on 3.13 locally — see note below), FastAPI, SQLAlchemy 2, Alembic.
+
+## Setup
+
+```bash
+cd api
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+# then edit .env with a real Supabase DATABASE_URL
+```
+
+## Run
+
+```bash
+uvicorn app.main:app --reload
+```
+
+- API: http://127.0.0.1:8000
+- Swagger UI: http://127.0.0.1:8000/docs
+- ReDoc: http://127.0.0.1:8000/redoc
+
+## Endpoints (Sprint 1)
+
+- `GET /` — API name and version.
+- `GET /health` — `{"status": "ok", "database": "connected"}`, or a `503` if the database is unreachable.
+
+## Note on Python version
+
+The finalized stack specifies Python 3.12. This machine currently has 3.11/3.13/3.14 available and Homebrew cannot install 3.12 without a permissions fix. Per project decision, development is proceeding on **3.13** temporarily; this is tracked as a known deviation in [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) and [`../docs/ROADMAP.md`](../docs/ROADMAP.md) until standardized.
