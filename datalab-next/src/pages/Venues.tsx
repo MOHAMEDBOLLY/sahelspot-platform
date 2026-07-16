@@ -1,35 +1,18 @@
-import { Store } from 'lucide-react'
-import { useVenues } from '../features/venues/useVenues'
-import { VenueTable } from '../features/venues/VenueTable'
-import { LoadingState } from '../components/LoadingState'
-import { ErrorState } from '../components/ErrorState'
-import { PagePlaceholder } from '../components/PagePlaceholder'
+import { useState } from 'react'
+import { VenueListPanel } from '../features/venues/VenueListPanel'
+import { VenueWorkspace } from '../features/venues/workspace/VenueWorkspace'
 
 export function Venues() {
-  const { data, isPending, isError, error, refetch } = useVenues()
+  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null)
 
-  if (isPending) {
-    return <LoadingState label="Loading venues…" />
-  }
-
-  if (isError) {
-    return (
-      <ErrorState
-        message={error instanceof Error ? error.message : 'Failed to load venues.'}
-        onRetry={() => refetch()}
-      />
-    )
-  }
-
-  if (!data || data.length === 0) {
-    return (
-      <PagePlaceholder
-        icon={Store}
-        title="No venues yet"
-        description="Venues will appear here once they're added."
-      />
-    )
-  }
-
-  return <VenueTable venues={data} />
+  return (
+    <div className="flex h-full gap-6">
+      <div className="w-80 shrink-0 overflow-y-auto">
+        <VenueListPanel selectedVenueId={selectedVenueId} onSelectVenue={setSelectedVenueId} />
+      </div>
+      <div className="min-w-0 flex-1 overflow-y-auto">
+        <VenueWorkspace venueId={selectedVenueId} />
+      </div>
+    </div>
+  )
 }

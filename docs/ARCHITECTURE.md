@@ -2,7 +2,7 @@
 
 ## Status
 
-Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration, applied and verified against a real Supabase database (Sprint 3), with a seed and three read-only smoke-test endpoints (Sprint 4). The frontend — SahelSpot Studio — has an application shell (Sprint 5) and, as of Sprint 6, its first real feature: a Venues list reading live from the API (`GET /venues`), with loading/error/empty states. CORS is now configured on the API to allow the Studio dev origin.
+Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration, applied and verified against a real Supabase database (Sprint 3), with a seed and three read-only smoke-test endpoints (Sprint 4). The frontend — SahelSpot Studio — has an application shell (Sprint 5), a Venues list reading live from the API (Sprint 6), and, as of Sprint 7, a two-panel Venue Workspace: selecting a venue from the list shows its full detail (`GET /venues/{id}`) in six read-only sections alongside the list, without navigating away. Still entirely read-only — no editing, forms, or auth.
 
 ## Known deviations
 
@@ -79,31 +79,39 @@ sahelspot-platform/
 │       ├── layouts/
 │       │   └── AppShell.tsx    # Sidebar + Header + <Outlet />
 │       ├── lib/
-│       │   └── apiClient.ts     # fetch wrapper — only place that talks HTTP to the API
+│       │   ├── apiClient.ts      # fetch wrapper — only place that talks HTTP to the API
+│       │   └── formatDate.ts      # shared display formatting
 │       ├── types/
-│       │   └── venue.ts          # Venue TypeScript type
+│       │   └── venue.ts          # full Venue type (GET /venues and GET /venues/{id} share this shape)
 │       ├── features/
 │       │   └── venues/
-│       │       ├── api.ts           # fetchVenues()
-│       │       ├── useVenues.ts     # TanStack Query hook
-│       │       └── VenueTable.tsx   # renders a list of venues
+│       │       ├── api.ts                # fetchVenues(), fetchVenue(id)
+│       │       ├── useVenues.ts          # TanStack Query hook — list
+│       │       ├── useVenue.ts           # TanStack Query hook — single venue, seeded from list cache
+│       │       ├── VenueList.tsx         # presentational: clickable venue rows
+│       │       ├── VenueListPanel.tsx    # stateful: loading/error/empty + VenueList
+│       │       └── workspace/
+│       │           ├── VenueWorkspace.tsx     # stateful: no-selection/loading/error + sections
+│       │           ├── WorkspaceSection.tsx    # shared section card chrome
+│       │           ├── WorkspaceField.tsx       # shared label/value row with placeholder
+│       │           └── sections/                # Basic Info, Location, Contact, Opening Hours, Images, Publishing Status
 │       ├── components/
 │       │   ├── Sidebar.tsx
 │       │   ├── Header.tsx
-│       │   ├── PagePlaceholder.tsx  # shared "not built"/empty state
+│       │   ├── PagePlaceholder.tsx  # shared empty / "nothing selected" state
 │       │   ├── LoadingState.tsx
 │       │   ├── ErrorState.tsx        # includes a retry action
 │       │   └── StatusBadge.tsx
 │       └── pages/
 │           ├── Dashboard.tsx    # welcome page
-│           ├── Venues.tsx        # live data: loading / error / empty / table states
+│           ├── Venues.tsx        # thin: owns selectedVenueId, composes VenueListPanel + VenueWorkspace
 │           ├── Destinations.tsx
 │           ├── Publishing.tsx
 │           └── Settings.tsx
 └── docs/                    # Project documentation
 ```
 
-`datalab-next/` has the application shell (Sprint 5) plus its first live feature (Sprint 6): a read-only Venues list fetched via TanStack Query from `GET /venues`. No editing, forms, or auth yet. `api/` has app startup, config, logging, a live Supabase/PostgreSQL connection, a migrated and verified data model (Sprint 3), three read-only smoke-test endpoints reading directly from the draft tables (Sprint 4), and now CORS configured for the Studio dev origin (Sprint 6) — the endpoints themselves are still not the final public API (see [Publishing architecture](#publishing-architecture) below).
+`datalab-next/` has the application shell (Sprint 5), a read-only Venues list (Sprint 6), and, as of Sprint 7, a two-panel Venue Workspace — selecting a venue shows its full detail alongside the list, on the same page, with no navigation. Still no editing, forms, or auth. `api/` has app startup, config, logging, a live Supabase/PostgreSQL connection, a migrated and verified data model (Sprint 3), three read-only smoke-test endpoints reading directly from the draft tables (Sprint 4), and CORS configured for the Studio dev origin (Sprint 6) — the endpoints themselves are still not the final public API (see [Publishing architecture](#publishing-architecture) below).
 
 ## Publishing architecture
 
