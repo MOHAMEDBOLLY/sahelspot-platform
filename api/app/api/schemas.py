@@ -19,13 +19,25 @@ class DestinationOut(BaseModel):
     updated_at: datetime
 
 
+class DestinationRef(BaseModel):
+    """A lightweight, resolved reference to a destination — id + display name only.
+    Used when a venue points at a destination, so the frontend never has to look up
+    a name for an id itself. See DestinationOut for the full destination record.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+
+
 class VenueOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
     name: str
     slug: str
-    destination_id: str
+    destination: DestinationRef
     district: str | None = None
     category: str
     status: str

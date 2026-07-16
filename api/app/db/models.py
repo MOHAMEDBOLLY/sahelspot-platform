@@ -17,7 +17,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -59,6 +59,8 @@ class Destination(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
+    venues: Mapped[list["Venue"]] = relationship(back_populates="destination")
+
 
 class Venue(Base):
     """A specific place (restaurant, hotel, shop, activity, beach...) within a destination."""
@@ -76,6 +78,7 @@ class Venue(Base):
     destination_id: Mapped[str] = mapped_column(
         ForeignKey("destinations.id", ondelete="RESTRICT"), nullable=False
     )
+    destination: Mapped["Destination"] = relationship(back_populates="venues")
     district: Mapped[str | None] = mapped_column(Text, nullable=True)
     category: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False)

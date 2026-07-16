@@ -4,7 +4,7 @@ The editorial/admin frontend for SahelSpot Platform — where content is edited,
 
 ## Status
 
-**Shell + Venue Workspace, read-only** (Sprint 7). Selecting a venue from the list opens a two-panel workspace showing its full detail across six sections. No editing, creating, deleting, publishing, forms, or authentication yet — that's the next layer, built on this same architecture (see [Deliverables](#deliverables) below).
+**Shell + Venue Workspace, read-only** (Sprint 7), reading an enriched API contract (Sprint 8). Selecting a venue from the list opens a two-panel workspace showing its full detail across six sections. No editing, creating, deleting, publishing, forms, or authentication yet.
 
 ## Stack
 
@@ -77,7 +77,6 @@ src/
 
 ## Notes
 
-- All business logic (validation, status meaning, filtering) lives in the API — the frontend only fetches and displays what the API returns.
-- `GET /venues` currently returns `destination_id` (e.g. `"marassi"`), not a resolved destination name — displayed as-is. Resolving it to a display name is an API-side concern for a later sprint, not something joined client-side.
+- All business logic (validation, status meaning, filtering, id → name resolution) lives in the API — the frontend only fetches and displays what the API returns. As of Sprint 8, `GET /venues`/`GET /venues/{id}` return a resolved `destination: {id, name}` object (see [`../docs/API.md`](../docs/API.md#response-model-enrichment-sprint-8)) — the frontend reads `venue.destination.name` directly, no client-side lookup.
 - TanStack Query's `networkMode: 'always'` is set globally in `main.tsx` — the default `'online'` mode can leave a query stuck in a "paused" state (indistinguishable from loading) when the browser's connectivity/visibility signals are unreliable, which is worth knowing if a query ever seems to hang without erring.
 - `useVenue(id)` seeds its `initialData` from the already-fetched `['venues']` list cache, since `GET /venues` returns full venue objects (same shape as `GET /venues/{id}`). Selecting a venue already visible in the list renders instantly with no extra network round trip.

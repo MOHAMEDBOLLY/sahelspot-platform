@@ -48,8 +48,8 @@ uvicorn app.main:app --reload
 - `GET /` — API name and version.
 - `GET /health` — `{"status": "ok", "database": "connected"}`, or a `503` if the database is unreachable.
 - `GET /destinations` — list all destinations, read directly from the `destinations` table.
-- `GET /venues` — list all venues, read directly from the `venues` table.
-- `GET /venues/{venue_id}` — a single venue by id, or `404`.
+- `GET /venues` — list all venues, read directly from the `venues` table. Each venue's `destination` is a resolved `{id, name}` object, not a raw `destination_id` — see [`../docs/API.md`](../docs/API.md#response-model-enrichment-sprint-8).
+- `GET /venues/{venue_id}` — a single venue by id, or `404`. Same resolved `destination` object.
 
 **Note**: the three business endpoints above read straight from the draft/editorial tables — they're a Sprint 4 smoke test proving the DB → API → Swagger → JSON pipeline end-to-end, not the final public API. Per [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md#publishing-architecture), the real public API will read only from `publish_revisions` once the publish/rollback endpoints exist — that hasn't been built yet.
 

@@ -49,6 +49,39 @@ If the database is unreachable, returns `503` with:
 }
 ```
 
+### `GET /destinations`
+
+Returns all destinations. Added Sprint 4, unchanged since.
+
+### `GET /venues`
+
+Returns all venues. Added Sprint 4; response model enriched Sprint 8 (see below).
+
+### `GET /venues/{venue_id}`
+
+Returns a single venue, or `404`. Added Sprint 4; response model enriched Sprint 8 (see below).
+
+## Response model enrichment (Sprint 8)
+
+The frontend is meant to receive presentation-ready data — it shouldn't have to resolve an id into a name, or otherwise derive a display value from raw fields. `venues.destination_id` (a foreign key, e.g. `"marassi"`) forced exactly that: the Studio UI was displaying the raw id in place of a destination name.
+
+**Changed**: `VenueOut.destination_id: str` → `VenueOut.destination: DestinationRef`, where `DestinationRef` is `{id: str, name: str}`. Both `GET /venues` and `GET /venues/{id}` now return:
+
+```json
+{
+  "destination": {
+    "id": "marassi",
+    "name": "Marassi"
+  }
+}
+```
+
+instead of `"destination_id": "marassi"`. The FK column itself is unchanged (see [`DATABASE.md`](DATABASE.md)) — this is a read-model change only: the route now eager-loads the related `Destination` row (`joinedload(Venue.destination)`, one query, not N+1) and the response schema nests it. No migration, no new table — a SQLAlchemy `relationship()` was added to the existing `Venue`/`Destination` models to make the eager-load possible, which is an ORM-level mapping, not a schema change.
+
+`DestinationRef` is deliberately a lean `{id, name}`, not the full `DestinationOut` — a venue list doesn't need every destination field (region, status, boundary, ...) repeated per row; that's what `GET /destinations` is for.
+
+**Considered and left alone**: `category`, `district`, and `status` are already plain, human-readable strings with no lookup table behind them (a deliberate simplification from the Sprint 2.5 schema review — see [`DATABASE.md`](DATABASE.md#categories-a-small-fixed-flat-list--not-a-table)), so there's no id to resolve. Booleans (`is_featured`, `is_verified`) and timestamps are left as raw booleans/ISO strings — formatting those into "Yes"/"No" or a locale-specific date is display formatting, not business logic, and doing it server-side would bake in a language/timezone the API has no business assuming.
+
 ## Publishing architecture: two endpoint groups, not yet built
 
 The platform is **not live-edit** — see [`PRODUCT.md`](PRODUCT.md#content--publishing-model) and [`ARCHITECTURE.md`](ARCHITECTURE.md#publishing-architecture). This shapes the API into two logically separate groups, planned but **not implemented**:

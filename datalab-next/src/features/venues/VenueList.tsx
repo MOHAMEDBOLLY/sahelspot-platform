@@ -37,7 +37,7 @@ export function VenueList({ venues, selectedVenueId, onSelectVenue }: VenueListP
                   isSelected ? 'text-gray-300' : 'text-gray-500',
                 ].join(' ')}
               >
-                {venue.category} · {venue.destination_id}
+                {venue.category} · {venue.destination.name}
               </span>
               <StatusBadge status={venue.status} />
             </button>

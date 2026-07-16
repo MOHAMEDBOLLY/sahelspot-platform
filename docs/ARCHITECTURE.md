@@ -2,7 +2,7 @@
 
 ## Status
 
-Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration, applied and verified against a real Supabase database (Sprint 3), with a seed and three read-only smoke-test endpoints (Sprint 4). The frontend — SahelSpot Studio — has an application shell (Sprint 5), a Venues list reading live from the API (Sprint 6), and, as of Sprint 7, a two-panel Venue Workspace: selecting a venue from the list shows its full detail (`GET /venues/{id}`) in six read-only sections alongside the list, without navigating away. Still entirely read-only — no editing, forms, or auth.
+Technology stack is **finalized** as of Sprint 0.5. The API foundation (Sprint 1) is implemented and running against this stack. The database schema (designed in Sprint 2/2.5) is implemented as SQLAlchemy models and a first Alembic migration, applied and verified against a real Supabase database (Sprint 3), with a seed and three read-only smoke-test endpoints (Sprint 4). The frontend — SahelSpot Studio — has an application shell (Sprint 5), a Venues list reading live from the API (Sprint 6), and a two-panel Venue Workspace showing full read-only detail alongside the list (Sprint 7). As of Sprint 8, the venue read models are enriched — `GET /venues`/`GET /venues/{id}` return a resolved `destination: {id, name}` object instead of a raw `destination_id`, so the frontend never resolves an id into a name itself. Still entirely read-only — no editing, forms, or auth.
 
 ## Known deviations
 

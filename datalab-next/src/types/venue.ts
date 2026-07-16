@@ -8,11 +8,16 @@ export type OpeningHours = Partial<Record<
   OpeningHoursRange[]
 >>
 
+export interface DestinationRef {
+  id: string
+  name: string
+}
+
 export interface Venue {
   id: string
   name: string
   slug: string
-  destination_id: string
+  destination: DestinationRef
   district: string | null
   category: string
   status: VenueStatus
