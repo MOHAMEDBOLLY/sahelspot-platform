@@ -2,7 +2,7 @@
 
 ## Status
 
-No architecture has been implemented yet. This document records decisions as they are made, sprint by sprint — it is not a speculative design written ahead of the code.
+Technology stack is **finalized** as of Sprint 0.5. No application code has been implemented yet — that begins in a future sprint, built against the stack below.
 
 ## Guiding principles
 
@@ -14,25 +14,46 @@ These principles govern every architectural decision in this project:
 - **No microservices.** This is a single, cohesive application, not a distributed system.
 - **Small, incremental sprints.** Architecture evolves in reviewed, approved steps.
 
-## Current structure
+## Technology stack
+
+### Frontend — DataLab Next (`datalab-next/`)
+
+- **React** — UI library.
+- **Vite** — build tool and dev server.
+- **TypeScript** — static typing.
+- **Tailwind CSS** — styling.
+- **React Router** — client-side routing.
+- **React Hook Form** — form state and validation.
+- **TanStack Query** — server-state management / data fetching.
+- **Lucide Icons** — icon set.
+
+### Backend — API (`api/`)
+
+- **Python 3.12**
+- **FastAPI** — web framework.
+- **SQLAlchemy 2** — ORM / database toolkit.
+- **Alembic** — database migrations.
+
+### Database
+
+- **Supabase (PostgreSQL)**
+
+## Repository structure
 
 ```
 sahelspot-platform/
-├── backend/     # server-side application (not yet initialized)
-├── frontend/    # client-side application (not yet initialized)
-└── docs/        # project documentation
+├── api/             # Backend — Python 3.12 / FastAPI / SQLAlchemy 2 / Alembic
+├── datalab-next/    # Frontend — React / Vite / TypeScript
+└── docs/            # Project documentation
 ```
 
-No framework, language runtime, or dependency has been installed in either `backend/` or `frontend/`. Those choices will be proposed and explained before implementation, in a future sprint.
+Neither `api/` nor `datalab-next/` contains application code, dependencies, or scaffolding yet — the stack is decided, but implementation has not started.
 
-## Open decisions
+## Decisions still open
 
-The following are intentionally undecided as of Sprint 0:
+The stack itself is fixed. The following implementation details remain open and will be addressed in future sprints as they come up:
 
-- Backend framework and language.
-- Frontend framework and language.
-- Database engine (see [`DATABASE.md`](DATABASE.md)).
+- Database schema design (see [`DATABASE.md`](DATABASE.md)).
+- API endpoint design and conventions (see [`API.md`](API.md)).
 - Deployment/hosting model.
-- Authentication approach.
-
-Each will be addressed as its own sprint, with the reasoning explained before any code is written.
+- Authentication approach (Supabase Auth is the likely default, to be confirmed).

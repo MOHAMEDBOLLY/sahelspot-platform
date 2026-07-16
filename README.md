@@ -6,14 +6,37 @@ This repository is a **new, independent project**. It does not share code, infra
 
 ## Status
 
-🚧 Early foundation stage (Sprint 0). No application code exists yet.
+🚧 Foundation stage. Technology stack is finalized (Sprint 0.5). No application code has been written yet.
+
+## Technology stack
+
+**Frontend — DataLab Next**
+- React
+- Vite
+- TypeScript
+- Tailwind CSS
+- React Router
+- React Hook Form
+- TanStack Query
+- Lucide Icons
+
+**Backend — API**
+- Python 3.12
+- FastAPI
+- SQLAlchemy 2
+- Alembic
+
+**Database**
+- Supabase (PostgreSQL)
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the reasoning behind these choices.
 
 ## Repository layout
 
 | Path | Purpose |
 |---|---|
-| [`backend/`](backend/) | Server-side application code (framework not yet chosen/installed). |
-| [`frontend/`](frontend/) | Client-side application code (framework not yet chosen/installed). |
+| [`api/`](api/) | Backend application — Python 3.12 / FastAPI / SQLAlchemy 2 / Alembic. |
+| [`datalab-next/`](datalab-next/) | Frontend application — React / Vite / TypeScript. |
 | [`docs/`](docs/) | Product, architecture, database, API, and roadmap documentation. |
 
 ## Development philosophy
@@ -31,4 +54,4 @@ Start with [`docs/PRODUCT.md`](docs/PRODUCT.md) for what this platform is and wh
 
 ## Getting started
 
-There is nothing to install or run yet — this is the project foundation only. Setup instructions will be added here once the backend and frontend are initialized.
+Nothing is installed or runnable yet — the stack is finalized but no application code, dependencies, or scaffolding exist. Setup instructions will be added here once the `api/` and `datalab-next/` projects are initialized.

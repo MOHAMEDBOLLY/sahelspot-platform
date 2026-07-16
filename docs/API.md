@@ -2,15 +2,22 @@
 
 ## Status
 
-No API exists yet. No framework has been chosen or installed. This document will record endpoint design and conventions once the backend is initialized.
+Backend stack is **finalized**: Python 3.12, FastAPI, SQLAlchemy 2, Alembic. No endpoints or application code exist yet.
+
+## Stack
+
+- **Python 3.12**
+- **FastAPI** — web framework serving the API.
+- **SQLAlchemy 2** — ORM / database toolkit.
+- **Alembic** — database migrations.
+- **Database**: Supabase (PostgreSQL) — see [`DATABASE.md`](DATABASE.md).
 
 ## Open decisions
 
-- API style (REST, or other) — not yet chosen.
-- Framework — not yet chosen.
-- Authentication/authorization approach — not yet decided.
+- API style and endpoint conventions — not yet designed; FastAPI's built-in OpenAPI/REST conventions are the likely default.
+- Authentication/authorization approach — not yet decided (Supabase Auth is the likely default, to be confirmed).
 - Versioning strategy — not yet decided.
 
 ## Notes
 
-This document exists as a placeholder so API conventions are documented in one place from the first endpoint onward, rather than decided ad hoc.
+This document will be filled in with real endpoints and conventions once API design begins in a future sprint.
