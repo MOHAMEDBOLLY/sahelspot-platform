@@ -1,7 +1,13 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.schemas import DestinationRef, PublishedVenueOut, PublishRevisionOut
+from app.api.schemas import (
+    DestinationRef,
+    PublishedVenueOut,
+    PublishRevisionDetail,
+    PublishRevisionOut,
+)
+from app.db.models import PublishRevision
 from app.db.session import get_db
 from app.publishing.engine import get_current_revision, publish
 
@@ -49,3 +55,27 @@ def list_published_venues(db: Session = Depends(get_db)):
             }
         )
     return published_venues
+
+
+@router.get("/publish/revisions", response_model=list[PublishRevisionOut])
+def list_publish_revisions(db: Session = Depends(get_db)):
+    """Revision history — the Revision Browser's list (Sprint 17). Metadata
+    only, newest first; read-only, and it stays that way — nothing here
+    ever restores a revision or changes `is_current`. See
+    `publish_current_approved_content` above for the only code path that
+    does either.
+    """
+    return db.query(PublishRevision).order_by(PublishRevision.id.desc()).all()
+
+
+@router.get("/publish/revisions/{revision_id}", response_model=PublishRevisionDetail)
+def get_publish_revision(revision_id: int, db: Session = Depends(get_db)):
+    """A single revision's full record, including its snapshot — for
+    inspection only. `404` if the revision doesn't exist. This is not a
+    restore/rollback mechanism: it returns data, it never assigns
+    `is_current`.
+    """
+    revision = db.get(PublishRevision, revision_id)
+    if revision is None:
+        raise HTTPException(status_code=404, detail="Publish revision not found")
+    return revision

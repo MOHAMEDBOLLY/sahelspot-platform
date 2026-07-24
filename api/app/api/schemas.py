@@ -91,8 +91,8 @@ class VenueUpdate(BaseModel):
 
 class PublishRevisionOut(BaseModel):
     """Metadata about a publish revision — not its full snapshot. Returned
-    by the Publish action itself; a future revision-history/rollback
-    endpoint would reuse this same shape.
+    by the Publish action itself and by the revision-history list
+    (Sprint 17); a future Rollback endpoint would reuse this same shape.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -104,6 +104,17 @@ class PublishRevisionOut(BaseModel):
     label: str | None = None
     destination_count: int | None = None
     venue_count: int | None = None
+
+
+class PublishRevisionDetail(PublishRevisionOut):
+    """A single revision's full record, metadata plus its frozen snapshot —
+    read-only, for inspection (Sprint 17's Revision Browser). Deliberately
+    not used by anything that writes; Rollback (not built) would read the
+    metadata here to decide *which* revision to restore, not this schema
+    itself to perform the restore.
+    """
+
+    snapshot: dict
 
 
 class PublishedVenueOut(BaseModel):

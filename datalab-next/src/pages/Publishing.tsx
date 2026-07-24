@@ -1,12 +1,21 @@
-import { UploadCloud } from 'lucide-react'
-import { PagePlaceholder } from '../components/PagePlaceholder'
+import { useState } from 'react'
+import { RevisionListPanel } from '../features/publishing/RevisionListPanel'
+import { RevisionDetail } from '../features/publishing/RevisionDetail'
 
+/** Revision Browser (Sprint 17) — read-only inspection of publish history.
+ * No publish/rollback controls live here yet; this page only lets an
+ * editor see what's been published and when. */
 export function Publishing() {
+  const [selectedRevisionId, setSelectedRevisionId] = useState<number | null>(null)
+
   return (
-    <PagePlaceholder
-      icon={UploadCloud}
-      title="Publishing"
-      description="Publish revisions and rollback controls will be built here in a future sprint."
-    />
+    <div className="flex h-full gap-6">
+      <div className="w-80 shrink-0 overflow-y-auto">
+        <RevisionListPanel selectedRevisionId={selectedRevisionId} onSelectRevision={setSelectedRevisionId} />
+      </div>
+      <div className="min-w-0 flex-1 overflow-y-auto">
+        <RevisionDetail revisionId={selectedRevisionId} />
+      </div>
+    </div>
   )
 }
