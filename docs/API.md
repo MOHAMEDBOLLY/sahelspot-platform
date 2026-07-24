@@ -2,7 +2,7 @@
 
 ## Status
 
-Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. Sprint 11 added the first write endpoint, `PATCH /venues/{venue_id}` (Save Draft) — no validation, no status transition. Sprint 12 adds the "Validate" gate itself: `POST /venues/{venue_id}/validate`, a read-only canonical check the frontend cannot bypass or duplicate. Sprint 13 evolves that same endpoint's response into an **Editorial Readiness** model (`valid`, `ready_for_review`, `errors`, `warnings`, `info`). Sprint 14 adds the first editorial state transition: `POST /venues/{venue_id}/submit-for-review` moves a venue from `draft` to `review`, gated on `ready_for_review`. Sprint 15 adds the second: `POST /venues/{venue_id}/approve` moves `review` to `approved`, sharing a centralized transition guard (`app/workflow/transitions.py`) with Review rather than duplicating the status-check logic. Sprint 16 adds the Publish Engine: `POST /publish` freezes every currently `approved` destination/venue into a new immutable `publish_revisions` snapshot, and `GET /published/venues` is the first public read path — it reads *only* that snapshot, never the draft tables. Sprint 17 adds the read-only Revision Browser: `GET /publish/revisions` (history list) and `GET /publish/revisions/{id}` (a single revision's metadata plus its full snapshot) — both metadata/inspection only, neither writes anything. Sprint 18 adds Republish: `POST /publish/revisions/{id}/republish` moves the current-revision pointer to an existing revision — no new snapshot, no data regenerated, only the same atomic pointer-flip `publish()` already used. Sprint 19 adds the Editorial Activity Log: `GET /activity`, backed by a new `app/activity/` service and `activity_log` table — a cross-cutting observability record of Submit for Review, Approve, Publish, and Republish, independent of Validation/Workflow/Publishing and read by none of them.
+Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. Sprint 11 added the first write endpoint, `PATCH /venues/{venue_id}` (Save Draft) — no validation, no status transition. Sprint 12 adds the "Validate" gate itself: `POST /venues/{venue_id}/validate`, a read-only canonical check the frontend cannot bypass or duplicate. Sprint 13 evolves that same endpoint's response into an **Editorial Readiness** model (`valid`, `ready_for_review`, `errors`, `warnings`, `info`). Sprint 14 adds the first editorial state transition: `POST /venues/{venue_id}/submit-for-review` moves a venue from `draft` to `review`, gated on `ready_for_review`. Sprint 15 adds the second: `POST /venues/{venue_id}/approve` moves `review` to `approved`, sharing a centralized transition guard (`app/workflow/transitions.py`) with Review rather than duplicating the status-check logic. Sprint 16 adds the Publish Engine: `POST /publish` freezes every currently `approved` destination/venue into a new immutable `publish_revisions` snapshot, and `GET /published/venues` is the first public read path — it reads *only* that snapshot, never the draft tables. Sprint 17 adds the read-only Revision Browser: `GET /publish/revisions` (history list) and `GET /publish/revisions/{id}` (a single revision's metadata plus its full snapshot) — both metadata/inspection only, neither writes anything. Sprint 18 adds Republish: `POST /publish/revisions/{id}/republish` moves the current-revision pointer to an existing revision — no new snapshot, no data regenerated, only the same atomic pointer-flip `publish()` already used. Sprint 19 adds the Editorial Activity Log: `GET /activity`, backed by a new `app/activity/` service and `activity_log` table — a cross-cutting observability record of Submit for Review, Approve, Publish, and Republish, independent of Validation/Workflow/Publishing and read by none of them. Sprint 20 adds this project's first automated test suite (`api/tests/`) — see [`TESTING.md`](TESTING.md). Sprint 21 gives Destinations their first write path — `GET /destinations/{destination_id}` and `PATCH /destinations/{destination_id}` — reusing the exact Save Draft pattern `PATCH /venues/{venue_id}` established in Sprint 11, with no Validate/Review/Approval/Publish endpoints for destinations yet (deliberately out of this sprint's scope).
 
 ## Stack
 
@@ -52,6 +52,37 @@ If the database is unreachable, returns `503` with:
 ### `GET /destinations`
 
 Returns all destinations. Added Sprint 4, unchanged since.
+
+### `GET /destinations/{destination_id}`
+
+Added Sprint 21. Returns a single destination, or `404`. Same shape and behavior as `GET /venues/{venue_id}` — no enrichment needed here, since a destination has no foreign key to resolve into a display value the way a venue's `destination_id` did (Sprint 8).
+
+### `PATCH /destinations/{destination_id}`
+
+Added Sprint 21 — Destinations' first write endpoint, reusing exactly the pattern `PATCH /venues/{venue_id}` established in Sprint 11: updates the draft `destinations` row in place via `DestinationUpdate` (a partial update, `.model_dump(exclude_unset=True)`) and returns the updated destination (`DestinationOut`). `404` if the destination doesn't exist. Not Publish — nothing here touches `status` or `publish_revisions`.
+
+Request body (`DestinationUpdate`) accepts a subset of `DestinationOut`'s fields:
+
+```json
+{
+  "name": "Marassi",
+  "region": "Sidi Abdelrahman Area",
+  "aliases": ["New Alamein"],
+  "notes": "..."
+}
+```
+
+`id`, `status` (workflow-controlled, same reasoning as `venues.status` even though no workflow endpoints exist yet for destinations), `boundary` (a geometry blob with no editor built), and timestamps aren't part of this schema — exactly the same set of exclusions `VenueUpdate` documents, for the same reasons.
+
+**Deliberately not built this sprint**: `POST /destinations/{id}/validate`, `POST /destinations/{id}/submit-for-review`, `POST /destinations/{id}/approve`. Sprint 21's instructions named only the three endpoints above; Review, Approval, and Publish for destinations are explicitly future sprints. See [How Destinations reuse the editorial architecture](#how-destinations-reuse-the-editorial-architecture-sprint-21) below for what's already in place to build those on top of when that sprint comes.
+
+#### How Destinations reuse the editorial architecture (Sprint 21)
+
+**What was reused, unchanged**: the `Destination` SQLAlchemy model (already existed since Sprint 3 — no migration needed), the `CONTENT_STATUSES` vocabulary destinations already shared with venues, the Save Draft pattern (partial-update `PATCH`, `exclude_unset=True`, 404-on-missing) byte-for-byte identical in shape to `update_venue`, and the frontend's entire Edit Mode machinery (`useDraft`, dirty tracking, Cancel/Save Draft, the shared workspace UI components — see `docs/ARCHITECTURE.md`'s Sprint 21 entry for the frontend half of this).
+
+**What was deliberately *not* built**: `validate_destination()`, a destination `require_status()` guard, or any destination transition/publish logic. Nothing was needed — those packages (`app/validation/`, `app/workflow/`, `app/publishing/`) are structured so that adding a second entity means adding a new `validate_<entity>()`/route, not modifying the existing ones. This sprint didn't need to touch any of them, which is itself a small piece of evidence for the "reusable for future entities" design goal the Sprint 20 architecture review flagged as unverified — Destinations getting a real write path without requiring a single line of change in `app/validation/venues.py`, `app/workflow/transitions.py`, or `app/publishing/engine.py` is exactly the kind of confirmation that review was looking for, even though this sprint stopped short of building `validate_destination()` itself.
+
+**What a future Editorial Readiness/Review/Approval sprint for Destinations will reuse directly**: `FieldError`/`ValidationResult`/`build_validation_result()` (`app/validation/schemas.py`) are already entity-agnostic — a `validate_destination()` would return the exact same shape `validate_venue()` does. `require_status()` (`app/workflow/transitions.py`) takes a row and two status strings; it already works on any model with a `.status` attribute, including `Destination`, with zero changes. `publish()` (`app/publishing/engine.py`) *already* includes destinations in every snapshot (it always has, since Sprint 16) — the only thing missing for destinations to have a real Review/Approval workflow is the two transition routes themselves, following `submit_venue_for_review`/`approve_venue` in `routes/venues.py` as templates.
 
 ### `GET /venues`
 

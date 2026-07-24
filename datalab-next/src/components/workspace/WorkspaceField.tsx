@@ -5,7 +5,8 @@ type WorkspaceFieldProps = {
   value?: ReactNode
 }
 
-/** A single "label / value" pair, with a consistent placeholder when a field has no data. */
+/** A single "label / value" pair, with a consistent placeholder when a
+ * field has no data. Entity-agnostic — shared by every entity's workspace. */
 export function WorkspaceField({ label, value }: WorkspaceFieldProps) {
   const isEmpty = value === null || value === undefined || value === ''
 

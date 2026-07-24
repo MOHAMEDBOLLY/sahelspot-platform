@@ -19,6 +19,20 @@ class DestinationOut(BaseModel):
     updated_at: datetime
 
 
+class DestinationUpdate(BaseModel):
+    """Save Draft payload — same shape/intent as `VenueUpdate`: only the
+    fields Edit Mode exposes as editable. `id`, `status`, `boundary`
+    (a geometry blob with no editor built yet), and timestamps are
+    structural or workflow-controlled and aren't part of this write path,
+    exactly the same reasoning `VenueUpdate` already documents.
+    """
+
+    name: str | None = None
+    region: str | None = None
+    aliases: list[str] | None = None
+    notes: str | None = None
+
+
 class DestinationRef(BaseModel):
     """A lightweight, resolved reference to a destination — id + display name only.
     Used when a venue points at a destination, so the frontend never has to look up

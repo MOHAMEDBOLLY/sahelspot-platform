@@ -1,11 +1,11 @@
 import { UploadCloud } from 'lucide-react'
 import type { Venue } from '../../../../types/venue'
-import { WorkspaceSection } from '../WorkspaceSection'
-import { WorkspaceField } from '../WorkspaceField'
-import { TextAreaField } from '../fields/TextAreaField'
+import { WorkspaceSection } from '../../../../components/workspace/WorkspaceSection'
+import { WorkspaceField } from '../../../../components/workspace/WorkspaceField'
+import { TextAreaField } from '../../../../components/workspace/fields/TextAreaField'
 import { StatusBadge } from '../../../../components/StatusBadge'
 import { formatDateTime } from '../../../../lib/formatDate'
-import type { WorkspaceMode } from '../types'
+import type { WorkspaceMode } from '../../../../components/workspace/types'
 import type { FieldErrors } from '../../../../lib/validation'
 
 type PublishingStatusSectionProps = {

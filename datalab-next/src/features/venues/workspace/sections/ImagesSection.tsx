@@ -1,6 +1,6 @@
 import { ImageOff, Images } from 'lucide-react'
 import type { Venue } from '../../../../types/venue'
-import { WorkspaceSection } from '../WorkspaceSection'
+import { WorkspaceSection } from '../../../../components/workspace/WorkspaceSection'
 
 type ImagesSectionProps = {
   venue: Venue

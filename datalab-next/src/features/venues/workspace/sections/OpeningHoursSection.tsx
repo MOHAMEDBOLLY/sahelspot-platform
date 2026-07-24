@@ -1,6 +1,6 @@
 import { Clock } from 'lucide-react'
 import type { Venue } from '../../../../types/venue'
-import { WorkspaceSection } from '../WorkspaceSection'
+import { WorkspaceSection } from '../../../../components/workspace/WorkspaceSection'
 
 type OpeningHoursSectionProps = {
   venue: Venue

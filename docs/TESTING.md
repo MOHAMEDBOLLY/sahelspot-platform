@@ -2,7 +2,7 @@
 
 ## Status
 
-Automated test infrastructure was added in Sprint 20, after 19 sprints of manual-only verification (a `curl`/browser pass performed once, by hand, per sprint — see each sprint's `ROADMAP.md` entry for what that looked like). This document covers what exists as of Sprint 20: backend tests for the editorial workflow, publishing, and activity logging, plus a minimal frontend test foundation. It does not cover Media, Authentication, AI, or future entities — those were explicitly out of scope for this sprint (see `ROADMAP.md`'s Sprint 20 entry).
+Automated test infrastructure was added in Sprint 20, after 19 sprints of manual-only verification (a `curl`/browser pass performed once, by hand, per sprint — see each sprint's `ROADMAP.md` entry for what that looked like). Sprint 21 added the first test file for a second entity (`test_destinations.py`), reusing the fixtures Sprint 20 built without modifying them — see [What's covered](#whats-covered) below. This document covers backend tests for the editorial workflow, publishing, activity logging, and destinations, plus a minimal frontend test foundation. It does not cover Media, Authentication, AI, or any entity beyond venues/destinations.
 
 ## Backend testing strategy
 
@@ -30,6 +30,7 @@ Because isolation is convention-based (shared state, not a fresh database per te
 - **Editorial workflow** (`tests/test_workflow.py`): Submit for Review (`draft → review`) and Approve (`review → approved`) — success paths, every invalid-transition rejection (`409`), the not-ready-for-review rejection (`422`), unknown-entity `404`s, and that a rejected transition leaves the row's `status` unchanged in the database (not just that the HTTP response looked right).
 - **Publishing** (`tests/test_publishing.py`): Publish (snapshot creation, exclusion of non-approved venues, pointer supersession across two publishes, draft edits after a publish not leaking into the already-published snapshot) and Republish (pointer-only move, `404`/`409`, and — critically — that the target revision's `published_at` and snapshot content are provably unchanged by being republished).
 - **Activity logging** (`tests/test_activity.py`): that each of the four logged actions produces exactly the activity entry it claims to (correct `action`, `entity_type`, `entity_id`, `actor`, and `metadata` where applicable), that a *rejected* action does not log an entry, and that `GET /activity` returns entries newest-first.
+- **Destinations** (`tests/test_destinations.py`, added Sprint 21): list, single-destination `404`, and Save Draft (success, partial update leaving other fields unchanged, `status` untouched, `aliases` round-tripping correctly, unknown-destination `404`, and — since Save Draft is deliberately unlogged — that it produces *no* activity entry). Notably, this file needed **zero changes to `conftest.py`** — the `make_destination` factory fixture already existed from Sprint 20, written generically enough that a second entity's test file could just use it directly. That's the extensibility this document's "How future contributors should add new tests" section below was written to enable, now demonstrated rather than just claimed.
 
 ### What's deliberately not covered
 
@@ -49,7 +50,8 @@ api/
     │                        # _clean_global_tables (autouse), latest_activity() helper
     ├── test_workflow.py      # Submit for Review, Approve
     ├── test_publishing.py    # Publish, Republish
-    └── test_activity.py      # Activity logging side effects of the above
+    ├── test_activity.py      # Activity logging side effects of the above
+    └── test_destinations.py  # GET/PATCH /destinations... (Sprint 21) — reuses conftest.py's make_destination unchanged
 ```
 
 ## How to run the backend tests

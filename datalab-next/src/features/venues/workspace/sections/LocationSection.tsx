@@ -1,9 +1,9 @@
 import { MapPin } from 'lucide-react'
 import type { Venue } from '../../../../types/venue'
-import { WorkspaceSection } from '../WorkspaceSection'
-import { WorkspaceField } from '../WorkspaceField'
-import { TextField } from '../fields/TextField'
-import type { WorkspaceMode } from '../types'
+import { WorkspaceSection } from '../../../../components/workspace/WorkspaceSection'
+import { WorkspaceField } from '../../../../components/workspace/WorkspaceField'
+import { TextField } from '../../../../components/workspace/fields/TextField'
+import type { WorkspaceMode } from '../../../../components/workspace/types'
 import type { FieldErrors } from '../../../../lib/validation'
 
 type LocationSectionProps = {

@@ -7,7 +7,10 @@ type WorkspaceSectionProps = {
   children: ReactNode
 }
 
-/** Card chrome (border, padding, title+icon header) shared by every workspace section. */
+/** Card chrome (border, padding, title+icon header) shared by every
+ * workspace section, across every entity's workspace (Venues, Destinations,
+ * and future entities). Entity-agnostic — moved to `components/workspace/`
+ * in Sprint 21 when Destinations became the second consumer. */
 export function WorkspaceSection({ title, icon: Icon, children }: WorkspaceSectionProps) {
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-5">
