@@ -10,6 +10,7 @@ explicit about — see "Publishing architecture" there.
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.models import Destination, PublishRevision, Venue
@@ -133,3 +134,42 @@ def get_current_revision(db: Session) -> PublishRevision | None:
     point of the snapshot (see docs/ARCHITECTURE.md#publishing-architecture).
     """
     return db.query(PublishRevision).filter(PublishRevision.is_current.is_(True)).one_or_none()
+
+
+def republish(db: Session, revision_id: int) -> PublishRevision:
+    """Republish (Sprint 18) — makes an *existing* revision current again.
+    Deliberately the inverse of the snapshot half of `publish()`: this
+    function never builds a snapshot, never touches any row's data, and
+    never reads `destinations`/`venues` at all. It only ever moves the
+    `is_current` pointer, atomically, between two rows that already exist —
+    the exact "Rollback" mechanism docs/API.md's Sprint 16/17 entries
+    described as future work, built here on the same atomic pointer-flip
+    pattern `publish()` already established.
+
+    Raises a structured `404` if the revision doesn't exist, or `409` if
+    it's already current (there is nothing to move — a redundant republish
+    would be a no-op disguised as an action).
+    """
+    revision = db.get(PublishRevision, revision_id)
+    if revision is None:
+        raise HTTPException(status_code=404, detail="Publish revision not found")
+
+    if revision.is_current:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "already_current",
+                "message": f"Revision {revision_id} is already the current published revision.",
+            },
+        )
+
+    # Flip the old current (if any) and the target revision in the same
+    # transaction — committed together, so the pointer move is atomic. No
+    # snapshot is read, built, or written anywhere in this function.
+    db.query(PublishRevision).filter(PublishRevision.is_current.is_(True)).update(
+        {"is_current": False}, synchronize_session=False
+    )
+    revision.is_current = True
+    db.commit()
+    db.refresh(revision)
+    return revision

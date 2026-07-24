@@ -1,21 +1,31 @@
-import { FileClock, MapPin, Store } from 'lucide-react'
+import { FileClock, MapPin, RefreshCw, Store } from 'lucide-react'
 import { useRevisionDetail } from './useRevisionDetail'
+import { useRepublishRevision } from './useRepublishRevision'
 import { RevisionField } from './RevisionField'
 import { LoadingState } from '../../components/LoadingState'
 import { ErrorState } from '../../components/ErrorState'
 import { PagePlaceholder } from '../../components/PagePlaceholder'
 import { formatDateTime } from '../../lib/formatDate'
+import { ApiError } from '../../lib/apiClient'
 
 type RevisionDetailProps = {
   revisionId: number | null
 }
 
 /** Read-only inspection of a single revision — metadata plus a snapshot
- * summary (names/categories, not the full per-field record). No edit, no
- * delete, no restore/rollback action anywhere in this component, by
- * design: this page only reads history, it never changes what's current. */
+ * summary (names/categories, not the full per-field record) — plus, as of
+ * Sprint 18, the one action this page allows: Republish, which only moves
+ * the current-revision pointer. There is still no edit, delete, or
+ * snapshot-mutating control anywhere here — Republish never touches a
+ * revision's data, it only changes which one is current. */
 export function RevisionDetail({ revisionId }: RevisionDetailProps) {
   const { data: revision, isPending, isError, error, refetch } = useRevisionDetail(revisionId)
+  const { mutate: republish, isPending: isRepublishing, error: republishError } = useRepublishRevision()
+
+  function handleRepublish() {
+    if (!revisionId) return
+    republish(revisionId)
+  }
 
   if (!revisionId) {
     return (
@@ -47,12 +57,33 @@ export function RevisionDetail({ revisionId }: RevisionDetailProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold text-gray-900">Revision #{revision.id}</h2>
-        {revision.is_current && (
-          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Current
-          </span>
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="text-lg font-semibold text-gray-900">Revision #{revision.id}</h2>
+          {revision.is_current && (
+            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Current
+            </span>
+          )}
+          {republishError && (
+            <span
+              className="truncate text-xs font-medium text-red-600"
+              title={republishError instanceof ApiError ? republishError.message : 'Failed to republish.'}
+            >
+              {republishError instanceof ApiError ? republishError.message : 'Failed to republish.'}
+            </span>
+          )}
+        </div>
+        {!revision.is_current && (
+          <button
+            type="button"
+            onClick={handleRepublish}
+            disabled={isRepublishing}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={isRepublishing ? 'animate-spin' : undefined} />
+            {isRepublishing ? 'Republishing…' : 'Republish'}
+          </button>
         )}
       </div>
 
