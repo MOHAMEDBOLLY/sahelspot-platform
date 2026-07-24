@@ -140,3 +140,29 @@ class PublishRevision(Base):
     label: Mapped[str | None] = mapped_column(Text, nullable=True)
     destination_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     venue_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class ActivityLogEntry(Base):
+    """A single recorded editorial action — Submit for Review, Approve,
+    Publish, Republish, and any future workflow/publishing action. Purely
+    an observability record: nothing in the codebase ever reads this table
+    to decide behavior, and nothing here ever mutates `destinations`,
+    `venues`, or `publish_revisions`. See app/activity/service.py for the
+    one function that ever inserts a row here.
+    """
+
+    __tablename__ = "activity_log"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    entity_type: Mapped[str] = mapped_column(Text, nullable=False)
+    entity_id: Mapped[str] = mapped_column(Text, nullable=False)
+    actor: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'system'"))
+    # Python attribute deliberately not named `metadata` — that name is
+    # reserved on every declarative model (it's `Base.metadata`, the
+    # schema's MetaData instance). Mapped to the actual DB/JSON field name
+    # "metadata" via the explicit column-name argument below.
+    activity_metadata: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)

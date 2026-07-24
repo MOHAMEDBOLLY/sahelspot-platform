@@ -4,6 +4,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Venues } from './pages/Venues'
 import { Destinations } from './pages/Destinations'
 import { Publishing } from './pages/Publishing'
+import { Activity } from './pages/Activity'
 import { Settings } from './pages/Settings'
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
         <Route path="/venues" element={<Venues />} />
         <Route path="/destinations" element={<Destinations />} />
         <Route path="/publishing" element={<Publishing />} />
+        <Route path="/activity" element={<Activity />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>

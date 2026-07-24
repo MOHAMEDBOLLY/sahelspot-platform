@@ -13,6 +13,7 @@ from decimal import Decimal
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.activity.service import log_activity
 from app.db.models import Destination, PublishRevision, Venue
 
 
@@ -122,6 +123,14 @@ def publish(db: Session) -> PublishRevision:
         venue_count=len(venues),
     )
     db.add(revision)
+    db.flush()  # assigns revision.id, needed for the activity entry below
+    log_activity(
+        db,
+        action="publish",
+        entity_type="publish_revision",
+        entity_id=str(revision.id),
+        metadata={"destination_count": len(destinations), "venue_count": len(venues)},
+    )
     db.commit()
     db.refresh(revision)
     return revision
@@ -170,6 +179,7 @@ def republish(db: Session, revision_id: int) -> PublishRevision:
         {"is_current": False}, synchronize_session=False
     )
     revision.is_current = True
+    log_activity(db, action="republish", entity_type="publish_revision", entity_id=str(revision.id))
     db.commit()
     db.refresh(revision)
     return revision

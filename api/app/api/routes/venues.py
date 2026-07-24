@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
+from app.activity.service import log_activity
 from app.api.schemas import VenueOut, VenueUpdate
 from app.db.models import Venue
 from app.db.session import get_db
@@ -89,6 +90,7 @@ def submit_venue_for_review(venue_id: str, db: Session = Depends(get_db)):
         )
 
     venue.status = "review"
+    log_activity(db, action="submit_for_review", entity_type="venue", entity_id=venue.id)
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
@@ -113,6 +115,7 @@ def approve_venue(venue_id: str, db: Session = Depends(get_db)):
     require_status(venue, expected="review", target="approved")
 
     venue.status = "approved"
+    log_activity(db, action="approve", entity_type="venue", entity_id=venue.id)
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])

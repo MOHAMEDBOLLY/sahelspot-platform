@@ -2,7 +2,7 @@
 
 ## Status
 
-Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. Sprint 11 added the first write endpoint, `PATCH /venues/{venue_id}` (Save Draft) — no validation, no status transition. Sprint 12 adds the "Validate" gate itself: `POST /venues/{venue_id}/validate`, a read-only canonical check the frontend cannot bypass or duplicate. Sprint 13 evolves that same endpoint's response into an **Editorial Readiness** model (`valid`, `ready_for_review`, `errors`, `warnings`, `info`). Sprint 14 adds the first editorial state transition: `POST /venues/{venue_id}/submit-for-review` moves a venue from `draft` to `review`, gated on `ready_for_review`. Sprint 15 adds the second: `POST /venues/{venue_id}/approve` moves `review` to `approved`, sharing a centralized transition guard (`app/workflow/transitions.py`) with Review rather than duplicating the status-check logic. Sprint 16 adds the Publish Engine: `POST /publish` freezes every currently `approved` destination/venue into a new immutable `publish_revisions` snapshot, and `GET /published/venues` is the first public read path — it reads *only* that snapshot, never the draft tables. Sprint 17 adds the read-only Revision Browser: `GET /publish/revisions` (history list) and `GET /publish/revisions/{id}` (a single revision's metadata plus its full snapshot) — both metadata/inspection only, neither writes anything. Sprint 18 adds Republish: `POST /publish/revisions/{id}/republish` moves the current-revision pointer to an existing revision — no new snapshot, no data regenerated, only the same atomic pointer-flip `publish()` already used.
+Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. Sprint 11 added the first write endpoint, `PATCH /venues/{venue_id}` (Save Draft) — no validation, no status transition. Sprint 12 adds the "Validate" gate itself: `POST /venues/{venue_id}/validate`, a read-only canonical check the frontend cannot bypass or duplicate. Sprint 13 evolves that same endpoint's response into an **Editorial Readiness** model (`valid`, `ready_for_review`, `errors`, `warnings`, `info`). Sprint 14 adds the first editorial state transition: `POST /venues/{venue_id}/submit-for-review` moves a venue from `draft` to `review`, gated on `ready_for_review`. Sprint 15 adds the second: `POST /venues/{venue_id}/approve` moves `review` to `approved`, sharing a centralized transition guard (`app/workflow/transitions.py`) with Review rather than duplicating the status-check logic. Sprint 16 adds the Publish Engine: `POST /publish` freezes every currently `approved` destination/venue into a new immutable `publish_revisions` snapshot, and `GET /published/venues` is the first public read path — it reads *only* that snapshot, never the draft tables. Sprint 17 adds the read-only Revision Browser: `GET /publish/revisions` (history list) and `GET /publish/revisions/{id}` (a single revision's metadata plus its full snapshot) — both metadata/inspection only, neither writes anything. Sprint 18 adds Republish: `POST /publish/revisions/{id}/republish` moves the current-revision pointer to an existing revision — no new snapshot, no data regenerated, only the same atomic pointer-flip `publish()` already used. Sprint 19 adds the Editorial Activity Log: `GET /activity`, backed by a new `app/activity/` service and `activity_log` table — a cross-cutting observability record of Submit for Review, Approve, Publish, and Republish, independent of Validation/Workflow/Publishing and read by none of them.
 
 ## Stack
 
@@ -307,6 +307,45 @@ Added Sprint 18 — **Republish**, the action Sprint 16/17 flagged as future "Ro
 **Why republishing is safer than rewriting history.** The alternative to "move the pointer to an old revision" would be something like "re-run publish, but reconstruct the old data first" — which requires either keeping draft rows in sync with a past state (impossible without destructive edits to *current* draft content) or mutating an old revision's snapshot to make it "current-shaped" again. Both are strictly more dangerous than what Republish actually does: it never reads or writes `destinations`/`venues`, never reconstructs anything, and never touches a snapshot's bytes. The only state that changes is which single row has `is_current = true` — the smallest, most reversible operation that could possibly achieve "make the site show what it showed before."
 
 **Why snapshots remain immutable, even now that there's a reason to want to "restore" one.** It would be tempting to think Republish needs to touch the target snapshot somehow — bump its `published_at`, say, to reflect "when it became current again." Sprint 18 deliberately does neither: the target revision's `snapshot` and `published_at` stay exactly as they were the moment it was first published. This is what makes Republish trustworthy in the first place — if reusing a revision meant mutating it, a second republish of the same revision could no longer be guaranteed to produce byte-identical results to the first. Immutability isn't just Sprint 16's property anymore; Sprint 18 is proof that even the "restore an old state" action doesn't need to compromise it.
+
+### `GET /activity`
+
+Added Sprint 19 — the **Editorial Activity Log**. Returns every recorded activity entry, newest first, as `ActivityLogEntryOut`:
+
+```json
+[
+  {
+    "id": 5,
+    "timestamp": "2026-07-24T20:04:28.430520Z",
+    "action": "republish",
+    "entity_type": "publish_revision",
+    "entity_id": "8",
+    "actor": "system",
+    "metadata": null
+  },
+  {
+    "id": 3,
+    "timestamp": "2026-07-24T20:04:14.288050Z",
+    "action": "publish",
+    "entity_type": "publish_revision",
+    "entity_id": "8",
+    "actor": "system",
+    "metadata": { "destination_count": 1, "venue_count": 1 }
+  }
+]
+```
+
+Read-only, no filtering, no pagination — matching this sprint's explicit scope. `actor` is currently always `"system"` (see below for why). `entity_id` is always text, even for `publish_revisions`' integer ids, since this table logs references to entities of different id types uniformly.
+
+**Which actions are logged, and from where**: `submit_for_review` and `approve` (both `api/app/api/routes/venues.py`, entity type `venue`), and `publish` and `republish` (both `api/app/publishing/engine.py`, entity type `publish_revision`). Every one of these four call sites calls the same `app/activity/service.py` function — `log_activity()` — rather than constructing its own row; see that module for the single source of truth on what an activity entry looks like.
+
+**This does not change any workflow.** Nothing added this sprint touches `destinations`, `venues`, or `publish_revisions` — `log_activity()` only ever inserts into `activity_log`, and `GET /activity` only ever reads from it. Save Draft and Validate remain unlogged, deliberately: they're not the four actions this sprint's requirements named, and neither actually changes editorial state (Validate is read-only; Save Draft can happen many times per edit and doesn't itself move a row through the workflow) — the log is a record of state *transitions* and publish *events*, not every touch of a row.
+
+#### Editorial Activity Log (Sprint 19)
+
+**Why activity logging is infrastructure, not workflow.** Every one of the four logged actions already fully decides what happens to `destinations`/`venues`/`publish_revisions` before `log_activity()` is ever called — Review's readiness gate, Approval's status guard, Publish's eligibility filter, and Republish's already-current check all run and either succeed or reject *first*. Logging happens only once an action has already succeeded, and it never influences whether that action succeeds: `log_activity()` takes no lock, checks no precondition, and returns nothing any caller inspects to decide further behavior. This is what makes it infrastructure rather than a fifth workflow concept — a workflow step affects what happens next; this only ever records what already did.
+
+**How future users/roles will integrate with it.** The `actor` column exists today specifically to receive this without a schema change: every call site currently passes the module-level `PLACEHOLDER_ACTOR = "system"` default from `app/activity/service.py`, but `log_activity()`'s signature already accepts a real `actor` argument. Once authentication exists, each of the four call sites threads the authenticated user's identifier through instead of relying on the default — a one-line change per call site, not a new column, new table, or new endpoint. Roles/permissions (who's *allowed* to approve or publish) are a separate, not-yet-designed concern from *logging who did* — this sprint deliberately only builds the latter, since the former depends on an authentication approach that's still an open decision (see `docs/ARCHITECTURE.md`'s "Decisions still open").
 
 ## Publishing architecture: still-open pieces
 

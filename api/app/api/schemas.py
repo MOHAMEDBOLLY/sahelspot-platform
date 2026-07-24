@@ -146,3 +146,17 @@ class PublishedVenueOut(BaseModel):
     gallery_image_urls: list[str] | None = None
     opening_hours: dict | None = None
     beach_details: dict | None = None
+
+
+class ActivityLogEntryOut(BaseModel):
+    """A single editorial activity record — observability only. See
+    app/activity/service.py for the one place these are ever created.
+    """
+
+    id: int
+    timestamp: datetime
+    action: str
+    entity_type: str
+    entity_id: str
+    actor: str
+    metadata: dict | None = None

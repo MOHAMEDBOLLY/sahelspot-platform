@@ -3,6 +3,7 @@ import {
   Store,
   MapPin,
   UploadCloud,
+  Activity as ActivityIcon,
   Settings as SettingsIcon,
   type LucideIcon,
 } from 'lucide-react'
@@ -19,5 +20,6 @@ export const navItems: NavItem[] = [
   { to: '/venues', label: 'Venues', icon: Store },
   { to: '/destinations', label: 'Destinations', icon: MapPin },
   { to: '/publishing', label: 'Publishing', icon: UploadCloud },
+  { to: '/activity', label: 'Activity', icon: ActivityIcon },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]

@@ -2,7 +2,7 @@
 
 ## Status
 
-Database engine is **finalized**: Supabase (PostgreSQL). As of Sprint 1, the API connects to Postgres via a SQLAlchemy engine and exposes a connectivity check at `GET /health`. The schema below was **designed** through four passes (Sprint 2 and 2.5) and is now **implemented** (Sprint 3) as SQLAlchemy models (`api/app/db/models.py`) and a first Alembic migration (`api/alembic/versions/0001_initial_schema.py`), matching this document field-for-field. The migration has not yet been applied to any real database — no Supabase project is connected in this environment. No CRUD endpoints, business logic, or seed data exist yet.
+Database engine is **finalized**: Supabase (PostgreSQL). As of Sprint 1, the API connects to Postgres via a SQLAlchemy engine and exposes a connectivity check at `GET /health`. The original three-table schema below was **designed** through four passes (Sprint 2 and 2.5) and **implemented** (Sprint 3) as SQLAlchemy models (`api/app/db/models.py`) and a first Alembic migration (`api/alembic/versions/0001_initial_schema.py`), applied and verified against a real Supabase database. Sprint 19 added a fourth table, `activity_log` (`api/alembic/versions/0002_activity_log.py`), also applied and verified live — see [`activity_log`](#activity_log) below.
 
 ## Stack
 
@@ -199,7 +199,27 @@ This also removes the need for a separate `venues.visibility` field (`public`/`h
 
 ---
 
-That's the complete schema: **three tables** — `destinations` and `venues` model the product's content, and `publish_revisions` is the mechanism that makes the draft → publish architecture real. Every other concept from earlier passes — regions, destination aliases, destination boundaries, districts, venue categories, beaches, opening hours, images — is a column, not a table, because none of them are independently queried, independently joined against by a third table, or carry enough of their own identity to need one.
+### `activity_log`
+
+**Why this table exists**: added Sprint 19 as the Editorial Activity Log — a cross-cutting observability record of editorial actions (Submit for Review, Approve, Publish, Republish, and any future workflow/publishing action). **Still necessary**: yes, but for a different reason than the other three tables — it doesn't model product content or the publish mechanism, it's a record *about* actions taken elsewhere. Nothing in the codebase reads this table to decide behavior; it exists purely so an editor (and later, an audit process) can see what happened, when, and by whom.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | bigint identity, PK | No legacy ID to preserve — same reasoning as `publish_revisions.id`. |
+| `timestamp` | timestamptz, required | When the action happened. |
+| `action` | text, required | A short action name (`submit_for_review`, `approve`, `publish`, `republish`, ...). Plain text with no `CHECK` constraint, deliberately — new actions are expected to be added as the workflow grows, and a closed enum would need a migration for each one. |
+| `entity_type` | text, required | What kind of thing the action was about (`venue`, `publish_revision`, and later `destination` once destinations gain their own workflow). |
+| `entity_id` | text, required | The affected entity's id, always stored as text — venues use text ids (`v00033`), publish revisions use integer ids; a shared text column avoids a type-per-entity-type complication for what's fundamentally just a logged reference, never joined against. |
+| `actor` | text, required, default `'system'` | Who performed the action. No authentication exists yet, so every entry is currently attributed to the placeholder `"system"` — see [`ARCHITECTURE.md`](ARCHITECTURE.md#publishing-architecture) for how a future authenticated user will supply a real value here instead. |
+| `metadata` | jsonb, nullable | Action-specific extra context (e.g. a publish's `destination_count`/`venue_count`). Not structured further — different actions need different incidental details, and a JSONB column avoids a wide, mostly-null table of action-specific columns. |
+
+**Relationships**: none (no FK in or out) — deliberately, same reasoning as `publish_revisions`: an activity entry is a point-in-time record of what happened, not a live reference. The entity it describes might later change status, get deleted, or (for a venue) simply not exist under the same understanding anymore; the log entry should still read correctly regardless.
+
+**Index**: `activity_log(timestamp)` — the one query this table serves today is "give me every entry, newest first."
+
+---
+
+That's the complete schema: **four tables** — `destinations` and `venues` model the product's content, `publish_revisions` is the mechanism that makes the draft → publish architecture real, and `activity_log` (Sprint 19) is cross-cutting observability infrastructure for the actions performed against the other three. Every other concept from earlier passes — regions, destination aliases, destination boundaries, districts, venue categories, beaches, opening hours, images — is a column, not a table, because none of them are independently queried, independently joined against by a third table, or carry enough of their own identity to need one.
 
 ---
 
