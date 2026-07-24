@@ -1,4 +1,4 @@
-import { CheckCheck, Loader2, Pencil, Save, X } from 'lucide-react'
+import { CheckCheck, Loader2, Pencil, Save, Send, X } from 'lucide-react'
 import type { WorkspaceMode } from './types'
 
 type WorkspaceToolbarProps = {
@@ -9,10 +9,14 @@ type WorkspaceToolbarProps = {
   saveError: string | null
   hasFieldErrors: boolean
   isValidating: boolean
+  canSubmitForReview: boolean
+  isSubmittingForReview: boolean
+  submitForReviewError: string | null
   onEdit: () => void
   onCancel: () => void
   onSave: () => void
   onValidate: () => void
+  onSubmitForReview: () => void
 }
 
 export function WorkspaceToolbar({
@@ -23,10 +27,14 @@ export function WorkspaceToolbar({
   saveError,
   hasFieldErrors,
   isValidating,
+  canSubmitForReview,
+  isSubmittingForReview,
+  submitForReviewError,
   onEdit,
   onCancel,
   onSave,
   onValidate,
+  onSubmitForReview,
 }: WorkspaceToolbarProps) {
   return (
     <div className="flex items-center justify-between gap-4">
@@ -43,6 +51,11 @@ export function WorkspaceToolbar({
             {saveError}
           </span>
         )}
+        {submitForReviewError && (
+          <span className="truncate text-xs font-medium text-red-600" title={submitForReviewError}>
+            {submitForReviewError}
+          </span>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <button
@@ -55,6 +68,17 @@ export function WorkspaceToolbar({
           {isValidating ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
           {isValidating ? 'Validating…' : 'Validate'}
         </button>
+        {canSubmitForReview && (
+          <button
+            type="button"
+            onClick={onSubmitForReview}
+            disabled={isSubmittingForReview}
+            className="flex items-center gap-1.5 rounded-lg bg-green-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isSubmittingForReview ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+            {isSubmittingForReview ? 'Submitting…' : 'Submit for Review'}
+          </button>
+        )}
         {mode === 'view' ? (
           <button
             type="button"

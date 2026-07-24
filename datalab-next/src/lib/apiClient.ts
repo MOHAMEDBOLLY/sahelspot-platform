@@ -38,8 +38,27 @@ export async function apiPost<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, { method: 'POST' })
 
   if (!response.ok) {
-    throw new ApiError(`${path} failed with status ${response.status}`, response.status)
+    throw new ApiError(await extractErrorMessage(response, path), response.status)
   }
 
   return response.json() as Promise<T>
+}
+
+/** FastAPI's `HTTPException(detail=...)` can carry a plain string or a
+ * structured object — surface whichever message is there instead of the
+ * generic "path failed with status N" fallback, since Sprint 14's Review
+ * transition (and any future action endpoint) returns a structured
+ * `{error, message, ...}` detail on rejection. */
+async function extractErrorMessage(response: Response, path: string): Promise<string> {
+  try {
+    const body: unknown = await response.json()
+    const detail = (body as { detail?: unknown } | null)?.detail
+    if (typeof detail === 'string') return detail
+    if (detail && typeof detail === 'object' && typeof (detail as { message?: unknown }).message === 'string') {
+      return (detail as { message: string }).message
+    }
+  } catch {
+    // Response wasn't JSON — fall through to the generic message.
+  }
+  return `${path} failed with status ${response.status}`
 }

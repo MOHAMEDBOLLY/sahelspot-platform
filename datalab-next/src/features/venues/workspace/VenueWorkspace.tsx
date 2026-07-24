@@ -3,6 +3,7 @@ import { MousePointerClick } from 'lucide-react'
 import { useVenue } from '../useVenue'
 import { useUpdateVenue } from '../useUpdateVenue'
 import { useValidateVenue } from '../useValidateVenue'
+import { useSubmitForReview } from '../useSubmitForReview'
 import { toVenuePatch } from '../api'
 import { validateVenueDraft } from '../venueValidation'
 import { ApiError } from '../../../lib/apiClient'
@@ -39,6 +40,12 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
   } = useDraft<Venue>(venue, venueId)
   const { mutate: saveDraft, isPending: isSaving, error: saveError, reset: resetSaveError } = useUpdateVenue()
   const { mutate: runValidate, isPending: isValidating } = useValidateVenue()
+  const {
+    mutate: submitForReview,
+    isPending: isSubmittingForReview,
+    error: submitForReviewError,
+    reset: resetSubmitForReviewError,
+  } = useSubmitForReview()
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
 
   // A stale validation result belongs to whatever the venue looked like when
@@ -50,12 +57,21 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
   const fieldErrors = mode === 'edit' && displayedVenue ? validateVenueDraft(displayedVenue) : {}
   const hasFieldErrors = Object.keys(fieldErrors).length > 0
 
+  // Review is only offerable once someone has actually run Validate and it
+  // came back ready — not derived independently, so this can never drift
+  // from what the backend's Editorial Readiness check just said. Also
+  // requires !isDirty, same reasoning as Validate itself: the persisted row
+  // (what Review would act on) must match what's on screen.
+  const canSubmitForReview =
+    !isDirty && displayedVenue?.status === 'draft' && validationResult?.ready_for_review === true
+
   useEffect(() => {
     onDirtyChange?.(isDirty)
   }, [isDirty, onDirtyChange])
 
   function handleCancel() {
     resetSaveError()
+    resetSubmitForReviewError()
     cancelEditing()
   }
 
@@ -75,6 +91,16 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
   function handleValidate() {
     if (!venueId) return
     runValidate(venueId, { onSuccess: setValidationResult })
+  }
+
+  function handleSubmitForReview() {
+    if (!venueId) return
+    submitForReview(venueId, {
+      onSuccess: (updatedVenue) => {
+        commitSave(updatedVenue)
+        setValidationResult(null)
+      },
+    })
   }
 
   if (!venueId) {
@@ -114,10 +140,20 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
         saveError={saveError instanceof ApiError ? saveError.message : saveError ? 'Failed to save.' : null}
         hasFieldErrors={hasFieldErrors}
         isValidating={isValidating}
+        canSubmitForReview={canSubmitForReview}
+        isSubmittingForReview={isSubmittingForReview}
+        submitForReviewError={
+          submitForReviewError instanceof ApiError
+            ? submitForReviewError.message
+            : submitForReviewError
+              ? 'Failed to submit for review.'
+              : null
+        }
         onEdit={startEditing}
         onCancel={handleCancel}
         onSave={handleSave}
         onValidate={handleValidate}
+        onSubmitForReview={handleSubmitForReview}
       />
       {validationResult && <ValidationSummary result={validationResult} />}
       <BasicInfoSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} errors={fieldErrors} />

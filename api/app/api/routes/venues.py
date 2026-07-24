@@ -48,12 +48,58 @@ def update_venue(venue_id: str, payload: VenueUpdate, db: Session = Depends(get_
 
 @router.post("/{venue_id}/validate", response_model=ValidationResult)
 def validate_venue_route(venue_id: str, db: Session = Depends(get_db)):
-    """Runs the canonical "Validate" gate (see docs/DATABASE.md) against the
-    venue's currently persisted draft state. Read-only — this checks whether
-    the row is fit to move from `draft` to `review`, it doesn't move it there
-    itself (Review isn't built yet).
+    """Runs the canonical Editorial Readiness check (see docs/DATABASE.md)
+    against the venue's currently persisted draft state. Read-only — this
+    checks whether the row is fit to move from `draft` to `review`, it
+    doesn't move it there itself. See submit_venue_for_review below for the
+    action that actually performs that transition.
     """
     venue = db.get(Venue, venue_id)
     if venue is None:
         raise HTTPException(status_code=404, detail="Venue not found")
     return validate_venue(venue)
+
+
+@router.post("/{venue_id}/submit-for-review", response_model=VenueOut)
+def submit_venue_for_review(venue_id: str, db: Session = Depends(get_db)):
+    """Review — the first editorial state transition: `draft` -> `review`.
+    This is an editorial *action* (it writes `status`), not a validation
+    check — it reuses `validate_venue()` as a precondition rather than
+    re-deciding readiness itself, so the two concepts stay separate (see
+    docs/API.md's "Review Workflow" section). Not Approval or Publish:
+    nothing here touches `publish_revisions`, and `review` is not a
+    publishable state.
+    """
+    venue = db.get(Venue, venue_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    if venue.status != "draft":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "invalid_transition",
+                "message": (
+                    f"Venue is in '{venue.status}' status; only a 'draft' "
+                    "venue can be submitted for review."
+                ),
+                "current_status": venue.status,
+            },
+        )
+
+    result = validate_venue(venue)
+    if not result.ready_for_review:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "not_ready_for_review",
+                "message": "Venue is not ready for review.",
+                "errors": [error.model_dump() for error in result.errors],
+            },
+        )
+
+    venue.status = "review"
+    db.commit()
+
+    venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+    return venue

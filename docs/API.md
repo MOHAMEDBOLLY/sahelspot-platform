@@ -2,7 +2,7 @@
 
 ## Status
 
-Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. Sprint 11 added the first write endpoint, `PATCH /venues/{venue_id}` (Save Draft) — no validation, no status transition. Sprint 12 adds the "Validate" gate itself: `POST /venues/{venue_id}/validate`, a read-only canonical check the frontend cannot bypass or duplicate. Sprint 13 evolves that same endpoint's response into an **Editorial Readiness** model (`valid`, `ready_for_review`, `errors`, `warnings`, `info`) — same endpoint, additive response shape, still no status transition. Review, Publish, and revisioning are still not implemented.
+Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. Sprint 11 added the first write endpoint, `PATCH /venues/{venue_id}` (Save Draft) — no validation, no status transition. Sprint 12 adds the "Validate" gate itself: `POST /venues/{venue_id}/validate`, a read-only canonical check the frontend cannot bypass or duplicate. Sprint 13 evolves that same endpoint's response into an **Editorial Readiness** model (`valid`, `ready_for_review`, `errors`, `warnings`, `info`). Sprint 14 adds the first editorial state transition: `POST /venues/{venue_id}/submit-for-review` moves a venue from `draft` to `review`, gated on `ready_for_review`. Approval, Publish, and revisioning are still not implemented.
 
 ## Stack
 
@@ -131,6 +131,43 @@ The frontend's Edit Mode runs its own lightweight checks (required-ness, charact
 **How Review will later consume this state.** Review's implementation (not yet built) is expected to call this same endpoint's underlying `validate_venue()` (or the HTTP endpoint itself) as a precondition check before allowing the `draft → review` transition — reject the transition with a 4xx and the same `errors` list if `ready_for_review` is `false`, proceed if `true`. No new validation logic gets written for Review; it consumes the existing `ValidationResult`, which is the entire reason this sprint extended the response shape instead of building a parallel one.
 
 **How Publish will later depend on Review.** Per [`DATABASE.md`](DATABASE.md#editorial-status-one-shared-vocabulary-renamed-to-avoid-colliding-with-the-new-meaning-of-publish), only rows with `status = approved` are eligible for the next Publish snapshot, and `approved` is only reachable by passing through `review` first (`draft → review → approved`). So Publish's eventual eligibility check is transitively gated by this sprint's work: a row can't be `approved` without having passed Review, and Review (once built) won't allow the transition without `ready_for_review: true` from this endpoint. Editorial Readiness is therefore the first link in that chain, not a parallel or optional one.
+
+### `POST /venues/{venue_id}/submit-for-review`
+
+Added Sprint 14 — **Review**, the first editorial state transition: `venues.status` moves from `draft` to `review`. Takes no request body — like Validate, it acts on the venue's currently persisted row. Returns the updated venue (`VenueOut`, same shape as the `GET`/`PATCH` endpoints) on success. `404` if the venue doesn't exist.
+
+Rejects rather than silently no-oping on an invalid transition, with a structured `detail`:
+
+- **`409 Conflict`** if the venue's current `status` isn't `draft` (covers "already in review," "already approved," and "archived" alike — anything that isn't `draft` is rejected the same way):
+  ```json
+  {
+    "detail": {
+      "error": "invalid_transition",
+      "message": "Venue is in 'review' status; only a 'draft' venue can be submitted for review.",
+      "current_status": "review"
+    }
+  }
+  ```
+- **`422 Unprocessable Entity`** if the venue *is* `draft` but isn't ready — `validate_venue()`'s `ready_for_review` is `false`:
+  ```json
+  {
+    "detail": {
+      "error": "not_ready_for_review",
+      "message": "Venue is not ready for review.",
+      "errors": [
+        { "field": "latitude", "message": "Latitude must be between 30.6 and 31.1." }
+      ]
+    }
+  }
+  ```
+
+**This is an editorial action, not a validation check — the two stay separate on purpose.** The route calls `validate_venue()` (the exact same function `POST /venues/{id}/validate` calls) as a precondition, rather than re-implementing readiness logic or trusting a client-supplied "yes it's ready" flag. Validate itself remains read-only and side-effect-free; this endpoint is the only place in the codebase that writes `venues.status`. Nothing here touches `publish_revisions` — `review` is not a publishable state, and Approval (the still-unbuilt `review → approved` transition) is a separate, later action, not something this endpoint does implicitly on top of the `draft → review` move.
+
+#### Review Workflow (Sprint 14)
+
+**Why Review is the first workflow transition.** Of the four state changes `venues.status` will ever make (`draft → review → approved`, then the separate `archived` path), `draft → review` is the only one with no precondition beyond Editorial Readiness itself — Sprint 13 already built the exact check (`ready_for_review`) this transition needs, with nothing else to design first. `review → approved` (Approval) implies a human reviewer's decision the schema doesn't model yet (who approved it, when, any reviewer notes), and `approved →` Publish is a whole-dataset snapshot operation (see [`DATABASE.md`](DATABASE.md#publish_revisions)), not a single-row transition at all. Building `draft → review` first means every later transition can follow the same shape it establishes here — fetch the row, check a precondition, reject with a structured error or write the new `status` — rather than inventing that pattern from scratch once the harder transitions (which need actual new business rules) are in scope.
+
+**Why Approval remains separate.** Folding `review → approved` into this same endpoint (e.g., an optional "and approve it too" flag) would collapse two different real-world decisions into one action: "is this row objectively ready" (Editorial Readiness, already automatable) versus "does a human reviewer actually approve this content" (Approval — a judgment call, not a re-run of the same checks). The moment Approval is scoped, it'll need its own precondition (status must be `review`, not `draft`) and very likely its own actor/notes fields once authentication exists — none of which belongs bolted onto Review's endpoint. Keeping them as two distinct, later-composable actions (`draft → review` now, `review → approved` next) mirrors exactly how `DATABASE.md` already describes the workflow as four distinct stages, not two.
 
 ## Response model enrichment (Sprint 8)
 

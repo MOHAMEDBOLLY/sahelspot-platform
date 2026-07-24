@@ -69,3 +69,10 @@ export function updateVenue(id: string, patch: VenuePatch): Promise<Venue> {
 export function validateVenue(id: string): Promise<ValidationResult> {
   return apiPost<ValidationResult>(`/venues/${encodeURIComponent(id)}/validate`)
 }
+
+/** Review — the first editorial state transition (`draft` -> `review`).
+ * Rejects with a structured error (409 wrong status, 422 not ready) rather
+ * than performing the transition unconditionally. */
+export function submitVenueForReview(id: string): Promise<Venue> {
+  return apiPost<Venue>(`/venues/${encodeURIComponent(id)}/submit-for-review`)
+}
