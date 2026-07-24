@@ -4,6 +4,7 @@ import { useVenue } from '../useVenue'
 import { useUpdateVenue } from '../useUpdateVenue'
 import { useValidateVenue } from '../useValidateVenue'
 import { useSubmitForReview } from '../useSubmitForReview'
+import { useApproveVenue } from '../useApproveVenue'
 import { toVenuePatch } from '../api'
 import { validateVenueDraft } from '../venueValidation'
 import { ApiError } from '../../../lib/apiClient'
@@ -46,6 +47,12 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
     error: submitForReviewError,
     reset: resetSubmitForReviewError,
   } = useSubmitForReview()
+  const {
+    mutate: approve,
+    isPending: isApproving,
+    error: approveError,
+    reset: resetApproveError,
+  } = useApproveVenue()
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
 
   // A stale validation result belongs to whatever the venue looked like when
@@ -65,6 +72,13 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
   const canSubmitForReview =
     !isDirty && displayedVenue?.status === 'draft' && validationResult?.ready_for_review === true
 
+  // Approval is a human editorial decision, not a re-run of Validate — it
+  // only depends on the venue's current status, never on validationResult.
+  // Still requires !isDirty for the same reason Review does: Approval acts
+  // on the persisted row, so it shouldn't be offered while what's on screen
+  // might not match it.
+  const canApprove = !isDirty && displayedVenue?.status === 'review'
+
   useEffect(() => {
     onDirtyChange?.(isDirty)
   }, [isDirty, onDirtyChange])
@@ -72,6 +86,7 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
   function handleCancel() {
     resetSaveError()
     resetSubmitForReviewError()
+    resetApproveError()
     cancelEditing()
   }
 
@@ -101,6 +116,11 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
         setValidationResult(null)
       },
     })
+  }
+
+  function handleApprove() {
+    if (!venueId) return
+    approve(venueId, { onSuccess: commitSave })
   }
 
   if (!venueId) {
@@ -149,11 +169,17 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
               ? 'Failed to submit for review.'
               : null
         }
+        canApprove={canApprove}
+        isApproving={isApproving}
+        approveError={
+          approveError instanceof ApiError ? approveError.message : approveError ? 'Failed to approve.' : null
+        }
         onEdit={startEditing}
         onCancel={handleCancel}
         onSave={handleSave}
         onValidate={handleValidate}
         onSubmitForReview={handleSubmitForReview}
+        onApprove={handleApprove}
       />
       {validationResult && <ValidationSummary result={validationResult} />}
       <BasicInfoSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} errors={fieldErrors} />

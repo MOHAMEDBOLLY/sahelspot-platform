@@ -1,4 +1,4 @@
-import { CheckCheck, Loader2, Pencil, Save, Send, X } from 'lucide-react'
+import { CheckCheck, Loader2, Pencil, Save, Send, ThumbsUp, X } from 'lucide-react'
 import type { WorkspaceMode } from './types'
 
 type WorkspaceToolbarProps = {
@@ -12,11 +12,15 @@ type WorkspaceToolbarProps = {
   canSubmitForReview: boolean
   isSubmittingForReview: boolean
   submitForReviewError: string | null
+  canApprove: boolean
+  isApproving: boolean
+  approveError: string | null
   onEdit: () => void
   onCancel: () => void
   onSave: () => void
   onValidate: () => void
   onSubmitForReview: () => void
+  onApprove: () => void
 }
 
 export function WorkspaceToolbar({
@@ -30,11 +34,15 @@ export function WorkspaceToolbar({
   canSubmitForReview,
   isSubmittingForReview,
   submitForReviewError,
+  canApprove,
+  isApproving,
+  approveError,
   onEdit,
   onCancel,
   onSave,
   onValidate,
   onSubmitForReview,
+  onApprove,
 }: WorkspaceToolbarProps) {
   return (
     <div className="flex items-center justify-between gap-4">
@@ -54,6 +62,11 @@ export function WorkspaceToolbar({
         {submitForReviewError && (
           <span className="truncate text-xs font-medium text-red-600" title={submitForReviewError}>
             {submitForReviewError}
+          </span>
+        )}
+        {approveError && (
+          <span className="truncate text-xs font-medium text-red-600" title={approveError}>
+            {approveError}
           </span>
         )}
       </div>
@@ -77,6 +90,17 @@ export function WorkspaceToolbar({
           >
             {isSubmittingForReview ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
             {isSubmittingForReview ? 'Submitting…' : 'Submit for Review'}
+          </button>
+        )}
+        {canApprove && (
+          <button
+            type="button"
+            onClick={onApprove}
+            disabled={isApproving}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isApproving ? <Loader2 size={14} className="animate-spin" /> : <ThumbsUp size={14} />}
+            {isApproving ? 'Approving…' : 'Approve'}
           </button>
         )}
         {mode === 'view' ? (

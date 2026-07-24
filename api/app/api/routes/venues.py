@@ -6,6 +6,7 @@ from app.db.models import Venue
 from app.db.session import get_db
 from app.validation.schemas import ValidationResult
 from app.validation.venues import validate_venue
+from app.workflow.transitions import require_status
 
 router = APIRouter(prefix="/venues", tags=["venues"])
 
@@ -74,18 +75,7 @@ def submit_venue_for_review(venue_id: str, db: Session = Depends(get_db)):
     if venue is None:
         raise HTTPException(status_code=404, detail="Venue not found")
 
-    if venue.status != "draft":
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "error": "invalid_transition",
-                "message": (
-                    f"Venue is in '{venue.status}' status; only a 'draft' "
-                    "venue can be submitted for review."
-                ),
-                "current_status": venue.status,
-            },
-        )
+    require_status(venue, expected="draft", target="review")
 
     result = validate_venue(venue)
     if not result.ready_for_review:
@@ -99,6 +89,30 @@ def submit_venue_for_review(venue_id: str, db: Session = Depends(get_db)):
         )
 
     venue.status = "review"
+    db.commit()
+
+    venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+    return venue
+
+
+@router.post("/{venue_id}/approve", response_model=VenueOut)
+def approve_venue(venue_id: str, db: Session = Depends(get_db)):
+    """Approval — the second editorial state transition: `review` ->
+    `approved`. A human editorial decision, not a validation re-run:
+    Editorial Readiness was already the prerequisite for entering `review`
+    in the first place (Sprint 14), so it is never repeated here — the only
+    precondition Approval enforces is the status guard itself, via the same
+    `require_status` Review already uses. Not Publish: nothing here touches
+    `publish_revisions` — `approved` only makes a venue *eligible* for the
+    next publish, it doesn't publish it.
+    """
+    venue = db.get(Venue, venue_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    require_status(venue, expected="review", target="approved")
+
+    venue.status = "approved"
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])

@@ -76,3 +76,10 @@ export function validateVenue(id: string): Promise<ValidationResult> {
 export function submitVenueForReview(id: string): Promise<Venue> {
   return apiPost<Venue>(`/venues/${encodeURIComponent(id)}/submit-for-review`)
 }
+
+/** Approval — the second editorial state transition (`review` -> `approved`).
+ * A human editorial decision, not a re-run of Validate — rejects with a
+ * structured 409 if the venue isn't currently `review`. */
+export function approveVenue(id: string): Promise<Venue> {
+  return apiPost<Venue>(`/venues/${encodeURIComponent(id)}/approve`)
+}
