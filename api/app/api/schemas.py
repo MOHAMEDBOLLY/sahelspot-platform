@@ -87,3 +87,51 @@ class VenueUpdate(BaseModel):
     facebook_handle: str | None = None
     tiktok_handle: str | None = None
     internal_notes: str | None = None
+
+
+class PublishRevisionOut(BaseModel):
+    """Metadata about a publish revision — not its full snapshot. Returned
+    by the Publish action itself; a future revision-history/rollback
+    endpoint would reuse this same shape.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    is_current: bool
+    published_at: datetime
+    published_by: str | None = None
+    label: str | None = None
+    destination_count: int | None = None
+    venue_count: int | None = None
+
+
+class PublishedVenueOut(BaseModel):
+    """The public read shape — deliberately leaner than `VenueOut`: no
+    `status` (everything here is implicitly published), no editorial-only
+    fields (`internal_notes`, `source`, timestamps). Sourced entirely from
+    a publish revision's frozen snapshot, never from the live `venues` table.
+    """
+
+    id: str
+    name: str
+    slug: str
+    destination: DestinationRef
+    district: str | None = None
+    category: str
+    is_featured: bool
+    is_verified: bool
+    latitude: str | None = None
+    longitude: str | None = None
+    phone: str | None = None
+    whatsapp: str | None = None
+    website: str | None = None
+    maps_url: str | None = None
+    instagram_handle: str | None = None
+    facebook_handle: str | None = None
+    tiktok_handle: str | None = None
+    short_description: str | None = None
+    cover_image_url: str | None = None
+    gallery_image_urls: list[str] | None = None
+    opening_hours: dict | None = None
+    beach_details: dict | None = None

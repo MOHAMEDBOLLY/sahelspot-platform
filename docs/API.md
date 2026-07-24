@@ -2,7 +2,7 @@
 
 ## Status
 
-Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. Sprint 11 added the first write endpoint, `PATCH /venues/{venue_id}` (Save Draft) — no validation, no status transition. Sprint 12 adds the "Validate" gate itself: `POST /venues/{venue_id}/validate`, a read-only canonical check the frontend cannot bypass or duplicate. Sprint 13 evolves that same endpoint's response into an **Editorial Readiness** model (`valid`, `ready_for_review`, `errors`, `warnings`, `info`). Sprint 14 adds the first editorial state transition: `POST /venues/{venue_id}/submit-for-review` moves a venue from `draft` to `review`, gated on `ready_for_review`. Sprint 15 adds the second: `POST /venues/{venue_id}/approve` moves `review` to `approved`, sharing a centralized transition guard (`app/workflow/transitions.py`) with Review rather than duplicating the status-check logic. Publish and revisioning are still not implemented.
+Backend stack is **finalized**: Python 3.12 (currently running on 3.13 locally, see [`ARCHITECTURE.md`](ARCHITECTURE.md#known-deviations)), FastAPI, SQLAlchemy 2, Alembic. App startup, config, logging, and a Supabase/PostgreSQL connection have existed since Sprint 1. The data model (Sprint 3) and read endpoints for destinations and venues (Sprint 4, enriched Sprint 8) exist and are verified against a real Supabase database. Sprint 11 added the first write endpoint, `PATCH /venues/{venue_id}` (Save Draft) — no validation, no status transition. Sprint 12 adds the "Validate" gate itself: `POST /venues/{venue_id}/validate`, a read-only canonical check the frontend cannot bypass or duplicate. Sprint 13 evolves that same endpoint's response into an **Editorial Readiness** model (`valid`, `ready_for_review`, `errors`, `warnings`, `info`). Sprint 14 adds the first editorial state transition: `POST /venues/{venue_id}/submit-for-review` moves a venue from `draft` to `review`, gated on `ready_for_review`. Sprint 15 adds the second: `POST /venues/{venue_id}/approve` moves `review` to `approved`, sharing a centralized transition guard (`app/workflow/transitions.py`) with Review rather than duplicating the status-check logic. Sprint 16 adds the Publish Engine: `POST /publish` freezes every currently `approved` destination/venue into a new immutable `publish_revisions` snapshot, and `GET /published/venues` is the first public read path — it reads *only* that snapshot, never the draft tables. Rollback and revision browsing/history are not yet implemented.
 
 ## Stack
 
@@ -216,17 +216,61 @@ instead of `"destination_id": "marassi"`. The FK column itself is unchanged (see
 
 **Considered and left alone**: `category`, `district`, and `status` are already plain, human-readable strings with no lookup table behind them (a deliberate simplification from the Sprint 2.5 schema review — see [`DATABASE.md`](DATABASE.md#categories-a-small-fixed-flat-list--not-a-table)), so there's no id to resolve. Booleans (`is_featured`, `is_verified`) and timestamps are left as raw booleans/ISO strings — formatting those into "Yes"/"No" or a locale-specific date is display formatting, not business logic, and doing it server-side would bake in a language/timezone the API has no business assuming.
 
-## Publishing architecture: two endpoint groups, not yet built
+### `POST /publish`
 
-The platform is **not live-edit** — see [`PRODUCT.md`](PRODUCT.md#content--publishing-model) and [`ARCHITECTURE.md`](ARCHITECTURE.md#publishing-architecture). This shapes the API into two logically separate groups, planned but **not implemented**:
+Added Sprint 16 — the **Publish Engine**. Gathers every `destinations`/`venues` row currently `status = approved`, freezes them into a new, immutable `publish_revisions` row, and atomically makes it the current one (the previous current revision, if any, is flipped to `is_current = false` in the same transaction — never edited, never deleted). No request body. Returns `PublishRevisionOut` — revision metadata, not the full snapshot:
 
-- **Public endpoints** (e.g. under `/destinations`, `/venues`) will read *only* from the current publish revision (see [`DATABASE.md`](DATABASE.md#publish_revisions)) — never from the `destinations`/`venues` working tables directly. No draft or in-review content can ever be returned by a public endpoint, by construction, not by a filter that could be forgotten.
-- **Editorial/admin endpoints** (e.g. under `/admin/...`, authenticated — auth approach still undecided) will manage the draft workflow: create/edit destinations and venues, run validation, move content through review, and trigger the two actions that don't exist in a live-edit system:
-  - **Publish** — snapshots all `approved` content into a new publish revision and makes it current.
-  - **Rollback** — makes a previous publish revision current again, instantly.
-  - Plus a read endpoint to list publish-revision history (for an admin "what's been published, and when" view).
+```json
+{
+  "id": 3,
+  "is_current": true,
+  "published_at": "2026-07-24T17:54:00.356000Z",
+  "published_by": null,
+  "label": null,
+  "destination_count": 1,
+  "venue_count": 1
+}
+```
 
-None of this is designed at the request/response level yet — routes, payload shapes, and auth are all open. This section exists so the *shape* of the API (public vs. editorial, and that Publish/Rollback are real actions, not implicit side effects) is decided before the endpoints themselves are.
+Also stamps `last_published_at` on every published `destinations`/`venues` row (the field `docs/DATABASE.md` already designed for exactly this, unused until now) — the same timestamp as the revision's own `published_at`, so "was this row included in the current publish" and "when was the current publish" always agree.
+
+**Not a status change.** This route never reads or writes `destinations.status`/`venues.status` — Approval (Sprint 15) already decided what's eligible; Publish only freezes it. The engine itself (`app/publishing/engine.py`) has no concept of `draft`/`review` at all, only "is this row `approved` right now."
+
+### `GET /published/venues`
+
+Added Sprint 16 — the first real **public read path**. Reads *only* the current publish revision's frozen snapshot — there is no code path in this handler that queries the draft `venues`/`destinations` tables at all, so draft, in-review, or approved-but-not-yet-published content can never appear here, by construction rather than by a filter that could be forgotten. Returns `[]` if nothing has ever been published. Response shape (`PublishedVenueOut`) is deliberately leaner than `VenueOut`: no `status` (everything here is implicitly published) and no editorial-only fields (`internal_notes`, `source`, timestamps):
+
+```json
+[
+  {
+    "id": "v00001",
+    "name": "The Smokery",
+    "slug": "the-smokery",
+    "destination": { "id": "marassi", "name": "Marassi" },
+    "category": "Restaurant",
+    "is_featured": true,
+    "is_verified": true,
+    "...": "..."
+  }
+]
+```
+
+#### Publish Engine (Sprint 16)
+
+**Why publishing is snapshot-based, not a live query.** A "publish" that just meant "the public API queries `WHERE status = 'approved'` at read time" would leak two problems: it can't answer "what did the site look like on Tuesday" (Rollback needs a real distinct past state to restore, not a re-run of today's filter), and it couples the public read path's performance/availability to the same tables editors are actively writing to. A snapshot decouples both: `publish_revisions.snapshot` is a complete, self-contained copy — `GET /published/venues` never touches `Destination`/`Venue` at all (see `get_current_revision()` in `app/publishing/engine.py`), so heavy draft-table writes can never affect public reads, and a past revision remains a fully faithful copy of exactly what was live at that moment, not a reconstruction.
+
+**Why immutable revisions exist.** `publish_revisions` rows are never updated or deleted by any code path in this codebase — a new publish always *inserts* a new row and flips the pointer, it never rewrites an old one. This is what makes "roll back to how the site looked before" a meaningful, trustworthy operation: if history could be edited, a rollback target might not actually be what was once live. Sprint 16 verified this directly — publishing twice with different draft content in between produced two distinct, independently-readable revisions, with the first left byte-for-byte as it was.
+
+**How Rollback will later reuse this infrastructure.** Everything Rollback needs already exists after this sprint: multiple `publish_revisions` rows persist (never overwritten), each is a complete, independently valid snapshot, and exactly one is ever `is_current` at a time (the partial unique index guarantees this, and `publish()`'s flip-then-insert pattern is the only code path that changes it). Rollback (not built this sprint, per instruction) will be almost the entire inverse of half of `publish()` — flip the *currently* current revision to `false` and flip a *chosen past* revision to `true`, in one transaction, reusing the exact same atomic-pointer-move pattern already proven here. It needs no new snapshot logic at all, only a different source for which row becomes current. Revision browsing/history (also out of scope this sprint) would similarly just be a new read endpoint listing `PublishRevisionOut` rows — no new mechanism, just a new query.
+
+## Publishing architecture: still-open pieces
+
+The platform is **not live-edit** — see [`PRODUCT.md`](PRODUCT.md#content--publishing-model) and [`ARCHITECTURE.md`](ARCHITECTURE.md#publishing-architecture). As of Sprint 16, the core mechanism (snapshot + atomic pointer + isolated public read) is real, verified against Supabase. Still open:
+
+- **Rollback** — repointing `is_current` at a past revision. Deliberately not built this sprint (see "How Rollback will later reuse this infrastructure" above).
+- **Revision browsing/history** — a `GET /publish-revisions` (or similar) listing endpoint. Deliberately not built this sprint, per instruction.
+- **The full public/editorial endpoint split** — `GET /published/venues` is the first public-only route, but `GET /venues`/`GET /destinations` still read the draft tables directly and aren't behind any editorial auth yet (auth itself remains undecided). A `GET /published/destinations` companion to `GET /published/venues` also doesn't exist yet — not needed for this sprint's verification, since `PublishedVenueOut` already embeds the resolved `destination: {id, name}` a public consumer needs.
+- **A known snapshot edge case, not yet handled**: `publish()` includes a venue only if its own `status` is `approved`, but does not require its `destination` to also be `approved`. If that ever diverges (an approved venue whose destination is still `draft`/`review`), `GET /published/venues` silently skips that venue rather than crashing, since it has no destination name to resolve in the snapshot — flagged as follow-up in `docs/ROADMAP.md`, not fixed this sprint, since the current seed data never exercises it (both the seeded destination and venue are `approved`).
 
 ## CORS
 

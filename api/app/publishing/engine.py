@@ -1,0 +1,135 @@
+"""The Publish Engine — snapshot creation only.
+
+Deliberately its own package, separate from `app/validation/` (Editorial
+Readiness) and `app/workflow/` (status transitions): Publishing is not a
+status change, it is a whole-dataset snapshot operation. Mixing it into
+either of those modules would blur a distinction docs/ARCHITECTURE.md is
+explicit about — see "Publishing architecture" there.
+"""
+
+from datetime import datetime, timezone
+from decimal import Decimal
+
+from sqlalchemy.orm import Session
+
+from app.db.models import Destination, PublishRevision, Venue
+
+
+def _decimal_to_str(value: Decimal | None) -> str | None:
+    return str(value) if value is not None else None
+
+
+def _serialize_destination(destination: Destination) -> dict:
+    """Only the fields a frozen, public-facing snapshot needs. `status` is
+    omitted — every destination here is `approved` by construction (that's
+    what qualified it for this snapshot), so repeating it would be dead
+    weight. Editorial-only fields (`last_published_at`, timestamps) are
+    admin concerns, not part of what the public reads.
+    """
+    return {
+        "id": destination.id,
+        "name": destination.name,
+        "region": destination.region,
+        "aliases": destination.aliases,
+        "boundary": destination.boundary,
+        "notes": destination.notes,
+    }
+
+
+def _serialize_venue(venue: Venue) -> dict:
+    """Same reasoning as `_serialize_destination` — no `status`, no
+    editorial-only fields (`internal_notes`, `source`, `last_published_at`,
+    timestamps). Decimal columns are stringified since JSONB storage and
+    the eventual JSON response both need a JSON-native type.
+    """
+    return {
+        "id": venue.id,
+        "name": venue.name,
+        "slug": venue.slug,
+        "destination_id": venue.destination_id,
+        "district": venue.district,
+        "category": venue.category,
+        "is_featured": venue.is_featured,
+        "is_verified": venue.is_verified,
+        "latitude": _decimal_to_str(venue.latitude),
+        "longitude": _decimal_to_str(venue.longitude),
+        "phone": venue.phone,
+        "whatsapp": venue.whatsapp,
+        "website": venue.website,
+        "maps_url": venue.maps_url,
+        "instagram_handle": venue.instagram_handle,
+        "facebook_handle": venue.facebook_handle,
+        "tiktok_handle": venue.tiktok_handle,
+        "short_description": venue.short_description,
+        "cover_image_url": venue.cover_image_url,
+        "gallery_image_urls": venue.gallery_image_urls,
+        "opening_hours": venue.opening_hours,
+        "beach_details": venue.beach_details,
+    }
+
+
+def publish(db: Session) -> PublishRevision:
+    """Gathers every currently `approved` destination and venue, freezes
+    them into a new immutable `publish_revisions` row, and atomically makes
+    it the current one: the previous current revision (if any) is flipped
+    to `is_current=False` in the same transaction as the new row's insert,
+    so there is never a moment with zero or two current revisions — the
+    partial unique index on `is_current` backs this at the database level
+    too. Also stamps `last_published_at` on every published row (the field
+    docs/DATABASE.md already designed for exactly this, unused until now).
+
+    Never reads or writes `status` on any row — Approval already decided
+    what's eligible; Publish only freezes it. That separation is the whole
+    point: this function has no concept of "review" or "draft" at all.
+    """
+    now = datetime.now(timezone.utc)
+
+    destinations = (
+        db.query(Destination)
+        .filter(Destination.status == "approved")
+        .order_by(Destination.name)
+        .all()
+    )
+    venues = (
+        db.query(Venue)
+        .filter(Venue.status == "approved")
+        .order_by(Venue.name)
+        .all()
+    )
+
+    snapshot = {
+        "destinations": [_serialize_destination(d) for d in destinations],
+        "venues": [_serialize_venue(v) for v in venues],
+    }
+
+    # Flip the old current (if any) and insert the new one in the same
+    # transaction — committed together, so the pointer move is atomic.
+    db.query(PublishRevision).filter(PublishRevision.is_current.is_(True)).update(
+        {"is_current": False}, synchronize_session=False
+    )
+
+    for destination in destinations:
+        destination.last_published_at = now
+    for venue in venues:
+        venue.last_published_at = now
+
+    revision = PublishRevision(
+        snapshot=snapshot,
+        is_current=True,
+        published_at=now,
+        destination_count=len(destinations),
+        venue_count=len(venues),
+    )
+    db.add(revision)
+    db.commit()
+    db.refresh(revision)
+    return revision
+
+
+def get_current_revision(db: Session) -> PublishRevision | None:
+    """The only lookup a public read path is ever allowed to use — no
+    caller of this function should also query `Destination`/`Venue`
+    directly to answer a public request; that would defeat the entire
+    point of the snapshot (see docs/ARCHITECTURE.md#publishing-architecture).
+    """
+    return db.query(PublishRevision).filter(PublishRevision.is_current.is_(True)).one_or_none()
