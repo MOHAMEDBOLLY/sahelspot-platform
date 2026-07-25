@@ -17,6 +17,12 @@ by convention instead of by a separate database:
 - `publish_revisions`/`activity_log` are global, append-only tables with
   no per-test owner; `_clean_global_tables` (autouse) waterlines their max
   id before each test and deletes anything created above it after.
+- Sprint 22 protects every mutation route behind `get_current_user`. Rather
+  than mint real Supabase tokens for every test, `_authenticated_by_default`
+  (autouse) overrides that dependency with a fixed test identity, so
+  existing tests keep exercising the route's actual behavior instead of
+  its auth gate. `test_auth.py` clears the override to test the gate
+  itself.
 
 Because state is shared (not a fresh database per test), tests in this
 suite must run serially, not with a parallel runner like pytest-xdist —
@@ -29,12 +35,29 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func
 
+from app.auth.dependencies import CurrentUser, get_current_user
 from app.db.models import ActivityLogEntry, Destination, PublishRevision, Venue
 from app.db.session import SessionLocal
 from app.main import app
 
 SEED_VENUE_ID = "v00001"
 SEED_DESTINATION_ID = "marassi"
+
+TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
+TEST_USER_EMAIL = "test-editor@example.com"
+
+
+@pytest.fixture(autouse=True)
+def _authenticated_by_default():
+    """Every test is "logged in" as this fixed user unless it explicitly
+    clears the override (see `test_auth.py`) — keeps the rest of the suite
+    focused on route behavior, not on reproducing Supabase's token format.
+    """
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        id=TEST_USER_ID, email=TEST_USER_EMAIL
+    )
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
 
 
 @pytest.fixture()

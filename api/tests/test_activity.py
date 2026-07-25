@@ -5,23 +5,23 @@ own success/rejection behavior is covered in test_workflow.py /
 test_publishing.py.
 """
 
-from tests.conftest import latest_activity
+from tests.conftest import TEST_USER_ID, latest_activity
 
 
 def test_submit_for_review_logs_activity(client, make_venue, db):
     venue = make_venue(status="draft")
 
-    client.post(f"/venues/{venue.id}/submit-for-review")
+    client.post(f"/editor/venues/{venue.id}/submit-for-review")
 
     entry = latest_activity(db, entity_type="venue", entity_id=venue.id, action="submit_for_review")
     assert entry is not None
-    assert entry.actor == "system"
+    assert entry.actor == TEST_USER_ID
 
 
 def test_rejected_submit_for_review_does_not_log_activity(client, make_venue, db):
     venue = make_venue(status="review")  # already in review -> 409, no transition happens
 
-    client.post(f"/venues/{venue.id}/submit-for-review")
+    client.post(f"/editor/venues/{venue.id}/submit-for-review")
 
     entry = latest_activity(db, entity_type="venue", entity_id=venue.id, action="submit_for_review")
     assert entry is None
@@ -30,17 +30,17 @@ def test_rejected_submit_for_review_does_not_log_activity(client, make_venue, db
 def test_approve_logs_activity(client, make_venue, db):
     venue = make_venue(status="review")
 
-    client.post(f"/venues/{venue.id}/approve")
+    client.post(f"/editor/venues/{venue.id}/approve")
 
     entry = latest_activity(db, entity_type="venue", entity_id=venue.id, action="approve")
     assert entry is not None
-    assert entry.actor == "system"
+    assert entry.actor == TEST_USER_ID
 
 
 def test_publish_logs_activity_with_counts(client, make_venue, db, preserve_seed_state):
     make_venue(status="approved")
 
-    revision = client.post("/publish").json()
+    revision = client.post("/editor/publish").json()
 
     entry = latest_activity(db, entity_type="publish_revision", entity_id=str(revision["id"]), action="publish")
     assert entry is not None
@@ -51,11 +51,11 @@ def test_publish_logs_activity_with_counts(client, make_venue, db, preserve_seed
 
 def test_republish_logs_activity(client, make_venue, db, preserve_seed_state):
     make_venue(status="approved")
-    first = client.post("/publish").json()
+    first = client.post("/editor/publish").json()
     make_venue(status="approved")
-    client.post("/publish")
+    client.post("/editor/publish")
 
-    client.post(f"/publish/revisions/{first['id']}/republish")
+    client.post(f"/editor/publish/revisions/{first['id']}/republish")
 
     entry = latest_activity(
         db, entity_type="publish_revision", entity_id=str(first["id"]), action="republish"
@@ -66,10 +66,10 @@ def test_republish_logs_activity(client, make_venue, db, preserve_seed_state):
 def test_activity_endpoint_returns_entries_newest_first(client, make_venue):
     venue = make_venue(status="draft")
 
-    client.post(f"/venues/{venue.id}/submit-for-review")
-    client.post(f"/venues/{venue.id}/approve")
+    client.post(f"/editor/venues/{venue.id}/submit-for-review")
+    client.post(f"/editor/venues/{venue.id}/approve")
 
-    response = client.get("/activity")
+    response = client.get("/editor/activity")
 
     assert response.status_code == 200
     entries = response.json()

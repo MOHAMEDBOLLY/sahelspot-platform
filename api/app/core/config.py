@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: str = "INFO"
     database_url: str
+    supabase_jwt_secret: str
 
 
 settings = Settings()

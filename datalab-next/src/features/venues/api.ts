@@ -3,11 +3,11 @@ import type { Venue } from '../../types/venue'
 import type { ValidationResult } from '../../types/validation'
 
 export function fetchVenues(): Promise<Venue[]> {
-  return apiGet<Venue[]>('/venues')
+  return apiGet<Venue[]>('/editor/venues')
 }
 
 export function fetchVenue(id: string): Promise<Venue> {
-  return apiGet<Venue>(`/venues/${encodeURIComponent(id)}`)
+  return apiGet<Venue>(`/editor/venues/${encodeURIComponent(id)}`)
 }
 
 /** Exactly the fields Edit Mode exposes as editable — see the workspace
@@ -61,25 +61,25 @@ export function toVenuePatch(venue: Venue): VenuePatch {
 }
 
 export function updateVenue(id: string, patch: VenuePatch): Promise<Venue> {
-  return apiPatch<Venue>(`/venues/${encodeURIComponent(id)}`, patch)
+  return apiPatch<Venue>(`/editor/venues/${encodeURIComponent(id)}`, patch)
 }
 
 /** Runs the canonical Validate gate against the venue's persisted draft
  * state (api/app/validation/venues.py) — read-only, doesn't change status. */
 export function validateVenue(id: string): Promise<ValidationResult> {
-  return apiPost<ValidationResult>(`/venues/${encodeURIComponent(id)}/validate`)
+  return apiPost<ValidationResult>(`/editor/venues/${encodeURIComponent(id)}/validate`)
 }
 
 /** Review — the first editorial state transition (`draft` -> `review`).
  * Rejects with a structured error (409 wrong status, 422 not ready) rather
  * than performing the transition unconditionally. */
 export function submitVenueForReview(id: string): Promise<Venue> {
-  return apiPost<Venue>(`/venues/${encodeURIComponent(id)}/submit-for-review`)
+  return apiPost<Venue>(`/editor/venues/${encodeURIComponent(id)}/submit-for-review`)
 }
 
 /** Approval — the second editorial state transition (`review` -> `approved`).
  * A human editorial decision, not a re-run of Validate — rejects with a
  * structured 409 if the venue isn't currently `review`. */
 export function approveVenue(id: string): Promise<Venue> {
-  return apiPost<Venue>(`/venues/${encodeURIComponent(id)}/approve`)
+  return apiPost<Venue>(`/editor/venues/${encodeURIComponent(id)}/approve`)
 }

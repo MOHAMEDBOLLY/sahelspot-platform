@@ -2,11 +2,11 @@ import { apiGet, apiPatch } from '../../lib/apiClient'
 import type { Destination } from '../../types/destination'
 
 export function fetchDestinations(): Promise<Destination[]> {
-  return apiGet<Destination[]>('/destinations')
+  return apiGet<Destination[]>('/editor/destinations')
 }
 
 export function fetchDestination(id: string): Promise<Destination> {
-  return apiGet<Destination>(`/destinations/${encodeURIComponent(id)}`)
+  return apiGet<Destination>(`/editor/destinations/${encodeURIComponent(id)}`)
 }
 
 /** Exactly the fields Edit Mode exposes as editable — same reasoning as
@@ -32,5 +32,5 @@ export function toDestinationPatch(destination: Destination): DestinationPatch {
 }
 
 export function updateDestination(id: string, patch: DestinationPatch): Promise<Destination> {
-  return apiPatch<Destination>(`/destinations/${encodeURIComponent(id)}`, patch)
+  return apiPatch<Destination>(`/editor/destinations/${encodeURIComponent(id)}`, patch)
 }

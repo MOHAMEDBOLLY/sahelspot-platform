@@ -5,6 +5,12 @@ from app.api.schemas import DestinationOut, DestinationUpdate
 from app.db.models import Destination
 from app.db.session import get_db
 
+# Editorial only — mounted under /editor by app/api/router.py, which also
+# applies the router-level auth gate (see Sprint 23). No endpoint here
+# needs the caller's identity for anything (no activity is logged for
+# Save Draft), so unlike venues.py's workflow endpoints, nothing in this
+# file declares a `user` parameter at all — the gate is enforced entirely
+# one level up.
 router = APIRouter(prefix="/destinations", tags=["destinations"])
 
 

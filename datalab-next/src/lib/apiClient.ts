@@ -1,3 +1,5 @@
+import { getAccessToken } from '../features/auth/authService'
+
 const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 export class ApiError extends Error {
@@ -8,6 +10,16 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.status = status
   }
+}
+
+/** Every mutation route requires a Supabase-issued token as of Sprint 22
+ * (see `api/app/auth/dependencies.py`); GETs don't. Goes through
+ * `authService.getAccessToken()`, never the Supabase SDK directly — this
+ * is the one non-`features/auth/` file that's allowed to know a token
+ * exists at all. */
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await getAccessToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
@@ -23,7 +35,7 @@ export async function apiGet<T>(path: string): Promise<T> {
 export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify(body),
   })
 
@@ -35,7 +47,10 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
 }
 
 export async function apiPost<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, { method: 'POST' })
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: await authHeaders(),
+  })
 
   if (!response.ok) {
     throw new ApiError(await extractErrorMessage(response, path), response.status)

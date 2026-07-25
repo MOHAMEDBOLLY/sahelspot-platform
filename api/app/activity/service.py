@@ -13,12 +13,6 @@ from sqlalchemy.orm import Session
 
 from app.db.models import ActivityLogEntry
 
-# No authentication exists yet — every activity is attributed to this
-# placeholder until a real actor (a logged-in user) can be threaded through.
-# This is the one constant every call site shares, so the placeholder
-# string itself only has to be written once.
-PLACEHOLDER_ACTOR = "system"
-
 
 def log_activity(
     db: Session,
@@ -26,13 +20,15 @@ def log_activity(
     action: str,
     entity_type: str,
     entity_id: str,
+    actor: str,
     metadata: dict | None = None,
-    actor: str = PLACEHOLDER_ACTOR,
 ) -> ActivityLogEntry:
     """The one place an activity entry is ever constructed — every
     workflow/publishing action calls this instead of building its own row,
-    so the shape of an entry (and the placeholder-actor convention) only
-    has to be right once, not once per call site.
+    so the shape of an entry only has to be right once, not once per call
+    site. `actor` is the authenticated caller's Supabase user id (see
+    `app/auth/dependencies.py`) — every call site now has a real one via
+    `get_current_user`, so there is no placeholder to fall back to.
 
     Deliberately does not commit. The caller is expected to `db.add()` this
     within the same transaction as the action it's recording and commit

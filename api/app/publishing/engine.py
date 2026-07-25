@@ -70,7 +70,7 @@ def _serialize_venue(venue: Venue) -> dict:
     }
 
 
-def publish(db: Session) -> PublishRevision:
+def publish(db: Session, *, actor: str) -> PublishRevision:
     """Gathers every currently `approved` destination and venue, freezes
     them into a new immutable `publish_revisions` row, and atomically makes
     it the current one: the previous current revision (if any) is flipped
@@ -129,6 +129,7 @@ def publish(db: Session) -> PublishRevision:
         action="publish",
         entity_type="publish_revision",
         entity_id=str(revision.id),
+        actor=actor,
         metadata={"destination_count": len(destinations), "venue_count": len(venues)},
     )
     db.commit()
@@ -145,7 +146,7 @@ def get_current_revision(db: Session) -> PublishRevision | None:
     return db.query(PublishRevision).filter(PublishRevision.is_current.is_(True)).one_or_none()
 
 
-def republish(db: Session, revision_id: int) -> PublishRevision:
+def republish(db: Session, revision_id: int, *, actor: str) -> PublishRevision:
     """Republish (Sprint 18) — makes an *existing* revision current again.
     Deliberately the inverse of the snapshot half of `publish()`: this
     function never builds a snapshot, never touches any row's data, and
@@ -179,7 +180,13 @@ def republish(db: Session, revision_id: int) -> PublishRevision:
         {"is_current": False}, synchronize_session=False
     )
     revision.is_current = True
-    log_activity(db, action="republish", entity_type="publish_revision", entity_id=str(revision.id))
+    log_activity(
+        db,
+        action="republish",
+        entity_type="publish_revision",
+        entity_id=str(revision.id),
+        actor=actor,
+    )
     db.commit()
     db.refresh(revision)
     return revision

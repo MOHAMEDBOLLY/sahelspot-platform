@@ -8,7 +8,7 @@ class TestSubmitForReview:
     def test_success_moves_draft_to_review(self, client, make_venue, db):
         venue = make_venue(status="draft")
 
-        response = client.post(f"/venues/{venue.id}/submit-for-review")
+        response = client.post(f"/editor/venues/{venue.id}/submit-for-review")
 
         assert response.status_code == 200
         assert response.json()["status"] == "review"
@@ -18,7 +18,7 @@ class TestSubmitForReview:
     def test_rejects_venue_already_in_review(self, client, make_venue):
         venue = make_venue(status="review")
 
-        response = client.post(f"/venues/{venue.id}/submit-for-review")
+        response = client.post(f"/editor/venues/{venue.id}/submit-for-review")
 
         assert response.status_code == 409
         assert response.json()["detail"]["error"] == "invalid_transition"
@@ -26,14 +26,14 @@ class TestSubmitForReview:
     def test_rejects_approved_venue(self, client, make_venue):
         venue = make_venue(status="approved")
 
-        response = client.post(f"/venues/{venue.id}/submit-for-review")
+        response = client.post(f"/editor/venues/{venue.id}/submit-for-review")
 
         assert response.status_code == 409
 
     def test_rejects_venue_not_ready_for_review(self, client, make_venue):
         venue = make_venue(status="draft", name="")
 
-        response = client.post(f"/venues/{venue.id}/submit-for-review")
+        response = client.post(f"/editor/venues/{venue.id}/submit-for-review")
 
         assert response.status_code == 422
         body = response.json()["detail"]
@@ -43,13 +43,13 @@ class TestSubmitForReview:
     def test_rejected_transition_leaves_status_unchanged(self, client, make_venue, db):
         venue = make_venue(status="draft", name="")
 
-        client.post(f"/venues/{venue.id}/submit-for-review")
+        client.post(f"/editor/venues/{venue.id}/submit-for-review")
 
         db.refresh(venue)
         assert venue.status == "draft"
 
     def test_unknown_venue_returns_404(self, client):
-        response = client.post("/venues/does-not-exist/submit-for-review")
+        response = client.post("/editor/venues/does-not-exist/submit-for-review")
 
         assert response.status_code == 404
 
@@ -58,7 +58,7 @@ class TestApprove:
     def test_success_moves_review_to_approved(self, client, make_venue, db):
         venue = make_venue(status="review")
 
-        response = client.post(f"/venues/{venue.id}/approve")
+        response = client.post(f"/editor/venues/{venue.id}/approve")
 
         assert response.status_code == 200
         assert response.json()["status"] == "approved"
@@ -68,7 +68,7 @@ class TestApprove:
     def test_rejects_draft_venue(self, client, make_venue):
         venue = make_venue(status="draft")
 
-        response = client.post(f"/venues/{venue.id}/approve")
+        response = client.post(f"/editor/venues/{venue.id}/approve")
 
         assert response.status_code == 409
         assert response.json()["detail"]["error"] == "invalid_transition"
@@ -76,20 +76,20 @@ class TestApprove:
     def test_rejects_already_approved_venue(self, client, make_venue):
         venue = make_venue(status="approved")
 
-        response = client.post(f"/venues/{venue.id}/approve")
+        response = client.post(f"/editor/venues/{venue.id}/approve")
 
         assert response.status_code == 409
 
     def test_rejected_transition_leaves_status_unchanged(self, client, make_venue, db):
         venue = make_venue(status="draft")
 
-        client.post(f"/venues/{venue.id}/approve")
+        client.post(f"/editor/venues/{venue.id}/approve")
 
         db.refresh(venue)
         assert venue.status == "draft"
 
     def test_unknown_venue_returns_404(self, client):
-        response = client.post("/venues/does-not-exist/approve")
+        response = client.post("/editor/venues/does-not-exist/approve")
 
         assert response.status_code == 404
 
@@ -101,7 +101,7 @@ class TestApprove:
         """
         venue = make_venue(status="review", name="")
 
-        response = client.post(f"/venues/{venue.id}/approve")
+        response = client.post(f"/editor/venues/{venue.id}/approve")
 
         assert response.status_code == 200
         db.refresh(venue)

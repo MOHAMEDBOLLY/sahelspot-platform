@@ -3,12 +3,19 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.activity.service import log_activity
 from app.api.schemas import VenueOut, VenueUpdate
+from app.auth.dependencies import CurrentUser, get_current_user
 from app.db.models import Venue
 from app.db.session import get_db
 from app.validation.schemas import ValidationResult
 from app.validation.venues import validate_venue
 from app.workflow.transitions import require_status
 
+# Editorial only — mounted under /editor by app/api/router.py, which also
+# applies the router-level auth gate (see Sprint 23). Nothing in this file
+# adds `Depends(get_current_user)` purely to gate a route anymore; a `user`
+# parameter appears only where the endpoint itself needs the identity (to
+# attribute an activity log entry) — the auth check itself is enforced one
+# level up, structurally, not per function.
 router = APIRouter(prefix="/venues", tags=["venues"])
 
 
@@ -63,14 +70,19 @@ def validate_venue_route(venue_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{venue_id}/submit-for-review", response_model=VenueOut)
-def submit_venue_for_review(venue_id: str, db: Session = Depends(get_db)):
+def submit_venue_for_review(
+    venue_id: str,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
     """Review — the first editorial state transition: `draft` -> `review`.
     This is an editorial *action* (it writes `status`), not a validation
     check — it reuses `validate_venue()` as a precondition rather than
     re-deciding readiness itself, so the two concepts stay separate (see
     docs/API.md's "Review Workflow" section). Not Approval or Publish:
     nothing here touches `publish_revisions`, and `review` is not a
-    publishable state.
+    publishable state. `user` here is not a second auth check (the router
+    already enforced that) — it's needed to attribute the activity entry.
     """
     venue = db.get(Venue, venue_id)
     if venue is None:
@@ -90,7 +102,7 @@ def submit_venue_for_review(venue_id: str, db: Session = Depends(get_db)):
         )
 
     venue.status = "review"
-    log_activity(db, action="submit_for_review", entity_type="venue", entity_id=venue.id)
+    log_activity(db, action="submit_for_review", entity_type="venue", entity_id=venue.id, actor=user.id)
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
@@ -98,7 +110,11 @@ def submit_venue_for_review(venue_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{venue_id}/approve", response_model=VenueOut)
-def approve_venue(venue_id: str, db: Session = Depends(get_db)):
+def approve_venue(
+    venue_id: str,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
     """Approval — the second editorial state transition: `review` ->
     `approved`. A human editorial decision, not a validation re-run:
     Editorial Readiness was already the prerequisite for entering `review`
@@ -106,7 +122,8 @@ def approve_venue(venue_id: str, db: Session = Depends(get_db)):
     precondition Approval enforces is the status guard itself, via the same
     `require_status` Review already uses. Not Publish: nothing here touches
     `publish_revisions` — `approved` only makes a venue *eligible* for the
-    next publish, it doesn't publish it.
+    next publish, it doesn't publish it. `user` is for activity attribution
+    only — see `submit_venue_for_review` above.
     """
     venue = db.get(Venue, venue_id)
     if venue is None:
@@ -115,7 +132,7 @@ def approve_venue(venue_id: str, db: Session = Depends(get_db)):
     require_status(venue, expected="review", target="approved")
 
     venue.status = "approved"
-    log_activity(db, action="approve", entity_type="venue", entity_id=venue.id)
+    log_activity(db, action="approve", entity_type="venue", entity_id=venue.id, actor=user.id)
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])

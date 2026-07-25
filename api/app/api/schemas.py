@@ -162,6 +162,21 @@ class PublishedVenueOut(BaseModel):
     beach_details: dict | None = None
 
 
+class PublishedDestinationOut(BaseModel):
+    """The public read shape for a destination — same relationship to
+    `DestinationOut` that `PublishedVenueOut` has to `VenueOut`: no
+    `status` (everything here is implicitly published), no editorial-only
+    fields (`notes`, timestamps). Sourced entirely from a publish
+    revision's frozen snapshot, never from the live `destinations` table.
+    """
+
+    id: str
+    name: str
+    region: str
+    aliases: list[str] | None = None
+    boundary: dict | None = None
+
+
 class ActivityLogEntryOut(BaseModel):
     """A single editorial activity record — observability only. See
     app/activity/service.py for the one place these are ever created.
