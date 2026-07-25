@@ -59,15 +59,14 @@ export async function apiPost<T>(path: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
-/** Sprint 25 — media upload. Deliberately not `Content-Type: application/
- * json` like the other verbs: the browser sets `multipart/form-data` (with
- * the correct boundary) itself when the body is a `FormData`, and setting
- * it manually here would omit that boundary and break the request. */
-export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+/** Sprint 26 — for the rare action that's a `POST` but needs a JSON body
+ * (e.g. "set cover to this gallery URL"), rather than the no-body actions
+ * `apiPost` already covers (Validate, Submit for Review, Approve). */
+export async function apiPostJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
-    headers: await authHeaders(),
-    body: formData,
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify(body),
   })
 
   if (!response.ok) {
@@ -75,6 +74,54 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
   }
 
   return response.json() as Promise<T>
+}
+
+/** Sprint 25 — media upload. `XMLHttpRequest`, not `fetch`, is the only
+ * reason this can report upload progress at all (`fetch`'s request body
+ * doesn't expose progress events in any browser today) — that's the one
+ * new requirement Sprint 26's "basic upload progress indication" adds.
+ * Deliberately not `Content-Type: application/json` like the other verbs:
+ * the browser sets `multipart/form-data` (with the correct boundary)
+ * itself for a `FormData` body. */
+export async function apiUpload<T>(
+  path: string,
+  formData: FormData,
+  onProgress?: (percent: number) => void,
+): Promise<T> {
+  const headers = await authHeaders()
+
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${API_BASE_URL}${path}`)
+    for (const [key, value] of Object.entries(headers)) {
+      xhr.setRequestHeader(key, value)
+    }
+
+    xhr.upload.onprogress = (event) => {
+      if (onProgress && event.lengthComputable) {
+        onProgress(Math.round((event.loaded / event.total) * 100))
+      }
+    }
+
+    xhr.onload = () => {
+      const status = xhr.status
+      if (status >= 200 && status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText) as T)
+        } catch {
+          reject(new ApiError(`${path} returned an unreadable response.`, status))
+        }
+        return
+      }
+      reject(new ApiError(messageFromResponseText(xhr.responseText, status, path), status))
+    }
+
+    xhr.onerror = () => {
+      reject(new ApiError(`${path} failed — network error.`, 0))
+    }
+
+    xhr.send(formData)
+  })
 }
 
 /** FastAPI's `HTTPException(detail=...)` can carry a plain string or a
@@ -86,8 +133,16 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
  * required: "..."}`) has no `message` field — handled as its own case so
  * a 403 reads as a real sentence, not the generic fallback. */
 async function extractErrorMessage(response: Response, path: string): Promise<string> {
+  const bodyText = await response.text().catch(() => '')
+  return messageFromResponseText(bodyText, response.status, path)
+}
+
+/** Shared by both `fetch`-based helpers and `apiUpload`'s `XMLHttpRequest`
+ * path — the error shape FastAPI returns doesn't depend on which browser
+ * API made the request. */
+function messageFromResponseText(bodyText: string, status: number, path: string): string {
   try {
-    const body: unknown = await response.json()
+    const body: unknown = bodyText ? JSON.parse(bodyText) : null
     const detail = (body as { detail?: unknown } | null)?.detail
     if (typeof detail === 'string') return detail
     if (detail && typeof detail === 'object') {
@@ -100,8 +155,8 @@ async function extractErrorMessage(response: Response, path: string): Promise<st
   } catch {
     // Response wasn't JSON — fall through to the generic message.
   }
-  if (response.status === 403) {
+  if (status === 403) {
     return "You don't have permission to perform this action."
   }
-  return `${path} failed with status ${response.status}`
+  return `${path} failed with status ${status}`
 }

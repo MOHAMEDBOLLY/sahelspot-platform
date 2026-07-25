@@ -1,5 +1,5 @@
-import { useRef, useState, type ChangeEvent } from 'react'
-import { ImageOff, Images, Loader2, Upload, X } from 'lucide-react'
+import { useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { ImageOff, Images, ImageUp, Loader2, Upload, X } from 'lucide-react'
 import type { Venue } from '../../../../types/venue'
 import { WorkspaceSection } from '../../../../components/workspace/WorkspaceSection'
 import type { WorkspaceMode } from '../../../../components/workspace/types'
@@ -11,7 +11,10 @@ type ImagesSectionProps = {
   onUploadGalleryImage: (file: File) => void
   onRemoveCover: () => void
   onRemoveGalleryImage: (url: string) => void
+  onSetCover: (url: string) => void
+  onReorderGallery: (newOrder: string[]) => void
   isUploading: boolean
+  uploadProgress: number | null
   uploadError: string | null
 }
 
@@ -33,7 +36,15 @@ function ImagePlaceholder({ label }: { label: string }) {
  * later. Client-side type/size checks here are UX only, mirroring the
  * same rule the rest of this codebase already follows for validation
  * (`lib/validation.ts`): the backend (`app/media/service.py`) enforces
- * the real limit and is never bypassed by trusting this check. */
+ * the real limit and is never bypassed by trusting this check.
+ *
+ * Sprint 26 adds gallery reordering (native HTML5 drag-and-drop — no new
+ * dependency), "Set Cover" per gallery image, and a basic upload progress
+ * bar. Reordering and removal both go through `onReorderGallery`/
+ * `onRemoveGalleryImage`, which the parent workspace saves via the
+ * existing `PATCH` (no new backend endpoint for either — see
+ * `routes/venues.py`'s `update_venue` docstring).
+ */
 export function ImagesSection({
   venue,
   mode,
@@ -41,13 +52,17 @@ export function ImagesSection({
   onUploadGalleryImage,
   onRemoveCover,
   onRemoveGalleryImage,
+  onSetCover,
+  onReorderGallery,
   isUploading,
+  uploadProgress,
   uploadError,
 }: ImagesSectionProps) {
   const gallery = venue.gallery_image_urls ?? []
   const coverInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const [localError, setLocalError] = useState<string | null>(null)
+  const [draggedUrl, setDraggedUrl] = useState<string | null>(null)
 
   function validateFile(file: File): boolean {
     if (!file.type.startsWith('image/')) {
@@ -78,11 +93,46 @@ export function ImagesSection({
     }
   }
 
+  // Plain HTML5 drag-and-drop — no library. `draggedUrl` is the item
+  // currently being dragged; dropping onto another thumbnail swaps it to
+  // that position and saves the whole reordered array in one go.
+  function handleDragStart(url: string) {
+    setDraggedUrl(url)
+  }
+
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+  }
+
+  function handleDrop(targetUrl: string) {
+    if (!draggedUrl || draggedUrl === targetUrl) {
+      setDraggedUrl(null)
+      return
+    }
+    const withoutDragged = gallery.filter((url) => url !== draggedUrl)
+    const targetIndex = withoutDragged.indexOf(targetUrl)
+    const reordered = [
+      ...withoutDragged.slice(0, targetIndex),
+      draggedUrl,
+      ...withoutDragged.slice(targetIndex),
+    ]
+    setDraggedUrl(null)
+    onReorderGallery(reordered)
+  }
+
   const displayedError = localError ?? uploadError
 
   return (
     <WorkspaceSection title="Images" icon={Images}>
       {displayedError && <p className="mb-3 text-xs font-medium text-red-600">{displayedError}</p>}
+      {isUploading && uploadProgress !== null && (
+        <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+          <div
+            className="h-full rounded-full bg-gray-900 transition-all"
+            style={{ width: `${uploadProgress}%` }}
+          />
+        </div>
+      )}
 
       <div className="mb-4">
         <div className="mb-2 flex items-center justify-between">
@@ -157,22 +207,44 @@ export function ImagesSection({
         {gallery.length > 0 ? (
           <div className="grid grid-cols-3 gap-2">
             {gallery.map((url) => (
-              <div key={url} className="group relative">
+              <div
+                key={url}
+                draggable={mode === 'edit'}
+                onDragStart={() => handleDragStart(url)}
+                onDragOver={handleDragOver}
+                onDrop={() => handleDrop(url)}
+                className={`group relative ${mode === 'edit' ? 'cursor-move' : ''} ${
+                  draggedUrl === url ? 'opacity-40' : ''
+                }`}
+              >
                 <img
                   src={url}
                   alt={`${venue.name} gallery`}
                   className="aspect-square w-full rounded-lg object-cover"
                 />
                 {mode === 'edit' && (
-                  <button
-                    type="button"
-                    onClick={() => onRemoveGalleryImage(url)}
-                    disabled={isUploading}
-                    className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 disabled:cursor-not-allowed"
-                    title="Remove image"
-                  >
-                    <X size={12} />
-                  </button>
+                  <div className="absolute inset-x-0 top-0 flex justify-end gap-1 p-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    {url !== venue.cover_image_url && (
+                      <button
+                        type="button"
+                        onClick={() => onSetCover(url)}
+                        disabled={isUploading}
+                        className="rounded-full bg-black/60 p-1 text-white disabled:cursor-not-allowed"
+                        title="Set as cover image"
+                      >
+                        <ImageUp size={12} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onRemoveGalleryImage(url)}
+                      disabled={isUploading}
+                      className="rounded-full bg-black/60 p-1 text-white disabled:cursor-not-allowed"
+                      title="Remove image"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
                 )}
               </div>
             ))}

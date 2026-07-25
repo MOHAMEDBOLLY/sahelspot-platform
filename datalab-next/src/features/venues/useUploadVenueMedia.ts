@@ -11,8 +11,17 @@ export function useUploadVenueMedia() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ id, file, slot }: { id: string; file: File; slot: MediaSlot }) =>
-      uploadVenueMedia(id, file, slot),
+    mutationFn: ({
+      id,
+      file,
+      slot,
+      onProgress,
+    }: {
+      id: string
+      file: File
+      slot: MediaSlot
+      onProgress?: (percent: number) => void
+    }) => uploadVenueMedia(id, file, slot, onProgress),
     onSuccess: (updatedVenue) => {
       queryClient.setQueryData(['venue', updatedVenue.id], updatedVenue)
       queryClient.setQueryData<Venue[]>(['venues'], (venues) =>

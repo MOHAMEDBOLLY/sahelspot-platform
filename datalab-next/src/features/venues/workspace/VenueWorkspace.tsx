@@ -6,6 +6,7 @@ import { useValidateVenue } from '../useValidateVenue'
 import { useSubmitForReview } from '../useSubmitForReview'
 import { useApproveVenue } from '../useApproveVenue'
 import { useUploadVenueMedia } from '../useUploadVenueMedia'
+import { useSetCoverFromGallery } from '../useSetCoverFromGallery'
 import { toVenuePatch, type MediaSlot } from '../api'
 import { validateVenueDraft } from '../venueValidation'
 import { ApiError } from '../../../lib/apiClient'
@@ -65,8 +66,16 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
   // A separate mutation instance from `saveDraft` — removing a cover/gallery
   // image acts immediately (see ImagesSection's docstring) and shouldn't
   // share pending/error state with the unrelated Save Draft text-field flow.
+  // Reordering (Sprint 26) also reuses this instance — same reasoning:
+  // it's a media action, not a text-field save.
   const { mutate: saveMediaPatch, isPending: isSavingMediaPatch, error: mediaPatchError } = useUpdateVenue()
+  const {
+    mutate: setCoverFromGallery,
+    isPending: isSettingCover,
+    error: setCoverError,
+  } = useSetCoverFromGallery()
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const { role } = useAuth()
 
   // A stale validation result belongs to whatever the venue looked like when
@@ -150,7 +159,11 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
 
   function handleUpload(file: File, slot: MediaSlot) {
     if (!venueId) return
-    uploadMedia({ id: venueId, file, slot }, { onSuccess: commitSave })
+    setUploadProgress(0)
+    uploadMedia(
+      { id: venueId, file, slot, onProgress: setUploadProgress },
+      { onSuccess: commitSave, onSettled: () => setUploadProgress(null) },
+    )
   }
 
   function handleRemoveCover() {
@@ -168,6 +181,19 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
       { id: venueId, patch: { ...toVenuePatch(displayedVenue), gallery_image_urls: remaining } },
       { onSuccess: commitSave },
     )
+  }
+
+  function handleReorderGallery(newOrder: string[]) {
+    if (!venueId || !displayedVenue) return
+    saveMediaPatch(
+      { id: venueId, patch: { ...toVenuePatch(displayedVenue), gallery_image_urls: newOrder } },
+      { onSuccess: commitSave },
+    )
+  }
+
+  function handleSetCover(url: string) {
+    if (!venueId) return
+    setCoverFromGallery({ id: venueId, url }, { onSuccess: commitSave })
   }
 
   if (!venueId) {
@@ -241,15 +267,20 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
         onUploadGalleryImage={(file) => handleUpload(file, 'gallery')}
         onRemoveCover={handleRemoveCover}
         onRemoveGalleryImage={handleRemoveGalleryImage}
-        isUploading={isUploadingMedia || isSavingMediaPatch}
+        onSetCover={handleSetCover}
+        onReorderGallery={handleReorderGallery}
+        isUploading={isUploadingMedia || isSavingMediaPatch || isSettingCover}
+        uploadProgress={uploadProgress}
         uploadError={
           uploadMediaError instanceof ApiError
             ? uploadMediaError.message
             : mediaPatchError instanceof ApiError
               ? mediaPatchError.message
-              : uploadMediaError || mediaPatchError
-                ? 'Failed to update images.'
-                : null
+              : setCoverError instanceof ApiError
+                ? setCoverError.message
+                : uploadMediaError || mediaPatchError || setCoverError
+                  ? 'Failed to update images.'
+                  : null
         }
       />
       <PublishingStatusSection

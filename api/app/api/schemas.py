@@ -111,6 +111,15 @@ class VenueUpdate(BaseModel):
     gallery_image_urls: list[str] | None = None
 
 
+class SetCoverImageRequest(BaseModel):
+    """Sprint 26 — promotes an existing gallery image to cover, without a
+    re-upload. `url` must already be one of the venue's
+    `gallery_image_urls`; see `POST /venues/{id}/media/set-cover`.
+    """
+
+    url: str
+
+
 class PublishRevisionOut(BaseModel):
     """Metadata about a publish revision — not its full snapshot. Returned
     by the Publish action itself and by the revision-history list

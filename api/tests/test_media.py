@@ -1,4 +1,7 @@
-"""Sprint 25 — Media Library Foundation.
+"""Sprint 25 — Media Library Foundation. Sprint 26 — Media Management
+(reorder, set-cover-from-gallery, and their permission/consistency
+coverage) extends this same file rather than starting a new one, since
+it's testing the same upload route plus one small addition.
 
 No real Supabase Storage credentials exist in this environment (same
 situation Sprint 22's auth work was in), so every test here monkeypatches
@@ -12,8 +15,12 @@ content-type/size validation, all against the real database.
 import httpx
 import pytest
 
+from app.auth.dependencies import CurrentUser, get_current_user
 from app.core.config import settings
+from app.main import app as fastapi_app
 from app.media.service import MAX_UPLOAD_BYTES
+
+from .conftest import TEST_USER_EMAIL, TEST_USER_ID, TEST_USER_ROLE
 
 
 @pytest.fixture(autouse=True)
@@ -32,6 +39,25 @@ def mock_successful_upload(monkeypatch):
         return httpx.Response(status_code=200, request=httpx.Request("PUT", url))
 
     monkeypatch.setattr(httpx, "put", _fake_put)
+
+
+@pytest.fixture()
+def as_role(client):
+    """Overrides `get_current_user` with a fixed identity holding the given
+    role for one test — same technique `test_permissions.py` uses. Restores
+    the standard admin override afterward.
+    """
+
+    def _set(role: str) -> None:
+        fastapi_app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+            id=TEST_USER_ID, email=TEST_USER_EMAIL, role=role
+        )
+
+    yield _set
+
+    fastapi_app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        id=TEST_USER_ID, email=TEST_USER_EMAIL, role=TEST_USER_ROLE
+    )
 
 
 class TestUploadCover:
@@ -161,25 +187,181 @@ class TestUploadStorageFailure:
 
 
 class TestUploadPermission:
-    def test_viewer_cannot_upload_media(self, client, make_venue, mock_successful_upload):
-        from app.auth.dependencies import CurrentUser, get_current_user
-        from app.main import app as fastapi_app
-
+    def test_viewer_cannot_upload_media(self, client, make_venue, mock_successful_upload, as_role):
         venue = make_venue()
-        fastapi_app.dependency_overrides[get_current_user] = lambda: CurrentUser(
-            id="test-viewer", email="viewer@example.com", role="viewer"
-        )
-        try:
-            response = client.post(
-                f"/editor/venues/{venue.id}/media",
-                data={"slot": "cover"},
-                files={"file": ("cover.jpg", b"fake-image-bytes", "image/jpeg")},
-            )
-        finally:
-            from .conftest import TEST_USER_EMAIL, TEST_USER_ID, TEST_USER_ROLE
+        as_role("viewer")
 
-            fastapi_app.dependency_overrides[get_current_user] = lambda: CurrentUser(
-                id=TEST_USER_ID, email=TEST_USER_EMAIL, role=TEST_USER_ROLE
-            )
+        response = client.post(
+            f"/editor/venues/{venue.id}/media",
+            data={"slot": "cover"},
+            files={"file": ("cover.jpg", b"fake-image-bytes", "image/jpeg")},
+        )
+
+        assert response.status_code == 403
+
+
+class TestSetCoverFromGallery:
+    """Sprint 26 — promoting an existing gallery image to cover."""
+
+    def test_promotes_a_gallery_image_to_cover(self, client, make_venue):
+        venue = make_venue(gallery_image_urls=["https://example.com/a.jpg", "https://example.com/b.jpg"])
+
+        response = client.post(
+            f"/editor/venues/{venue.id}/media/set-cover",
+            json={"url": "https://example.com/b.jpg"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["cover_image_url"] == "https://example.com/b.jpg"
+
+    def test_promoted_image_remains_in_the_gallery(self, client, make_venue):
+        venue = make_venue(gallery_image_urls=["https://example.com/a.jpg"])
+
+        response = client.post(
+            f"/editor/venues/{venue.id}/media/set-cover",
+            json={"url": "https://example.com/a.jpg"},
+        )
+
+        assert response.status_code == 200
+        assert "https://example.com/a.jpg" in response.json()["gallery_image_urls"]
+
+    def test_rejects_a_url_not_in_the_gallery(self, client, make_venue):
+        venue = make_venue(gallery_image_urls=["https://example.com/a.jpg"])
+
+        response = client.post(
+            f"/editor/venues/{venue.id}/media/set-cover",
+            json={"url": "https://example.com/not-in-gallery.jpg"},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"]["error"] == "not_in_gallery"
+
+    def test_rejects_when_gallery_is_empty(self, client, make_venue):
+        venue = make_venue()
+
+        response = client.post(
+            f"/editor/venues/{venue.id}/media/set-cover",
+            json={"url": "https://example.com/anything.jpg"},
+        )
+
+        assert response.status_code == 422
+
+    def test_unknown_venue_returns_404(self, client):
+        response = client.post(
+            "/editor/venues/does-not-exist/media/set-cover",
+            json={"url": "https://example.com/a.jpg"},
+        )
+
+        assert response.status_code == 404
+
+    def test_viewer_cannot_set_cover(self, client, make_venue, as_role):
+        venue = make_venue(gallery_image_urls=["https://example.com/a.jpg"])
+        as_role("viewer")
+
+        response = client.post(
+            f"/editor/venues/{venue.id}/media/set-cover",
+            json={"url": "https://example.com/a.jpg"},
+        )
+
+        assert response.status_code == 403
+
+
+class TestGalleryReordering:
+    """Sprint 26 — reordering reuses the existing PATCH; no new endpoint.
+    See `update_venue`'s docstring in `routes/venues.py` for why.
+    """
+
+    def test_patch_persists_a_new_gallery_order(self, client, make_venue):
+        venue = make_venue(
+            gallery_image_urls=[
+                "https://example.com/a.jpg",
+                "https://example.com/b.jpg",
+                "https://example.com/c.jpg",
+            ]
+        )
+        reordered = [
+            "https://example.com/c.jpg",
+            "https://example.com/a.jpg",
+            "https://example.com/b.jpg",
+        ]
+
+        response = client.patch(f"/editor/venues/{venue.id}", json={"gallery_image_urls": reordered})
+
+        assert response.status_code == 200
+        assert response.json()["gallery_image_urls"] == reordered
+
+    def test_reordered_order_survives_a_fresh_read(self, client, make_venue):
+        venue = make_venue(gallery_image_urls=["https://example.com/a.jpg", "https://example.com/b.jpg"])
+        reordered = ["https://example.com/b.jpg", "https://example.com/a.jpg"]
+        client.patch(f"/editor/venues/{venue.id}", json={"gallery_image_urls": reordered})
+
+        response = client.get(f"/editor/venues/{venue.id}")
+
+        assert response.json()["gallery_image_urls"] == reordered
+
+    def test_reordering_does_not_touch_cover_image_url(self, client, make_venue):
+        venue = make_venue(
+            cover_image_url="https://example.com/cover.jpg",
+            gallery_image_urls=["https://example.com/a.jpg", "https://example.com/b.jpg"],
+        )
+
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"gallery_image_urls": ["https://example.com/b.jpg", "https://example.com/a.jpg"]},
+        )
+
+        assert response.json()["cover_image_url"] == "https://example.com/cover.jpg"
+
+    def test_viewer_cannot_reorder_gallery(self, client, make_venue, as_role):
+        venue = make_venue(gallery_image_urls=["https://example.com/a.jpg", "https://example.com/b.jpg"])
+        as_role("viewer")
+
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"gallery_image_urls": ["https://example.com/b.jpg", "https://example.com/a.jpg"]},
+        )
+
+        assert response.status_code == 403
+
+
+class TestGalleryDeletion:
+    """Sprint 26 — removing a gallery image also reuses the existing
+    PATCH (made editable in Sprint 25); no dedicated delete endpoint.
+    """
+
+    def test_patch_removes_one_gallery_image(self, client, make_venue):
+        venue = make_venue(
+            gallery_image_urls=["https://example.com/a.jpg", "https://example.com/b.jpg"]
+        )
+
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"gallery_image_urls": ["https://example.com/b.jpg"]},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["gallery_image_urls"] == ["https://example.com/b.jpg"]
+
+    def test_patch_can_clear_the_entire_gallery(self, client, make_venue):
+        venue = make_venue(gallery_image_urls=["https://example.com/a.jpg"])
+
+        response = client.patch(f"/editor/venues/{venue.id}", json={"gallery_image_urls": []})
+
+        assert response.status_code == 200
+        assert response.json()["gallery_image_urls"] == []
+
+    def test_clearing_cover_image_url(self, client, make_venue):
+        venue = make_venue(cover_image_url="https://example.com/cover.jpg")
+
+        response = client.patch(f"/editor/venues/{venue.id}", json={"cover_image_url": None})
+
+        assert response.status_code == 200
+        assert response.json()["cover_image_url"] is None
+
+    def test_viewer_cannot_remove_gallery_images(self, client, make_venue, as_role):
+        venue = make_venue(gallery_image_urls=["https://example.com/a.jpg"])
+        as_role("viewer")
+
+        response = client.patch(f"/editor/venues/{venue.id}", json={"gallery_image_urls": []})
 
         assert response.status_code == 403

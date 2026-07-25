@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost, apiUpload } from '../../lib/apiClient'
+import { apiGet, apiPatch, apiPost, apiPostJson, apiUpload } from '../../lib/apiClient'
 import type { Venue } from '../../types/venue'
 import type { ValidationResult } from '../../types/validation'
 
@@ -74,14 +74,28 @@ export function updateVenue(id: string, patch: VenuePatch): Promise<Venue> {
 /** Sprint 25 — Media Library Foundation. Uploads an image and returns the
  * updated venue: the server sets `cover_image_url` (slot "cover") or
  * appends to `gallery_image_urls` (slot "gallery") in the same request,
- * so there's no separate "now associate this URL" step. */
+ * so there's no separate "now associate this URL" step. `onProgress`
+ * (Sprint 26) is optional — every existing call site keeps working
+ * unchanged without it. */
 export type MediaSlot = 'cover' | 'gallery'
 
-export function uploadVenueMedia(id: string, file: File, slot: MediaSlot): Promise<Venue> {
+export function uploadVenueMedia(
+  id: string,
+  file: File,
+  slot: MediaSlot,
+  onProgress?: (percent: number) => void,
+): Promise<Venue> {
   const formData = new FormData()
   formData.append('slot', slot)
   formData.append('file', file)
-  return apiUpload<Venue>(`/editor/venues/${encodeURIComponent(id)}/media`, formData)
+  return apiUpload<Venue>(`/editor/venues/${encodeURIComponent(id)}/media`, formData, onProgress)
+}
+
+/** Sprint 26 — promotes an existing gallery image to cover without a
+ * re-upload. `url` must already be one of the venue's `gallery_image_urls`
+ * (enforced server-side); the image stays in the gallery too. */
+export function setCoverFromGallery(id: string, url: string): Promise<Venue> {
+  return apiPostJson<Venue>(`/editor/venues/${encodeURIComponent(id)}/media/set-cover`, { url })
 }
 
 /** Runs the canonical Validate gate against the venue's persisted draft

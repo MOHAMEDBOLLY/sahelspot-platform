@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
 from app.activity.service import log_activity
-from app.api.schemas import VenueOut, VenueUpdate
+from app.api.schemas import SetCoverImageRequest, VenueOut, VenueUpdate
 from app.auth.dependencies import CurrentUser, get_current_user
 from app.auth.permissions import Permission, require_permission
 from app.db.models import Venue
@@ -60,6 +60,14 @@ def update_venue(
 ):
     """Save Draft: writes straight to the draft `venues` row, no status change.
     This is not Publish — nothing here touches `publish_revisions`.
+
+    Also how Sprint 26 gallery **reordering** is done: `gallery_image_urls`
+    is already a plain, order-preserving array (see docs/DATABASE.md's
+    Sprint 2.5 "Images" decision), and was already made editable through
+    this same payload in Sprint 25 — a reorder is just "set the array to
+    this new order," which this endpoint already supports with no changes.
+    No dedicated `/reorder` endpoint was added; that would duplicate a
+    write path this one already provides.
     """
     venue = db.get(Venue, venue_id)
     if venue is None:
@@ -111,6 +119,44 @@ async def upload_venue_media(
         # of the Python list object it's currently holding.
         venue.gallery_image_urls = (venue.gallery_image_urls or []) + [url]
 
+    db.commit()
+
+    venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+    return venue
+
+
+@router.post("/{venue_id}/media/set-cover", response_model=VenueOut)
+def set_cover_from_gallery(
+    venue_id: str,
+    payload: SetCoverImageRequest,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
+):
+    """Sprint 26 — promotes an existing gallery image to cover, without a
+    re-upload or a call to `app/media/service.py` at all (no new file, so
+    there's nothing to upload). `url` must already be in the venue's
+    `gallery_image_urls` — this is a *promotion*, not "set cover to any
+    arbitrary URL" (that's still possible via `PATCH`'s `cover_image_url`,
+    unchanged since Sprint 25; this endpoint's own consistency guarantee is
+    narrower and specific to "an image already in this venue's gallery").
+    Deliberately leaves the image in the gallery too — cover is a
+    designation, not an exclusive placement, so promoting doesn't require
+    deciding whether to also remove it from the gallery.
+    """
+    venue = db.get(Venue, venue_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    if payload.url not in (venue.gallery_image_urls or []):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "not_in_gallery",
+                "message": "That image is not in this venue's gallery.",
+            },
+        )
+
+    venue.cover_image_url = payload.url
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
