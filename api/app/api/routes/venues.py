@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Literal
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
 from app.activity.service import log_activity
@@ -7,6 +9,7 @@ from app.auth.dependencies import CurrentUser, get_current_user
 from app.auth.permissions import Permission, require_permission
 from app.db.models import Venue
 from app.db.session import get_db
+from app.media.service import upload_image
 from app.validation.schemas import ValidationResult
 from app.validation.venues import validate_venue
 from app.workflow.transitions import require_status
@@ -64,6 +67,49 @@ def update_venue(
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(venue, field, value)
+
+    db.commit()
+
+    venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+    return venue
+
+
+@router.post("/{venue_id}/media", response_model=VenueOut)
+async def upload_venue_media(
+    venue_id: str,
+    slot: Literal["cover", "gallery"] = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
+):
+    """Sprint 25 — Media Library Foundation. Uploads an image (via
+    `app/media/service.py`, proxied through Supabase Storage) and
+    immediately sets it on the venue: `cover_image_url` if `slot="cover"`,
+    or appended to `gallery_image_urls` if `slot="gallery"`. Acts like Save
+    Draft (writes straight to the draft row, no status change, not
+    activity-logged — same reasoning Sprint 19 gave for why Save Draft
+    itself isn't logged) rather than a separate draft/commit step, since
+    an uploaded image is already a committed fact, not something to stage.
+    """
+    venue = db.get(Venue, venue_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    file_bytes = await file.read()
+    url = upload_image(
+        file_bytes,
+        filename=file.filename or "upload",
+        content_type=file.content_type or "application/octet-stream",
+        folder=f"venues/{venue_id}",
+    )
+
+    if slot == "cover":
+        venue.cover_image_url = url
+    else:
+        # Reassigned, not appended in place — SQLAlchemy only detects a
+        # change to an ARRAY column on assignment, not on in-place mutation
+        # of the Python list object it's currently holding.
+        venue.gallery_image_urls = (venue.gallery_image_urls or []) + [url]
 
     db.commit()
 

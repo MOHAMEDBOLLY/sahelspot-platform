@@ -83,6 +83,12 @@ class VenueUpdate(BaseModel):
     (see datalab-next Sprint 9/10 sections). Everything else on a venue
     (id, slug, destination, status, timestamps, ...) is structural or
     workflow-controlled and isn't part of this write path.
+
+    `cover_image_url`/`gallery_image_urls` were added in Sprint 25 — not to
+    let an editor paste a raw URL (the upload endpoint is the real way
+    those get set), but so removing a gallery image or clearing the cover
+    can go through this same partial-update path instead of a dedicated
+    "remove media" endpoint.
     """
 
     name: str | None = None
@@ -101,6 +107,8 @@ class VenueUpdate(BaseModel):
     facebook_handle: str | None = None
     tiktok_handle: str | None = None
     internal_notes: str | None = None
+    cover_image_url: str | None = None
+    gallery_image_urls: list[str] | None = None
 
 
 class PublishRevisionOut(BaseModel):

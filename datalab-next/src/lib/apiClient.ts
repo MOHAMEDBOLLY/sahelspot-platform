@@ -59,6 +59,24 @@ export async function apiPost<T>(path: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
+/** Sprint 25 — media upload. Deliberately not `Content-Type: application/
+ * json` like the other verbs: the browser sets `multipart/form-data` (with
+ * the correct boundary) itself when the body is a `FormData`, and setting
+ * it manually here would omit that boundary and break the request. */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: formData,
+  })
+
+  if (!response.ok) {
+    throw new ApiError(await extractErrorMessage(response, path), response.status)
+  }
+
+  return response.json() as Promise<T>
+}
+
 /** FastAPI's `HTTPException(detail=...)` can carry a plain string or a
  * structured object — surface whichever message is there instead of the
  * generic "path failed with status N" fallback, since Sprint 14's Review

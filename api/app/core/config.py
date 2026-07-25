@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     # per deployment. Optional: unset means no auto-promotion happens, and
     # the first admin row must be inserted manually.
     bootstrap_admin_user_id: str | None = None
+    # Sprint 25 — Media Library Foundation. Optional: media upload returns a
+    # clear 503 if unset rather than the app failing to start, since not
+    # every environment needs media upload configured to run everything else.
+    supabase_url: str | None = None
+    supabase_service_role_key: str | None = None
+    media_bucket: str = "venue-media"
 
 
 settings = Settings()
