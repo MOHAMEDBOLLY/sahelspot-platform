@@ -10,6 +10,8 @@ import { LoadingState } from '../../../components/LoadingState'
 import { ErrorState } from '../../../components/ErrorState'
 import { PagePlaceholder } from '../../../components/PagePlaceholder'
 import { DraftToolbar } from '../../../components/workspace/DraftToolbar'
+import { useAuth } from '../../auth/useAuth'
+import { hasPermission } from '../../auth/permissions'
 import { BasicInfoSection } from './sections/BasicInfoSection'
 import { PublishingStatusSection } from './sections/PublishingStatusSection'
 import type { Destination } from '../../../types/destination'
@@ -42,6 +44,8 @@ export function DestinationWorkspace({ destinationId, onDirtyChange }: Destinati
   } = useDraft<Destination>(destination, destinationId)
   const { mutate: saveDraft, isPending: isSaving, error: saveError, reset: resetSaveError } =
     useUpdateDestination()
+  const { role } = useAuth()
+  const canEdit = hasPermission(role, 'content_edit')
 
   const fieldErrors =
     mode === 'edit' && displayedDestination ? validateDestinationDraft(displayedDestination) : {}
@@ -104,6 +108,7 @@ export function DestinationWorkspace({ destinationId, onDirtyChange }: Destinati
         isSaving={isSaving}
         saveError={saveError instanceof ApiError ? saveError.message : saveError ? 'Failed to save.' : null}
         hasFieldErrors={hasFieldErrors}
+        canEdit={canEdit}
         onEdit={startEditing}
         onCancel={handleCancel}
         onSave={handleSave}

@@ -9,6 +9,10 @@ type WorkspaceToolbarProps = {
   isSaving: boolean
   saveError: string | null
   hasFieldErrors: boolean
+  /** Sprint 24 — whether the caller's role grants `content_edit`. Gates
+   * the base Edit/Save Draft group (forwarded to `DraftToolbar`) *and*
+   * Validate, since the backend requires the same permission for both. */
+  canEdit: boolean
   isValidating: boolean
   canSubmitForReview: boolean
   isSubmittingForReview: boolean
@@ -35,6 +39,7 @@ export function WorkspaceToolbar({
   isSaving,
   saveError,
   hasFieldErrors,
+  canEdit,
   isValidating,
   canSubmitForReview,
   isSubmittingForReview,
@@ -57,6 +62,7 @@ export function WorkspaceToolbar({
       isSaving={isSaving}
       saveError={saveError}
       hasFieldErrors={hasFieldErrors}
+      canEdit={canEdit}
       onEdit={onEdit}
       onCancel={onCancel}
       onSave={onSave}
@@ -76,16 +82,18 @@ export function WorkspaceToolbar({
       }
       extraActions={
         <>
-          <button
-            type="button"
-            onClick={onValidate}
-            disabled={isValidating || isDirty}
-            title={isDirty ? 'Save Draft first — Validate checks the saved state, not unsaved edits.' : undefined}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isValidating ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
-            {isValidating ? 'Validating…' : 'Validate'}
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={onValidate}
+              disabled={isValidating || isDirty}
+              title={isDirty ? 'Save Draft first — Validate checks the saved state, not unsaved edits.' : undefined}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isValidating ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
+              {isValidating ? 'Validating…' : 'Validate'}
+            </button>
+          )}
           {canSubmitForReview && (
             <button
               type="button"

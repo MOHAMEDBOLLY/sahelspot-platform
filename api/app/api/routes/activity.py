@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.schemas import ActivityLogEntryOut
+from app.auth.dependencies import CurrentUser
+from app.auth.permissions import Permission, require_permission
 from app.db.models import ActivityLogEntry
 from app.db.session import get_db
 
@@ -9,7 +11,10 @@ router = APIRouter(tags=["activity"])
 
 
 @router.get("/activity", response_model=list[ActivityLogEntryOut])
-def list_activity(db: Session = Depends(get_db)):
+def list_activity(
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_VIEW)),
+):
     """The Editorial Activity Log — observability only, newest first.
     Read-only: this route (and this whole feature) never writes anything;
     every entry it returns was created by `app/activity/service.py`'s

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.activity.service import log_activity
 from app.api.schemas import VenueOut, VenueUpdate
 from app.auth.dependencies import CurrentUser, get_current_user
+from app.auth.permissions import Permission, require_permission
 from app.db.models import Venue
 from app.db.session import get_db
 from app.validation.schemas import ValidationResult
@@ -11,16 +12,22 @@ from app.validation.venues import validate_venue
 from app.workflow.transitions import require_status
 
 # Editorial only — mounted under /editor by app/api/router.py, which also
-# applies the router-level auth gate (see Sprint 23). Nothing in this file
-# adds `Depends(get_current_user)` purely to gate a route anymore; a `user`
+# applies the router-level auth gate (see Sprint 23). As of Sprint 24,
+# every route below also depends on `require_permission(Permission.X)` —
+# the specific capability that route needs, never a role name (see
+# `app/auth/permissions.py`). A `user: CurrentUser = Depends(get_current_user)`
 # parameter appears only where the endpoint itself needs the identity (to
-# attribute an activity log entry) — the auth check itself is enforced one
-# level up, structurally, not per function.
+# attribute an activity log entry); FastAPI caches `get_current_user` per
+# request, so declaring it alongside `require_permission(...)` never
+# re-verifies the token.
 router = APIRouter(prefix="/venues", tags=["venues"])
 
 
 @router.get("", response_model=list[VenueOut])
-def list_venues(db: Session = Depends(get_db)):
+def list_venues(
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_VIEW)),
+):
     return (
         db.query(Venue)
         .options(joinedload(Venue.destination))
@@ -30,7 +37,11 @@ def list_venues(db: Session = Depends(get_db)):
 
 
 @router.get("/{venue_id}", response_model=VenueOut)
-def get_venue(venue_id: str, db: Session = Depends(get_db)):
+def get_venue(
+    venue_id: str,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_VIEW)),
+):
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
     if venue is None:
         raise HTTPException(status_code=404, detail="Venue not found")
@@ -38,7 +49,12 @@ def get_venue(venue_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/{venue_id}", response_model=VenueOut)
-def update_venue(venue_id: str, payload: VenueUpdate, db: Session = Depends(get_db)):
+def update_venue(
+    venue_id: str,
+    payload: VenueUpdate,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
+):
     """Save Draft: writes straight to the draft `venues` row, no status change.
     This is not Publish — nothing here touches `publish_revisions`.
     """
@@ -56,7 +72,11 @@ def update_venue(venue_id: str, payload: VenueUpdate, db: Session = Depends(get_
 
 
 @router.post("/{venue_id}/validate", response_model=ValidationResult)
-def validate_venue_route(venue_id: str, db: Session = Depends(get_db)):
+def validate_venue_route(
+    venue_id: str,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
+):
     """Runs the canonical Editorial Readiness check (see docs/DATABASE.md)
     against the venue's currently persisted draft state. Read-only — this
     checks whether the row is fit to move from `draft` to `review`, it
@@ -74,6 +94,7 @@ def submit_venue_for_review(
     venue_id: str,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_SUBMIT_REVIEW)),
 ):
     """Review — the first editorial state transition: `draft` -> `review`.
     This is an editorial *action* (it writes `status`), not a validation
@@ -114,6 +135,7 @@ def approve_venue(
     venue_id: str,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
 ):
     """Approval — the second editorial state transition: `review` ->
     `approved`. A human editorial decision, not a validation re-run:

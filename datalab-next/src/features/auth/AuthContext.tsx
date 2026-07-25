@@ -1,33 +1,45 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { getSession, onAuthStateChange, signInWithPassword, signOut } from './authService'
+import { fetchMe } from './api'
 import { AuthContext, type AuthContextValue } from './authContextValue'
 
-/** Owns the one piece of session state the rest of Studio needs: who (if
- * anyone) is logged in. Restoring the session on load and staying in sync
- * with sign-in/out is entirely `authService.onAuthStateChange`'s job —
- * this component only holds the result in React state. Consumed via
- * `useAuth()`, never imported directly by feature code. */
+/** Owns the two pieces of session state the rest of Studio needs: who (if
+ * anyone) is logged in, and — as of Sprint 24 — what role they hold.
+ * Restoring the session on load and staying in sync with sign-in/out is
+ * entirely `authService.onAuthStateChange`'s job; this component only
+ * holds the result in React state, and fetches `role` from `GET
+ * /editor/me` once a user exists. Consumed via `useAuth()`, never
+ * imported directly by feature code. */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [role, setRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getSession().then((session) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
-
-    const unsubscribe = onAuthStateChange((nextUser) => {
+    function applyUser(nextUser: User | null) {
       setUser(nextUser)
-      setLoading(false)
-    })
+      if (nextUser === null) {
+        setRole(null)
+        setLoading(false)
+        return
+      }
+      fetchMe()
+        .then((me) => setRole(me.role))
+        .catch(() => setRole(null))
+        .finally(() => setLoading(false))
+    }
+
+    getSession().then((session) => applyUser(session?.user ?? null))
+
+    const unsubscribe = onAuthStateChange(applyUser)
 
     return unsubscribe
   }, [])
 
   const value: AuthContextValue = {
     user,
+    role,
     loading,
     signIn: signInWithPassword,
     signOut,

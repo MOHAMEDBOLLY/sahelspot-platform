@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.schemas import PublishRevisionDetail, PublishRevisionOut
 from app.auth.dependencies import CurrentUser, get_current_user
+from app.auth.permissions import Permission, require_permission
 from app.db.models import PublishRevision
 from app.db.session import get_db
 from app.publishing.engine import publish, republish
@@ -13,7 +14,8 @@ from app.publishing.engine import publish, republish
 # now `GET /public/venues`/`GET /public/destinations`) lives in
 # `public.py` instead — a different router, mounted with no auth, so it
 # can never accidentally share this file's editorial gate or vice versa.
-# Mounted under /editor by app/api/router.py.
+# Mounted under /editor by app/api/router.py. As of Sprint 24, every
+# route also depends on `require_permission(Permission.X)`.
 router = APIRouter(tags=["publish"])
 
 
@@ -21,6 +23,7 @@ router = APIRouter(tags=["publish"])
 def publish_current_approved_content(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_PUBLISH)),
 ):
     """Publish — snapshots every `approved` destination/venue into a new,
     immutable publish revision and makes it current. Not a status change:
@@ -34,7 +37,10 @@ def publish_current_approved_content(
 
 
 @router.get("/publish/revisions", response_model=list[PublishRevisionOut])
-def list_publish_revisions(db: Session = Depends(get_db)):
+def list_publish_revisions(
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_VIEW)),
+):
     """Revision history — the Revision Browser's list (Sprint 17). Metadata
     only, newest first; this endpoint itself never restores a revision or
     changes `is_current` — see `publish_current_approved_content` and
@@ -44,7 +50,11 @@ def list_publish_revisions(db: Session = Depends(get_db)):
 
 
 @router.get("/publish/revisions/{revision_id}", response_model=PublishRevisionDetail)
-def get_publish_revision(revision_id: int, db: Session = Depends(get_db)):
+def get_publish_revision(
+    revision_id: int,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_VIEW)),
+):
     """A single revision's full record, including its snapshot — for
     inspection only. `404` if the revision doesn't exist. This endpoint
     itself is not a restore mechanism: it returns data, it never assigns
@@ -61,6 +71,7 @@ def republish_revision(
     revision_id: int,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_PUBLISH)),
 ):
     """Republish (Sprint 18) — makes an existing revision current again.
     Never creates a new snapshot, never regenerates or edits any revision's

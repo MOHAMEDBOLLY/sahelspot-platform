@@ -9,6 +9,8 @@ import { toVenuePatch } from '../api'
 import { validateVenueDraft } from '../venueValidation'
 import { ApiError } from '../../../lib/apiClient'
 import { useDraft } from '../../../hooks/useDraft'
+import { useAuth } from '../../auth/useAuth'
+import { hasPermission } from '../../auth/permissions'
 import { LoadingState } from '../../../components/LoadingState'
 import { ErrorState } from '../../../components/ErrorState'
 import { PagePlaceholder } from '../../../components/PagePlaceholder'
@@ -54,6 +56,7 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
     reset: resetApproveError,
   } = useApproveVenue()
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
+  const { role } = useAuth()
 
   // A stale validation result belongs to whatever the venue looked like when
   // it ran — never carry it across venues, or across a fresh edit session.
@@ -64,20 +67,30 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
   const fieldErrors = mode === 'edit' && displayedVenue ? validateVenueDraft(displayedVenue) : {}
   const hasFieldErrors = Object.keys(fieldErrors).length > 0
 
+  // Sprint 24 — the backend requires `content_edit` for both Save Draft
+  // and Validate, so one permission check covers Edit/Save Draft (via
+  // DraftToolbar's `canEdit`) and Validate's visibility.
+  const canEdit = hasPermission(role, 'content_edit')
+
   // Review is only offerable once someone has actually run Validate and it
   // came back ready — not derived independently, so this can never drift
   // from what the backend's Editorial Readiness check just said. Also
   // requires !isDirty, same reasoning as Validate itself: the persisted row
-  // (what Review would act on) must match what's on screen.
+  // (what Review would act on) must match what's on screen. Sprint 24 adds
+  // the permission check — same "never render what the backend would 403"
+  // reasoning as `canEdit` above.
   const canSubmitForReview =
-    !isDirty && displayedVenue?.status === 'draft' && validationResult?.ready_for_review === true
+    !isDirty &&
+    displayedVenue?.status === 'draft' &&
+    validationResult?.ready_for_review === true &&
+    hasPermission(role, 'content_submit_review')
 
   // Approval is a human editorial decision, not a re-run of Validate — it
   // only depends on the venue's current status, never on validationResult.
   // Still requires !isDirty for the same reason Review does: Approval acts
   // on the persisted row, so it shouldn't be offered while what's on screen
   // might not match it.
-  const canApprove = !isDirty && displayedVenue?.status === 'review'
+  const canApprove = !isDirty && displayedVenue?.status === 'review' && hasPermission(role, 'content_approve')
 
   useEffect(() => {
     onDirtyChange?.(isDirty)
@@ -159,6 +172,7 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
         isSaving={isSaving}
         saveError={saveError instanceof ApiError ? saveError.message : saveError ? 'Failed to save.' : null}
         hasFieldErrors={hasFieldErrors}
+        canEdit={canEdit}
         isValidating={isValidating}
         canSubmitForReview={canSubmitForReview}
         isSubmittingForReview={isSubmittingForReview}

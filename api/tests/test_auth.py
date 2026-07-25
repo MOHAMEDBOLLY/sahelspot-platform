@@ -13,11 +13,11 @@ does.
 import jwt
 import pytest
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import CurrentUser, get_current_user
 from app.core.config import settings
 from app.main import app
 
-from .conftest import TEST_USER_ID, latest_activity
+from .conftest import TEST_USER_EMAIL, TEST_USER_ID, TEST_USER_ROLE, latest_activity
 
 
 @pytest.fixture()
@@ -27,10 +27,8 @@ def unauthenticated(client):
     """
     app.dependency_overrides.pop(get_current_user, None)
     yield client
-    from app.auth.dependencies import CurrentUser
-
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(
-        id=TEST_USER_ID, email="test-editor@example.com"
+        id=TEST_USER_ID, email=TEST_USER_EMAIL, role=TEST_USER_ROLE
     )
 
 
@@ -161,7 +159,16 @@ class TestInvalidToken:
 
 
 class TestValidToken:
-    def test_valid_token_is_accepted_and_attributed_as_actor(self, unauthenticated, make_venue, db):
+    def test_valid_token_is_accepted_and_attributed_as_actor(
+        self, unauthenticated, make_venue, make_app_user, db
+    ):
+        # A real, correctly-signed token exercises get_current_user's real
+        # DB-backed role lookup, not the autouse override — so this test's
+        # identity needs a role with CONTENT_SUBMIT_REVIEW pre-provisioned,
+        # the same way a real second-login Supabase user would already
+        # have a row by the time they're not brand new. See
+        # test_permissions.py for the auto-provisioning path itself.
+        make_app_user(id=TEST_USER_ID, email=TEST_USER_EMAIL, role="editor")
         venue = make_venue(status="draft")
         token = _make_token()
 

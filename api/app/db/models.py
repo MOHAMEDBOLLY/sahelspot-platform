@@ -37,6 +37,11 @@ VENUE_CATEGORIES = (
     "Other",
 )
 
+# Sprint 24 — a small, fixed, closed set, same reasoning as CONTENT_STATUSES/
+# VENUE_CATEGORIES above: the role vocabulary is product-defined and rarely
+# changing, so it's a CHECK-constrained text column, not a lookup table.
+APP_USER_ROLES = ("viewer", "editor", "publisher", "admin")
+
 
 class Destination(Base):
     """A named compound/resort/development along the North Coast."""
@@ -166,3 +171,33 @@ class ActivityLogEntry(Base):
     # schema's MetaData instance). Mapped to the actual DB/JSON field name
     # "metadata" via the explicit column-name argument below.
     activity_metadata: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
+
+
+class AppUser(Base):
+    """Sprint 24 — the one fact this application tracks about an
+    authenticated identity beyond what Supabase already verifies: what
+    role they hold here. Deliberately not named `users` — this table
+    answers exactly one question (role), not a general user-profile
+    concern. No relationship to `destinations`/`venues`/`publish_revisions`
+    and no foreign key in or out: `id` is a Supabase auth user's UUID, an
+    identity that lives outside this database, same reasoning
+    `publish_revisions` already uses for having none. `email` is
+    denormalized display data only — Supabase remains the source of truth
+    for identity, this column is never read to make an authorization
+    decision.
+    """
+
+    __tablename__ = "app_users"
+    __table_args__ = (
+        CheckConstraint(f"role IN {APP_USER_ROLES}", name="ck_app_users_role"),
+    )
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

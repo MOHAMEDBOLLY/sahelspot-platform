@@ -26,7 +26,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`)
 
   if (!response.ok) {
-    throw new ApiError(`${path} failed with status ${response.status}`, response.status)
+    throw new ApiError(await extractErrorMessage(response, path), response.status)
   }
 
   return response.json() as Promise<T>
@@ -40,7 +40,7 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   })
 
   if (!response.ok) {
-    throw new ApiError(`${path} failed with status ${response.status}`, response.status)
+    throw new ApiError(await extractErrorMessage(response, path), response.status)
   }
 
   return response.json() as Promise<T>
@@ -63,17 +63,27 @@ export async function apiPost<T>(path: string): Promise<T> {
  * structured object — surface whichever message is there instead of the
  * generic "path failed with status N" fallback, since Sprint 14's Review
  * transition (and any future action endpoint) returns a structured
- * `{error, message, ...}` detail on rejection. */
+ * `{error, message, ...}` detail on rejection. Sprint 24's
+ * `require_permission(...)` rejection (`{error: "missing_permission",
+ * required: "..."}`) has no `message` field — handled as its own case so
+ * a 403 reads as a real sentence, not the generic fallback. */
 async function extractErrorMessage(response: Response, path: string): Promise<string> {
   try {
     const body: unknown = await response.json()
     const detail = (body as { detail?: unknown } | null)?.detail
     if (typeof detail === 'string') return detail
-    if (detail && typeof detail === 'object' && typeof (detail as { message?: unknown }).message === 'string') {
-      return (detail as { message: string }).message
+    if (detail && typeof detail === 'object') {
+      const detailObject = detail as { error?: unknown; message?: unknown }
+      if (typeof detailObject.message === 'string') return detailObject.message
+      if (detailObject.error === 'missing_permission') {
+        return "You don't have permission to perform this action."
+      }
     }
   } catch {
     // Response wasn't JSON — fall through to the generic message.
+  }
+  if (response.status === 403) {
+    return "You don't have permission to perform this action."
   }
   return `${path} failed with status ${response.status}`
 }

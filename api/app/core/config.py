@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     database_url: str
     supabase_jwt_secret: str
+    # Sprint 24 — the Supabase user id (sub claim) that gets bootstrapped as
+    # `admin` on first login instead of the default `viewer`. Deliberately
+    # not baked into the migration (see 0003_app_users.py) since it varies
+    # per deployment. Optional: unset means no auto-promotion happens, and
+    # the first admin row must be inserted manually.
+    bootstrap_admin_user_id: str | None = None
 
 
 settings = Settings()

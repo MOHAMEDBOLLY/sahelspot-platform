@@ -9,6 +9,14 @@ type DraftToolbarProps = {
   isSaving: boolean
   saveError: string | null
   hasFieldErrors?: boolean
+  /** Sprint 24 — whether the caller's role grants `content_edit`.
+   * Defaults to `true` (every pre-Sprint-24 caller keeps working
+   * unchanged). Hides the Edit button entirely rather than showing it
+   * disabled — a `viewer` has no path into edit mode at all, not a
+   * blocked one. The backend re-enforces this independently
+   * (`PATCH`/`Validate` require `Permission.CONTENT_EDIT`); this only
+   * controls what renders. */
+  canEdit?: boolean
   onEdit: () => void
   onCancel: () => void
   onSave: () => void
@@ -33,6 +41,7 @@ export function DraftToolbar({
   isSaving,
   saveError,
   hasFieldErrors = false,
+  canEdit = true,
   onEdit,
   onCancel,
   onSave,
@@ -59,14 +68,16 @@ export function DraftToolbar({
       <div className="flex shrink-0 items-center gap-2">
         {extraActions}
         {mode === 'view' ? (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700"
-          >
-            <Pencil size={14} />
-            Edit
-          </button>
+          canEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+            >
+              <Pencil size={14} />
+              Edit
+            </button>
+          )
         ) : (
           <>
             <button

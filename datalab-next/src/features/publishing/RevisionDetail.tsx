@@ -7,6 +7,8 @@ import { ErrorState } from '../../components/ErrorState'
 import { PagePlaceholder } from '../../components/PagePlaceholder'
 import { formatDateTime } from '../../lib/formatDate'
 import { ApiError } from '../../lib/apiClient'
+import { useAuth } from '../auth/useAuth'
+import { hasPermission } from '../auth/permissions'
 
 type RevisionDetailProps = {
   revisionId: number | null
@@ -21,6 +23,8 @@ type RevisionDetailProps = {
 export function RevisionDetail({ revisionId }: RevisionDetailProps) {
   const { data: revision, isPending, isError, error, refetch } = useRevisionDetail(revisionId)
   const { mutate: republish, isPending: isRepublishing, error: republishError } = useRepublishRevision()
+  const { role } = useAuth()
+  const canPublish = hasPermission(role, 'content_publish')
 
   function handleRepublish() {
     if (!revisionId) return
@@ -74,7 +78,7 @@ export function RevisionDetail({ revisionId }: RevisionDetailProps) {
             </span>
           )}
         </div>
-        {!revision.is_current && (
+        {!revision.is_current && canPublish && (
           <button
             type="button"
             onClick={handleRepublish}

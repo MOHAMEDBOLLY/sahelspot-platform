@@ -1,49 +1,102 @@
-"""Authentication — verifying who's making a request.
+"""Authentication — verifying who's making a request, and (Sprint 24) what
+role that identity holds here.
 
 Deliberately its own package, same shape as `app/activity/`, `app/workflow/`,
 `app/validation/`: one cross-cutting concern, isolated behind one reusable
-dependency. This module never decides *what* an authenticated user is
-allowed to do (no roles, no permissions) — Sprint 22 only answers "is this
-a real, logged-in Supabase user or not." Every mutation route depends on
-`get_current_user` instead of parsing/verifying a token itself, so the
-verification logic (and the day it needs to change, e.g. to rotate a
-secret or move to JWKS) only lives in one place.
+dependency. This module answers two questions and no more: "is this a
+real, logged-in Supabase user" and "what role does `app_users` say they
+have." It never decides what a role is *allowed* to do — that's
+`app/auth/permissions.py`'s job, kept deliberately separate so a route
+never has to know a role name exists at all (see that module's docstring).
 
 The backend never talks to Supabase's Auth API and never issues or stores
 tokens — it only verifies a JWT that Supabase already issued to the
 frontend, using the project's JWT secret. This keeps the backend stateless
-with respect to auth, consistent with "no premature abstraction": no user
-table, no session store.
+with respect to auth beyond the one small `app_users` table Sprint 24 adds.
 """
 
 from dataclasses import dataclass
 
 import jwt
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 from jwt import InvalidTokenError
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
+from app.activity.service import log_activity
 from app.core.config import settings
+from app.db.models import AppUser
+from app.db.session import get_db
 
 
 @dataclass(frozen=True)
 class CurrentUser:
-    """The only two facts a route ever needs about the caller right now.
-    Deliberately not "the full Supabase user object" — no roles/permissions
-    concept exists yet (see Sprint 22 non-goals), so there is nothing else
-    to carry here today.
+    """The facts a route needs about the caller. `role` was added in
+    Sprint 24 — every route that already depended on this dataclass for
+    `id`/`email` gets it for free, no signature change needed on their end.
     """
 
     id: str
     email: str | None
+    role: str
 
 
-def get_current_user(authorization: str | None = Header(default=None)) -> CurrentUser:
+def _provision_viewer(db: Session, *, user_id: str, email: str | None) -> AppUser:
+    """First login for this Supabase identity — no `app_users` row exists
+    yet. Defaults to `viewer`, the lowest-privilege role, except for the
+    one configured bootstrap admin id (see `Settings.bootstrap_admin_user_id`)
+    — there is no other way to become `admin` in this sprint; role changes
+    beyond this one bootstrap rule are a deferred feature (`PATCH
+    /editor/users/{id}`, not built yet).
+
+    This *is* a role change (none -> a real role), so it's activity-logged
+    the same way every other editorial action is — `actor` is the newly
+    provisioned user themselves, since logging in is what triggered it.
+
+    Two simultaneous first requests from the same identity (e.g. a
+    double-click, or two tabs restoring a session at once) both see no
+    existing row and both attempt this insert — a real race, not a
+    hypothetical one. Only one commit can win; the other hits `app_users`'
+    primary-key constraint. Rather than let that surface as an unhandled
+    `500`, the loser rolls back its own insert (and the activity entry
+    that would have duplicated the winner's) and reads the row the winner
+    already committed — the caller gets a normal, successful response
+    either way, attributing exactly one `role_assigned` entry per user.
+    """
+    role = "admin" if user_id == settings.bootstrap_admin_user_id else "viewer"
+    app_user = AppUser(id=user_id, email=email, role=role)
+    db.add(app_user)
+    log_activity(
+        db,
+        action="role_assigned",
+        entity_type="app_user",
+        entity_id=user_id,
+        actor=user_id,
+        metadata={"role": role},
+    )
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        app_user = db.get(AppUser, user_id)
+        assert app_user is not None  # the only reason this insert could conflict
+    return app_user
+
+
+def get_current_user(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> CurrentUser:
     """FastAPI dependency: verifies the `Authorization: Bearer <token>`
-    header against Supabase's JWT secret and returns the caller's identity.
-    Raises `401` for anything short of a valid, unexpired, correctly-signed
+    header against Supabase's JWT secret, then resolves the caller's role
+    from `app_users` — auto-provisioning a `viewer` row on first login
+    rather than rejecting an otherwise-valid Supabase user. Raises `401`
+    for anything short of a valid, unexpired, correctly-signed
     Supabase-issued token — missing header, malformed header, bad
     signature, and expiry are all the same "not authenticated" outcome to
-    every caller of this dependency.
+    every caller of this dependency. Never raises `403` here — role
+    *sufficiency* for a given action is `require_permission()`'s job, not
+    this function's.
     """
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or malformed Authorization header")
@@ -64,4 +117,10 @@ def get_current_user(authorization: str | None = Header(default=None)) -> Curren
     if not user_id:
         raise HTTPException(status_code=401, detail="Token missing subject claim")
 
-    return CurrentUser(id=user_id, email=payload.get("email"))
+    email = payload.get("email")
+
+    app_user = db.get(AppUser, user_id)
+    if app_user is None:
+        app_user = _provision_viewer(db, user_id=user_id, email=email)
+
+    return CurrentUser(id=user_id, email=email, role=app_user.role)

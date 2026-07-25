@@ -189,3 +189,15 @@ class ActivityLogEntryOut(BaseModel):
     entity_id: str
     actor: str
     metadata: dict | None = None
+
+
+class MeOut(BaseModel):
+    """Sprint 24 — `GET /editor/me`'s response. Deliberately just enough
+    for the frontend to know who's logged in and what they're allowed to
+    do (via `role`) — not a user-profile shape. See
+    `app/api/routes/me.py`.
+    """
+
+    id: str
+    email: str | None = None
+    role: str

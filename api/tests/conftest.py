@@ -17,12 +17,14 @@ by convention instead of by a separate database:
 - `publish_revisions`/`activity_log` are global, append-only tables with
   no per-test owner; `_clean_global_tables` (autouse) waterlines their max
   id before each test and deletes anything created above it after.
-- Sprint 22 protects every mutation route behind `get_current_user`. Rather
-  than mint real Supabase tokens for every test, `_authenticated_by_default`
-  (autouse) overrides that dependency with a fixed test identity, so
-  existing tests keep exercising the route's actual behavior instead of
-  its auth gate. `test_auth.py` clears the override to test the gate
-  itself.
+- Sprint 22 protects every mutation route behind `get_current_user`; Sprint
+  23 moved that to a router-level gate covering reads too; Sprint 24 adds
+  `require_permission(...)` on top of it. Rather than mint real Supabase
+  tokens for every test, `_authenticated_by_default` (autouse) overrides
+  `get_current_user` with a fixed test identity that holds `admin` — the
+  role with every permission — so existing tests keep exercising route
+  *behavior*, not the auth/permission gates. `test_auth.py` and
+  `test_permissions.py` clear the override to test those gates themselves.
 
 Because state is shared (not a fresh database per test), tests in this
 suite must run serially, not with a parallel runner like pytest-xdist —
@@ -36,7 +38,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func
 
 from app.auth.dependencies import CurrentUser, get_current_user
-from app.db.models import ActivityLogEntry, Destination, PublishRevision, Venue
+from app.db.models import ActivityLogEntry, AppUser, Destination, PublishRevision, Venue
 from app.db.session import SessionLocal
 from app.main import app
 
@@ -45,16 +47,19 @@ SEED_DESTINATION_ID = "marassi"
 
 TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
 TEST_USER_EMAIL = "test-editor@example.com"
+TEST_USER_ROLE = "admin"
 
 
 @pytest.fixture(autouse=True)
 def _authenticated_by_default():
-    """Every test is "logged in" as this fixed user unless it explicitly
-    clears the override (see `test_auth.py`) — keeps the rest of the suite
-    focused on route behavior, not on reproducing Supabase's token format.
+    """Every test is "logged in" as this fixed `admin` user unless it
+    explicitly clears the override (see `test_auth.py`/`test_permissions.py`)
+    — keeps the rest of the suite focused on route behavior, not on
+    reproducing Supabase's token format or provisioning a role for every
+    test that happens to call a protected route.
     """
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(
-        id=TEST_USER_ID, email=TEST_USER_EMAIL
+        id=TEST_USER_ID, email=TEST_USER_EMAIL, role=TEST_USER_ROLE
     )
     yield
     app.dependency_overrides.pop(get_current_user, None)
@@ -138,6 +143,36 @@ def make_venue(db, make_destination):
 
     for venue_id in created_ids:
         db.query(Venue).filter(Venue.id == venue_id).delete()
+    db.commit()
+
+
+@pytest.fixture()
+def make_app_user(db):
+    """Factory for a test-isolated `app_users` row — same shape as
+    `make_destination`/`make_venue`. Used only by real-JWT tests that need
+    a specific role already provisioned (e.g. to test a `publisher`-only
+    action), or that want to assert on the auto-provisioning path itself
+    without leaking a row into the shared dev database afterward.
+    """
+    created_ids: list[str] = []
+
+    def _make(**overrides) -> AppUser:
+        user_id = overrides.pop("id", f"test-user-{uuid.uuid4().hex[:8]}")
+        app_user = AppUser(
+            id=user_id,
+            email=overrides.pop("email", None),
+            role=overrides.pop("role", "viewer"),
+            **overrides,
+        )
+        db.add(app_user)
+        db.commit()
+        created_ids.append(user_id)
+        return app_user
+
+    yield _make
+
+    for user_id in created_ids:
+        db.query(AppUser).filter(AppUser.id == user_id).delete()
     db.commit()
 
 
