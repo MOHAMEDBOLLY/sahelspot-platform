@@ -43,3 +43,24 @@ export interface Venue {
   created_at: string
   updated_at: string
 }
+
+/** Sprint 27 — `GET /venues`'s response shape, mirrors `VenueListOut`
+ * (`api/app/api/schemas.py`). */
+export interface VenueListResponse {
+  items: Venue[]
+  total: number
+  page: number
+  page_size: number
+}
+
+/** All optional — an unset field means "don't filter on this." Matches
+ * the backend's query params exactly (`destinationId` -> `destination_id`
+ * is the one naming translation `fetchVenues` does). */
+export interface VenueSearchParams {
+  q?: string
+  destinationId?: string
+  category?: string
+  status?: string
+  page?: number
+  pageSize?: number
+}

@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { setCoverFromGallery } from './api'
-import type { Venue } from '../../types/venue'
 
 /** Sprint 26 — same cache-seeding shape as `useUpdateVenue`/
  * `useUploadVenueMedia`: the server's response is the authoritative,
- * already-persisted venue. */
+ * already-persisted venue. Sprint 27: the list cache is invalidated
+ * instead of patched directly — see `useUpdateVenue`'s docstring for why. */
 export function useSetCoverFromGallery() {
   const queryClient = useQueryClient()
 
@@ -12,9 +12,7 @@ export function useSetCoverFromGallery() {
     mutationFn: ({ id, url }: { id: string; url: string }) => setCoverFromGallery(id, url),
     onSuccess: (updatedVenue) => {
       queryClient.setQueryData(['venue', updatedVenue.id], updatedVenue)
-      queryClient.setQueryData<Venue[]>(['venues'], (venues) =>
-        venues?.map((venue) => (venue.id === updatedVenue.id ? updatedVenue : venue)),
-      )
+      queryClient.invalidateQueries({ queryKey: ['venues'] })
     },
   })
 }

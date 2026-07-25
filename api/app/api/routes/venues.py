@@ -1,10 +1,10 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
 from app.activity.service import log_activity
-from app.api.schemas import SetCoverImageRequest, VenueOut, VenueUpdate
+from app.api.schemas import SetCoverImageRequest, VenueListOut, VenueOut, VenueUpdate
 from app.auth.dependencies import CurrentUser, get_current_user
 from app.auth.permissions import Permission, require_permission
 from app.db.models import Venue
@@ -26,17 +26,49 @@ from app.workflow.transitions import require_status
 router = APIRouter(prefix="/venues", tags=["venues"])
 
 
-@router.get("", response_model=list[VenueOut])
+@router.get("", response_model=VenueListOut)
 def list_venues(
+    q: str | None = Query(default=None, description="Case-insensitive substring match on venue name"),
+    destination_id: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(require_permission(Permission.CONTENT_VIEW)),
 ):
-    return (
-        db.query(Venue)
-        .options(joinedload(Venue.destination))
-        .order_by(Venue.name)
-        .all()
-    )
+    """Sprint 27 — Search & Filter Foundation. All four query params are
+    optional and combine with AND semantics (e.g. `q` + `category` narrows
+    to both at once, not either). Deliberately plain `ILIKE` for `q`, not a
+    `tsvector`/GIN index — docs/DATABASE.md already named that as deferred
+    until AI Search is actually scoped, and nothing about this sprint
+    changes that trigger; at this data volume a sequential scan is fine.
+    An unrecognized `category`/`status` value isn't rejected — it just
+    matches no rows, the same as any other filter value nothing has —
+    rather than duplicating the `CHECK` constraint's own validation here.
+
+    Response is paginated (`VenueListOut`, not a bare list) so the caller
+    always knows `total`, keeping room for real pagination controls later
+    without another response-shape change — but this sprint's frontend
+    scope doesn't build page-by-page navigation, just search/filter, so it
+    requests one generously-sized page rather than exposing page controls
+    nobody asked for yet.
+    """
+    query = db.query(Venue).options(joinedload(Venue.destination))
+
+    if q:
+        query = query.filter(Venue.name.ilike(f"%{q}%"))
+    if destination_id:
+        query = query.filter(Venue.destination_id == destination_id)
+    if category:
+        query = query.filter(Venue.category == category)
+    if status:
+        query = query.filter(Venue.status == status)
+
+    total = query.count()
+    items = query.order_by(Venue.name).offset((page - 1) * page_size).limit(page_size).all()
+
+    return VenueListOut(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.get("/{venue_id}", response_model=VenueOut)

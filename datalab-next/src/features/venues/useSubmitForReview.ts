@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { submitVenueForReview } from './api'
-import type { Venue } from '../../types/venue'
 
 /**
- * Review — the first editorial state transition. Same cache-update pattern
- * as useUpdateVenue: seed both caches from the server's response (now
- * `status: 'review'`) rather than mutating the client's copy locally.
+ * Review — the first editorial state transition. Seeds the single-venue
+ * cache from the server's response (now `status: 'review'`). Sprint 27:
+ * the list cache is invalidated instead of patched directly — see
+ * `useUpdateVenue`'s docstring for why, now that it's keyed by
+ * search/filter params.
  */
 export function useSubmitForReview() {
   const queryClient = useQueryClient()
@@ -14,9 +15,7 @@ export function useSubmitForReview() {
     mutationFn: (id: string) => submitVenueForReview(id),
     onSuccess: (updatedVenue) => {
       queryClient.setQueryData(['venue', updatedVenue.id], updatedVenue)
-      queryClient.setQueryData<Venue[]>(['venues'], (venues) =>
-        venues?.map((venue) => (venue.id === updatedVenue.id ? updatedVenue : venue)),
-      )
+      queryClient.invalidateQueries({ queryKey: ['venues'] })
     },
   })
 }

@@ -1,9 +1,24 @@
 import { apiGet, apiPatch, apiPost, apiPostJson, apiUpload } from '../../lib/apiClient'
-import type { Venue } from '../../types/venue'
+import type { Venue, VenueListResponse, VenueSearchParams } from '../../types/venue'
 import type { ValidationResult } from '../../types/validation'
 
-export function fetchVenues(): Promise<Venue[]> {
-  return apiGet<Venue[]>('/editor/venues')
+/** Sprint 27 — Search & Filter Foundation. All params are optional and
+ * combine with AND semantics server-side. `page`/`pageSize` exist so the
+ * response shape (`VenueListResponse`, not a bare array) can support real
+ * pagination controls later without another shape change — this sprint's
+ * frontend doesn't build page-by-page navigation, just search/filter, so
+ * it requests one generously-sized page (see `useVenues`). */
+export function fetchVenues(params: VenueSearchParams = {}): Promise<VenueListResponse> {
+  const searchParams = new URLSearchParams()
+  if (params.q) searchParams.set('q', params.q)
+  if (params.destinationId) searchParams.set('destination_id', params.destinationId)
+  if (params.category) searchParams.set('category', params.category)
+  if (params.status) searchParams.set('status', params.status)
+  searchParams.set('page', String(params.page ?? 1))
+  searchParams.set('page_size', String(params.pageSize ?? 50))
+
+  const query = searchParams.toString()
+  return apiGet<VenueListResponse>(`/editor/venues${query ? `?${query}` : ''}`)
 }
 
 export function fetchVenue(id: string): Promise<Venue> {

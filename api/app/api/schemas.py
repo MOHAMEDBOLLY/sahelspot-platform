@@ -78,6 +78,19 @@ class VenueOut(BaseModel):
     updated_at: datetime
 
 
+class VenueListOut(BaseModel):
+    """Sprint 27 — `GET /venues`'s response shape, once search/filter/
+    pagination existed to make a bare `list[VenueOut]` insufficient (the
+    caller needs `total` to know if there's more than one page). `items`
+    is exactly what the bare list used to return.
+    """
+
+    items: list[VenueOut]
+    total: int
+    page: int
+    page_size: int
+
+
 class VenueUpdate(BaseModel):
     """Save Draft payload — the fields Edit Mode currently exposes as editable
     (see datalab-next Sprint 9/10 sections). Everything else on a venue
