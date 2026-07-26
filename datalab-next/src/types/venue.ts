@@ -1,3 +1,5 @@
+import type { ValidationResult } from './validation'
+
 export type VenueStatus = 'draft' | 'review' | 'approved' | 'archived'
 
 /** [open, close] in "HH:MM" 24h, e.g. ["12:00", "23:00"]. A day can have multiple ranges (split hours). */
@@ -63,4 +65,21 @@ export interface VenueSearchParams {
   status?: string
   page?: number
   pageSize?: number
+}
+
+/** Sprint 28 — Bulk Operations. Mirrors `BulkResultItem`/`BulkOperationResponse`
+ * (`api/app/api/schemas.py`) — the one shared shape every bulk endpoint
+ * returns, whether it's a validation check or a mutation. */
+export interface BulkResultItem {
+  venue_id: string
+  success: boolean
+  error: string | null
+  venue: Venue | null
+  validation: ValidationResult | null
+}
+
+export interface BulkOperationResponse {
+  results: BulkResultItem[]
+  succeeded: number
+  failed: number
 }

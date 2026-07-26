@@ -1,7 +1,9 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.validation.schemas import ValidationResult
 
 
 class DestinationOut(BaseModel):
@@ -131,6 +133,48 @@ class SetCoverImageRequest(BaseModel):
     """
 
     url: str
+
+
+class BulkVenueIdsRequest(BaseModel):
+    """Sprint 28 — the request body every bulk *action* endpoint (Validate,
+    Submit for Review, Approve) shares: just the target ids. Capped at 100
+    per request — a sane guard rail, same reasoning as `page_size`'s cap on
+    `GET /venues` (Sprint 27), not a hint that more would need a queue.
+    """
+
+    venue_ids: list[str] = Field(min_length=1, max_length=100)
+
+
+class BulkCategoryUpdateRequest(BaseModel):
+    venue_ids: list[str] = Field(min_length=1, max_length=100)
+    category: str
+
+
+class BulkDestinationUpdateRequest(BaseModel):
+    venue_ids: list[str] = Field(min_length=1, max_length=100)
+    destination_id: str
+
+
+class BulkResultItem(BaseModel):
+    """One row of a bulk operation's outcome. `venue`/`validation` are
+    populated only for the operations that produce them (mutations return
+    `venue`; Validate returns `validation`) — both `None` means the item
+    failed, with `error` explaining why. This is the one shape shared by
+    every bulk endpoint (Validate, Submit for Review, Approve, category
+    update, destination update) rather than a bespoke response per action.
+    """
+
+    venue_id: str
+    success: bool
+    error: str | None = None
+    venue: VenueOut | None = None
+    validation: ValidationResult | None = None
+
+
+class BulkOperationResponse(BaseModel):
+    results: list[BulkResultItem]
+    succeeded: int
+    failed: int
 
 
 class PublishRevisionOut(BaseModel):

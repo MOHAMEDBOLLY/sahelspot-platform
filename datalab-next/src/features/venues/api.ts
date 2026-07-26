@@ -1,5 +1,5 @@
 import { apiGet, apiPatch, apiPost, apiPostJson, apiUpload } from '../../lib/apiClient'
-import type { Venue, VenueListResponse, VenueSearchParams } from '../../types/venue'
+import type { BulkOperationResponse, Venue, VenueListResponse, VenueSearchParams } from '../../types/venue'
 import type { ValidationResult } from '../../types/validation'
 
 /** Sprint 27 — Search & Filter Foundation. All params are optional and
@@ -131,4 +131,43 @@ export function submitVenueForReview(id: string): Promise<Venue> {
  * structured 409 if the venue isn't currently `review`. */
 export function approveVenue(id: string): Promise<Venue> {
   return apiPost<Venue>(`/editor/venues/${encodeURIComponent(id)}/approve`)
+}
+
+/** Sprint 28 — Bulk Operations. Every bulk endpoint returns the same
+ * `BulkOperationResponse` shape (one result row per id) regardless of
+ * whether it's a read-only check or a mutation — partial failure is
+ * normal, not an error the caller needs to catch, so none of these throw
+ * on a per-item failure the way the single-item actions above do. */
+export function bulkValidateVenues(venueIds: string[]): Promise<BulkOperationResponse> {
+  return apiPostJson<BulkOperationResponse>('/editor/venues/bulk/validate', { venue_ids: venueIds })
+}
+
+export function bulkSubmitVenuesForReview(venueIds: string[]): Promise<BulkOperationResponse> {
+  return apiPostJson<BulkOperationResponse>('/editor/venues/bulk/submit-for-review', {
+    venue_ids: venueIds,
+  })
+}
+
+export function bulkApproveVenues(venueIds: string[]): Promise<BulkOperationResponse> {
+  return apiPostJson<BulkOperationResponse>('/editor/venues/bulk/approve', { venue_ids: venueIds })
+}
+
+export function bulkUpdateVenueCategory(
+  venueIds: string[],
+  category: string,
+): Promise<BulkOperationResponse> {
+  return apiPatch<BulkOperationResponse>('/editor/venues/bulk/category', {
+    venue_ids: venueIds,
+    category,
+  })
+}
+
+export function bulkUpdateVenueDestination(
+  venueIds: string[],
+  destinationId: string,
+): Promise<BulkOperationResponse> {
+  return apiPatch<BulkOperationResponse>('/editor/venues/bulk/destination', {
+    venue_ids: venueIds,
+    destination_id: destinationId,
+  })
 }

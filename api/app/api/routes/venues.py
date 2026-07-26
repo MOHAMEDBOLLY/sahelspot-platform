@@ -4,10 +4,20 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy.orm import Session, joinedload
 
 from app.activity.service import log_activity
-from app.api.schemas import SetCoverImageRequest, VenueListOut, VenueOut, VenueUpdate
+from app.api.schemas import (
+    BulkCategoryUpdateRequest,
+    BulkDestinationUpdateRequest,
+    BulkOperationResponse,
+    BulkResultItem,
+    BulkVenueIdsRequest,
+    SetCoverImageRequest,
+    VenueListOut,
+    VenueOut,
+    VenueUpdate,
+)
 from app.auth.dependencies import CurrentUser, get_current_user
 from app.auth.permissions import Permission, require_permission
-from app.db.models import Venue
+from app.db.models import VENUE_CATEGORIES, Destination, Venue
 from app.db.session import get_db
 from app.media.service import upload_image
 from app.validation.schemas import ValidationResult
@@ -69,6 +79,225 @@ def list_venues(
     items = query.order_by(Venue.name).offset((page - 1) * page_size).limit(page_size).all()
 
     return VenueListOut(items=items, total=total, page=page, page_size=page_size)
+
+
+# ---------------------------------------------------------------------------
+# Bulk operations (Sprint 28)
+#
+# Deliberately registered here, immediately after `list_venues` and before
+# `get_venue`/`update_venue`/etc. — not for readability, but because it's
+# load-bearing: FastAPI/Starlette matches routes in registration order, and
+# `/venues/{venue_id}` (below) would otherwise happily match a request to
+# `/venues/bulk/validate` with `venue_id="bulk"` before this literal route
+# ever got a chance to. Every bulk-* path below must stay registered above
+# any `/venues/{venue_id}...` route for that reason.
+#
+# Each bulk endpoint reuses the *exact* function the single-item endpoint
+# calls (`validate_venue()`, `_submit_for_review_or_raise()`,
+# `_approve_or_raise()`) — none of the business logic below is
+# reimplemented, only wrapped so one item's failure doesn't abort the rest
+# of the batch. No background job, no queue: this is a synchronous loop
+# over a capped (<=100) list of ids within a single request.
+# ---------------------------------------------------------------------------
+
+
+def _error_message(exc: HTTPException) -> str:
+    """Every single-item action already raises `HTTPException` with either
+    a plain string or a structured `{error, message, ...}` detail (see
+    `_submit_for_review_or_raise`/`_approve_or_raise` below). Bulk results
+    need one plain string per failed item — this is the one place that
+    unwraps either shape, so no bulk handler duplicates that parsing.
+    """
+    if isinstance(exc.detail, dict):
+        return exc.detail.get("message") or exc.detail.get("error") or str(exc.detail)
+    return str(exc.detail)
+
+
+@router.post("/bulk/validate", response_model=BulkOperationResponse)
+def bulk_validate_venues(
+    payload: BulkVenueIdsRequest,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
+):
+    """Runs the same `validate_venue()` Editorial Readiness check
+    `POST /venues/{id}/validate` uses, once per id. Read-only, like the
+    single-item version — no venue is ever mutated here. `success` is
+    `True` only when the venue was found *and* `ready_for_review` — a
+    found-but-not-ready venue is a failed validation, not a successful
+    check with a negative result, so the aggregate `succeeded`/`failed`
+    counts (and the frontend's summary banner) reflect actual readiness.
+    """
+    results: list[BulkResultItem] = []
+    for venue_id in payload.venue_ids:
+        venue = db.get(Venue, venue_id)
+        if venue is None:
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error="Venue not found"))
+            continue
+        validation = validate_venue(venue)
+        if validation.ready_for_review:
+            results.append(BulkResultItem(venue_id=venue_id, success=True, validation=validation))
+        else:
+            results.append(
+                BulkResultItem(
+                    venue_id=venue_id,
+                    success=False,
+                    error="Venue is not ready for review.",
+                    validation=validation,
+                )
+            )
+
+    succeeded = sum(1 for result in results if result.success)
+    return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
+
+
+@router.post("/bulk/submit-for-review", response_model=BulkOperationResponse)
+def bulk_submit_venues_for_review(
+    payload: BulkVenueIdsRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_SUBMIT_REVIEW)),
+):
+    """Calls `_submit_for_review_or_raise()` — the same function
+    `POST /venues/{id}/submit-for-review` calls — once per id. A venue
+    that's not `draft`, or isn't ready per Editorial Readiness, fails as
+    its own result row (same 409/422 reasoning as the single endpoint,
+    just captured instead of returned as the whole request's status); it
+    never stops the rest of the batch from being processed.
+    """
+    results: list[BulkResultItem] = []
+    for venue_id in payload.venue_ids:
+        venue = db.get(Venue, venue_id)
+        if venue is None:
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error="Venue not found"))
+            continue
+        try:
+            _submit_for_review_or_raise(db, venue, user.id)
+            db.commit()
+        except HTTPException as exc:
+            db.rollback()
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error=_error_message(exc)))
+            continue
+        venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
+
+    succeeded = sum(1 for result in results if result.success)
+    return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
+
+
+@router.post("/bulk/approve", response_model=BulkOperationResponse)
+def bulk_approve_venues(
+    payload: BulkVenueIdsRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    """Calls `_approve_or_raise()` — the same function
+    `POST /venues/{id}/approve` calls — once per id. Same partial-failure
+    handling as `bulk_submit_venues_for_review` above.
+    """
+    results: list[BulkResultItem] = []
+    for venue_id in payload.venue_ids:
+        venue = db.get(Venue, venue_id)
+        if venue is None:
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error="Venue not found"))
+            continue
+        try:
+            _approve_or_raise(db, venue, user.id)
+            db.commit()
+        except HTTPException as exc:
+            db.rollback()
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error=_error_message(exc)))
+            continue
+        venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
+
+    succeeded = sum(1 for result in results if result.success)
+    return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
+
+
+@router.patch("/bulk/category", response_model=BulkOperationResponse)
+def bulk_update_category(
+    payload: BulkCategoryUpdateRequest,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
+):
+    """A bulk Save Draft, narrowed to one field — the same "set the
+    attribute, commit" write `PATCH /venues/{id}` already does for
+    `category` (see `update_venue`), just applied across many ids. Not
+    activity-logged, for the same reason Save Draft itself isn't (Sprint
+    19): it's a draft-content edit, not a workflow transition or publish
+    event. `category` is validated once, up front, against the same fixed
+    list the database's own `CHECK` constraint enforces — this is a
+    mutation (unlike Sprint 27's search filter, which lets an unknown value
+    just match nothing), so a typo should fail cleanly here rather than as
+    a raw integrity-constraint error.
+    """
+    if payload.category not in VENUE_CATEGORIES:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_category", "message": f"'{payload.category}' is not a recognized category."},
+        )
+
+    results: list[BulkResultItem] = []
+    for venue_id in payload.venue_ids:
+        venue = db.get(Venue, venue_id)
+        if venue is None:
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error="Venue not found"))
+            continue
+        try:
+            venue.category = payload.category
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            error = _error_message(exc) if isinstance(exc, HTTPException) else "Failed to update category."
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error=error))
+            continue
+        venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
+
+    succeeded = sum(1 for result in results if result.success)
+    return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
+
+
+@router.patch("/bulk/destination", response_model=BulkOperationResponse)
+def bulk_update_destination(
+    payload: BulkDestinationUpdateRequest,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
+):
+    """Same shape as `bulk_update_category` above — a bulk Save Draft
+    narrowed to one field. `destination_id` isn't part of `VenueUpdate`
+    (Sprint 9 deliberately excluded it from single-item editing, since it
+    "would need a real destination picker"); a bulk reassignment is a
+    distinct, explicitly-scoped capability this sprint adds, not a
+    backdoor into making it a free-text field on the single-item form.
+    The target destination is validated to exist once, up front — the
+    same 404-on-missing pattern every other route in this codebase uses,
+    just checked before the loop instead of per item, since it's the same
+    destination for every venue in the batch.
+    """
+    if db.get(Destination, payload.destination_id) is None:
+        raise HTTPException(status_code=404, detail="Destination not found")
+
+    results: list[BulkResultItem] = []
+    for venue_id in payload.venue_ids:
+        venue = db.get(Venue, venue_id)
+        if venue is None:
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error="Venue not found"))
+            continue
+        try:
+            venue.destination_id = payload.destination_id
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            error = _error_message(exc) if isinstance(exc, HTTPException) else "Failed to update destination."
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error=error))
+            continue
+        venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
+
+    succeeded = sum(1 for result in results if result.success)
+    return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
 
 
 @router.get("/{venue_id}", response_model=VenueOut)
@@ -213,6 +442,33 @@ def validate_venue_route(
     return validate_venue(venue)
 
 
+def _submit_for_review_or_raise(db: Session, venue: Venue, actor: str) -> None:
+    """The entire `draft -> review` transition — status guard, Editorial
+    Readiness check, status write, activity log — extracted so
+    `submit_venue_for_review` (single) and `bulk_submit_venues_for_review`
+    (Sprint 28) call the exact same logic instead of one reimplementing
+    the other. Raises `HTTPException` (409 wrong status, 422 not ready) on
+    rejection; does not commit — the caller decides when (single commits
+    immediately, bulk commits per item so one failure can't roll back a
+    sibling's already-applied change).
+    """
+    require_status(venue, expected="draft", target="review")
+
+    result = validate_venue(venue)
+    if not result.ready_for_review:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "not_ready_for_review",
+                "message": "Venue is not ready for review.",
+                "errors": [error.model_dump() for error in result.errors],
+            },
+        )
+
+    venue.status = "review"
+    log_activity(db, action="submit_for_review", entity_type="venue", entity_id=venue.id, actor=actor)
+
+
 @router.post("/{venue_id}/submit-for-review", response_model=VenueOut)
 def submit_venue_for_review(
     venue_id: str,
@@ -233,25 +489,23 @@ def submit_venue_for_review(
     if venue is None:
         raise HTTPException(status_code=404, detail="Venue not found")
 
-    require_status(venue, expected="draft", target="review")
-
-    result = validate_venue(venue)
-    if not result.ready_for_review:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "not_ready_for_review",
-                "message": "Venue is not ready for review.",
-                "errors": [error.model_dump() for error in result.errors],
-            },
-        )
-
-    venue.status = "review"
-    log_activity(db, action="submit_for_review", entity_type="venue", entity_id=venue.id, actor=user.id)
+    _submit_for_review_or_raise(db, venue, user.id)
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
     return venue
+
+
+def _approve_or_raise(db: Session, venue: Venue, actor: str) -> None:
+    """The entire `review -> approved` transition, extracted for the same
+    reason `_submit_for_review_or_raise` was: `approve_venue` (single) and
+    `bulk_approve_venues` (Sprint 28) call this one function rather than
+    duplicating the status guard + write + activity log.
+    """
+    require_status(venue, expected="review", target="approved")
+
+    venue.status = "approved"
+    log_activity(db, action="approve", entity_type="venue", entity_id=venue.id, actor=actor)
 
 
 @router.post("/{venue_id}/approve", response_model=VenueOut)
@@ -275,10 +529,7 @@ def approve_venue(
     if venue is None:
         raise HTTPException(status_code=404, detail="Venue not found")
 
-    require_status(venue, expected="review", target="approved")
-
-    venue.status = "approved"
-    log_activity(db, action="approve", entity_type="venue", entity_id=venue.id, actor=user.id)
+    _approve_or_raise(db, venue, user.id)
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
