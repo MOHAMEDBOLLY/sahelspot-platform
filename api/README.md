@@ -47,15 +47,18 @@ uvicorn app.main:app --reload
 
 - `GET /` — API name and version.
 - `GET /health` — `{"status": "ok", "database": "connected"}`, or a `503` if the database is unreachable.
-- `GET /destinations` — list all destinations, read directly from the `destinations` table.
-- `GET /venues` — list all venues, read directly from the `venues` table. Each venue's `destination` is a resolved `{id, name}` object, not a raw `destination_id` — see [`../docs/API.md`](../docs/API.md#response-model-enrichment-sprint-8).
-- `GET /venues/{venue_id}` — a single venue by id, or `404`. Same resolved `destination` object.
+- `/editor/*` — the authenticated editorial API (destinations, venues, publishing, activity log, user role management). Requires a Supabase-issued JWT and, per route, a specific permission — see [`../docs/API.md`](../docs/API.md).
+- `/public/*` — unauthenticated reads of the current published snapshot only — never the draft tables.
 
-**Note**: the three business endpoints above read straight from the draft/editorial tables — they're a Sprint 4 smoke test proving the DB → API → Swagger → JSON pipeline end-to-end, not the final public API. Per [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md#publishing-architecture), the real public API will read only from `publish_revisions` once the publish/rollback endpoints exist — that hasn't been built yet.
+Full route inventory and request/response shapes: [`../docs/API.md`](../docs/API.md). Interactive docs (Swagger/ReDoc, below) are always the source of truth for the exact current schema.
 
 ## CORS
 
-`app/main.py` allows cross-origin `GET` requests from the Studio dev server (`http://localhost:5173`, `http://127.0.0.1:5173`) so the browser-based frontend can call this API directly. Local dev origins only for now — revisit when Studio has a real deployed URL.
+`app/main.py` reads allowed origins from `ALLOWED_ORIGINS` (see `.env.example`) — no wildcard, defaults to the Studio dev server if unset. A production deployment must set this to the frontend's real deployed URL, or browser requests will be rejected — see [`../docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md).
+
+## Production deployment
+
+See [`../docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md) for the full deployment guide, and [`../docs/RUNBOOK.md`](../docs/RUNBOOK.md) for day-to-day operations (deploy, rollback, backup, restore, health checks, logs). Database backup/restore scripts live in `scripts/backup_db.sh` / `scripts/restore_db.sh`.
 
 ## Note on Python version
 

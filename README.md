@@ -6,7 +6,12 @@ This repository is a **new, independent project**. It does not share code, infra
 
 ## Status
 
-🚧 Foundation stage. Technology stack is finalized (Sprint 0.5). No application code has been written yet.
+✅ Platform Core is feature complete: authentication, role-based
+authorization, destination/venue editorial workflows, media management,
+search, bulk operations, and publishing are all implemented and tested.
+Current work is operational readiness for Beta — see
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) and
+[`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 
 ## Technology stack
 
@@ -16,7 +21,6 @@ This repository is a **new, independent project**. It does not share code, infra
 - TypeScript
 - Tailwind CSS
 - React Router
-- React Hook Form
 - TanStack Query
 - Lucide Icons
 
@@ -54,4 +58,6 @@ Start with [`docs/PRODUCT.md`](docs/PRODUCT.md) for what this platform is and wh
 
 ## Getting started
 
-Nothing is installed or runnable yet — the stack is finalized but no application code, dependencies, or scaffolding exist. Setup instructions will be added here once the `api/` and `datalab-next/` projects are initialized.
+- Backend: see [`api/README.md`](api/README.md) for local setup.
+- Frontend: `cd datalab-next && npm install && npm run dev`.
+- Production deployment: see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
