@@ -439,7 +439,7 @@ The platform is **not live-edit** — see [`PRODUCT.md`](PRODUCT.md#content--pub
 
 ## CORS
 
-As of Sprint 6, `GET` requests are allowed from the Studio dev origins (`http://localhost:5173`, `http://127.0.0.1:5173`) so the browser-based frontend can call this API directly — see `api/app/main.py`. As of Sprint 11, `PATCH` is allowed too, for Save Draft; as of Sprint 12, `POST` is allowed, for Validate. Origin/method rules are unaffected by Sprint 23's path restructure — CORS matches on origin and method, not path. Local dev only; revisit once Studio has a real deployed URL.
+As of Sprint 6, `GET` requests are allowed from the Studio dev origins so the browser-based frontend can call this API directly — see `api/app/main.py`. As of Sprint 11, `PATCH` is allowed too, for Save Draft; as of Sprint 12, `POST` is allowed, for Validate; as of Sprint 30, `DELETE` is allowed, for Destination CRUD Parity. Origin/method rules are unaffected by Sprint 23's path restructure — CORS matches on origin and method, not path. As of Sprint 30, allowed origins come from `Settings.allowed_origins` (env-configurable, comma-separated, no wildcard) rather than being hardcoded, defaulting to the Studio dev origins (`http://localhost:5173`, `http://127.0.0.1:5173`) so local dev keeps working unconfigured.
 
 ## Open decisions
 

@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     database_url: str
     supabase_jwt_secret: str
+    # Sprint 30 — comma-separated list of origins allowed to call this API
+    # from a browser (CORSMiddleware's allow_origins). Defaults to the
+    # Studio dev server so local dev keeps working unconfigured; production
+    # deployments must set this explicitly. No wildcard support — every
+    # deployed frontend origin must be listed.
+    allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     # Sprint 24 — the Supabase user id (sub claim) that gets bootstrapped as
     # `admin` on first login instead of the default `viewer`. Deliberately
     # not baked into the migration (see 0003_app_users.py) since it varies
@@ -22,6 +28,10 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
     media_bucket: str = "venue-media"
+
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]
 
 
 settings = Settings()

@@ -1,5 +1,10 @@
 # Test-only dependencies — never installed in production, kept separate
 # from requirements.txt so a prod install stays minimal.
 -r requirements.txt
-pytest>=8.0
-pytest-cov>=5.0
+coverage==7.15.2
+iniconfig==2.3.0
+packaging==26.2
+pluggy==1.6.0
+Pygments==2.20.0
+pytest==9.1.1
+pytest-cov==7.1.0
