@@ -59,6 +59,20 @@ export async function apiPost<T>(path: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
+/** Sprint 29 — delete. The backend returns `204 No Content` on success
+ * (`DELETE /destinations/{id}`), so unlike every other verb here this
+ * never calls `response.json()` — there's no body to parse. */
+export async function apiDelete(path: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'DELETE',
+    headers: await authHeaders(),
+  })
+
+  if (!response.ok) {
+    throw new ApiError(await extractErrorMessage(response, path), response.status)
+  }
+}
+
 /** Sprint 26 — for the rare action that's a `POST` but needs a JSON body
  * (e.g. "set cover to this gallery URL"), rather than the no-body actions
  * `apiPost` already covers (Validate, Submit for Review, Approve). */

@@ -4,14 +4,25 @@ import { DestinationList } from './DestinationList'
 import { LoadingState } from '../../components/LoadingState'
 import { ErrorState } from '../../components/ErrorState'
 import { PagePlaceholder } from '../../components/PagePlaceholder'
+import type { DestinationSearchParams } from '../../types/destination'
 
 type DestinationListPanelProps = {
   selectedDestinationId: string | null
   onSelectDestination: (id: string) => void
+  searchParams: DestinationSearchParams
 }
 
-export function DestinationListPanel({ selectedDestinationId, onSelectDestination }: DestinationListPanelProps) {
-  const { data, isPending, isError, error, refetch } = useDestinations()
+/** Sprint 29 — `searchParams` is owned by the parent page (URL sync lives
+ * there, same split venues' `VenueListPanel` already uses). Two distinct
+ * empty states: "no destinations exist at all" vs. "no destinations match
+ * the current search" — same reasoning venues' panel already documents. */
+export function DestinationListPanel({
+  selectedDestinationId,
+  onSelectDestination,
+  searchParams,
+}: DestinationListPanelProps) {
+  const { data, isPending, isError, error, refetch } = useDestinations(searchParams)
+  const hasActiveSearch = Boolean(searchParams.q)
 
   if (isPending) {
     return <LoadingState label="Loading destinations…" />
@@ -26,8 +37,14 @@ export function DestinationListPanel({ selectedDestinationId, onSelectDestinatio
     )
   }
 
-  if (!data || data.length === 0) {
-    return (
+  if (!data || data.items.length === 0) {
+    return hasActiveSearch ? (
+      <PagePlaceholder
+        icon={MapPin}
+        title="No matching destinations"
+        description="Try a different search term."
+      />
+    ) : (
       <PagePlaceholder
         icon={MapPin}
         title="No destinations yet"
@@ -38,7 +55,7 @@ export function DestinationListPanel({ selectedDestinationId, onSelectDestinatio
 
   return (
     <DestinationList
-      destinations={data}
+      destinations={data.items}
       selectedDestinationId={selectedDestinationId}
       onSelectDestination={onSelectDestination}
     />

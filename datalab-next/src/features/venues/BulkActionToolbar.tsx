@@ -42,7 +42,10 @@ function requestErrorMessage(error: unknown): string {
  * second permission check reimplemented here.
  */
 export function BulkActionToolbar({ checkedVenueIds, onClearSelection }: BulkActionToolbarProps) {
-  const { data: destinations } = useDestinations()
+  // Sprint 29: useDestinations() now returns a paginated envelope
+  // ({items, total, ...}), not a bare array — .items is the list itself.
+  const { data: destinationsData } = useDestinations()
+  const destinations = destinationsData?.items
   const { role } = useAuth()
   const [categoryChoice, setCategoryChoice] = useState('')
   const [destinationChoice, setDestinationChoice] = useState('')

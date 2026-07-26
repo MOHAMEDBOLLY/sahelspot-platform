@@ -71,6 +71,26 @@ def client():
 
 
 @pytest.fixture()
+def as_role():
+    """Overrides `get_current_user` with the standard test identity but a
+    given role, for one test — same technique `test_media.py`/
+    `test_permissions.py` each already define locally; shared here now
+    that a third test file (Sprint 29) needs it too.
+    """
+
+    def _set(role: str) -> None:
+        app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+            id=TEST_USER_ID, email=TEST_USER_EMAIL, role=role
+        )
+
+    yield _set
+
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        id=TEST_USER_ID, email=TEST_USER_EMAIL, role=TEST_USER_ROLE
+    )
+
+
+@pytest.fixture()
 def db():
     session = SessionLocal()
     try:

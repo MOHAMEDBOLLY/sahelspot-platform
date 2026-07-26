@@ -58,6 +58,9 @@ class Destination(Base):
     aliases: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     boundary: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Sprint 29 — cover only, no gallery (explicitly out of scope). Same
+    # column shape as venues.cover_image_url.
+    cover_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -1,7 +1,9 @@
-import { useEffect } from 'react'
-import { MapPinOff } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { MapPinOff, Trash2 } from 'lucide-react'
 import { useDestination } from '../useDestination'
 import { useUpdateDestination } from '../useUpdateDestination'
+import { useDeleteDestination } from '../useDeleteDestination'
+import { useUploadDestinationCover } from '../useUploadDestinationCover'
 import { toDestinationPatch } from '../api'
 import { validateDestinationDraft } from '../destinationValidation'
 import { ApiError } from '../../../lib/apiClient'
@@ -13,12 +15,16 @@ import { DraftToolbar } from '../../../components/workspace/DraftToolbar'
 import { useAuth } from '../../auth/useAuth'
 import { hasPermission } from '../../auth/permissions'
 import { BasicInfoSection } from './sections/BasicInfoSection'
+import { CoverImageSection } from './sections/CoverImageSection'
 import { PublishingStatusSection } from './sections/PublishingStatusSection'
 import type { Destination } from '../../../types/destination'
 
 type DestinationWorkspaceProps = {
   destinationId: string | null
   onDirtyChange?: (isDirty: boolean) => void
+  /** Sprint 29 — called after a successful delete, so the parent page can
+   * clear its selection (the deleted destination no longer exists to show). */
+  onDeleted?: () => void
 }
 
 /**
@@ -27,11 +33,14 @@ type DestinationWorkspaceProps = {
  * Save Draft, frontend UX validation) generalizes to a second entity
  * without forking it. Deliberately simpler than `VenueWorkspace`: no
  * Validate/Submit for Review/Approve, since no Editorial Readiness or
- * workflow endpoints exist for destinations yet (out of this sprint's
- * scope) — so this uses `DraftToolbar` directly, with no entity-specific
- * wrapper toolbar the way Venue's `WorkspaceToolbar` needs one.
+ * workflow endpoints exist for destinations yet (out of scope) — so this
+ * uses `DraftToolbar` directly, with no entity-specific wrapper toolbar
+ * the way Venue's `WorkspaceToolbar` needs one. Sprint 29 adds Delete
+ * (via `DraftToolbar`'s existing `extraActions` slot — the same
+ * extension point Venue's toolbar already uses, not a new one) and a
+ * cover image section.
  */
-export function DestinationWorkspace({ destinationId, onDirtyChange }: DestinationWorkspaceProps) {
+export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }: DestinationWorkspaceProps) {
   const { data: destination, isPending, isError, error, refetch } = useDestination(destinationId)
   const {
     mode,
@@ -44,6 +53,16 @@ export function DestinationWorkspace({ destinationId, onDirtyChange }: Destinati
   } = useDraft<Destination>(destination, destinationId)
   const { mutate: saveDraft, isPending: isSaving, error: saveError, reset: resetSaveError } =
     useUpdateDestination()
+  const { mutate: deleteDestination, isPending: isDeleting, error: deleteError } = useDeleteDestination()
+  const {
+    mutate: uploadCover,
+    isPending: isUploadingCover,
+    error: uploadCoverError,
+    reset: resetUploadCoverError,
+  } = useUploadDestinationCover()
+  const { mutate: saveCoverPatch, isPending: isSavingCoverPatch, error: coverPatchError } =
+    useUpdateDestination()
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const { role } = useAuth()
   const canEdit = hasPermission(role, 'content_edit')
 
@@ -68,6 +87,36 @@ export function DestinationWorkspace({ destinationId, onDirtyChange }: Destinati
     if (!destinationId || !displayedDestination) return
     saveDraft(
       { id: destinationId, patch: toDestinationPatch(displayedDestination) },
+      { onSuccess: commitSave },
+    )
+  }
+
+  function handleDelete() {
+    if (!destinationId || !displayedDestination) return
+    if (
+      !window.confirm(
+        `Delete "${displayedDestination.name}"? This cannot be undone. Destinations that still have venues can't be deleted.`,
+      )
+    ) {
+      return
+    }
+    deleteDestination(destinationId, { onSuccess: () => onDeleted?.() })
+  }
+
+  function handleUploadCover(file: File) {
+    if (!destinationId) return
+    resetUploadCoverError()
+    setUploadProgress(0)
+    uploadCover(
+      { id: destinationId, file, onProgress: setUploadProgress },
+      { onSuccess: commitSave, onSettled: () => setUploadProgress(null) },
+    )
+  }
+
+  function handleRemoveCover() {
+    if (!destinationId || !displayedDestination) return
+    saveCoverPatch(
+      { id: destinationId, patch: { ...toDestinationPatch(displayedDestination), cover_image_url: null } },
       { onSuccess: commitSave },
     )
   }
@@ -112,12 +161,53 @@ export function DestinationWorkspace({ destinationId, onDirtyChange }: Destinati
         onEdit={startEditing}
         onCancel={handleCancel}
         onSave={handleSave}
+        extraActions={
+          canEdit && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={isDeleting || mode === 'edit'}
+              title={mode === 'edit' ? 'Cancel editing before deleting.' : 'Delete destination'}
+              className="flex items-center gap-1.5 rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 size={14} />
+              {isDeleting ? 'Deleting…' : 'Delete'}
+            </button>
+          )
+        }
+        extraStatus={
+          deleteError && (
+            <span
+              className="truncate text-xs font-medium text-red-600"
+              title={deleteError instanceof ApiError ? deleteError.message : 'Failed to delete.'}
+            >
+              {deleteError instanceof ApiError ? deleteError.message : 'Failed to delete.'}
+            </span>
+          )
+        }
       />
       <BasicInfoSection
         destination={displayedDestination}
         mode={mode}
         onFieldChange={handleFieldChange}
         errors={fieldErrors}
+      />
+      <CoverImageSection
+        destination={displayedDestination}
+        mode={mode}
+        onUploadCover={handleUploadCover}
+        onRemoveCover={handleRemoveCover}
+        isUploading={isUploadingCover || isSavingCoverPatch}
+        uploadProgress={uploadProgress}
+        uploadError={
+          uploadCoverError instanceof ApiError
+            ? uploadCoverError.message
+            : coverPatchError instanceof ApiError
+              ? coverPatchError.message
+              : uploadCoverError || coverPatchError
+                ? 'Failed to update cover image.'
+                : null
+        }
       />
       <PublishingStatusSection destination={displayedDestination} />
     </div>

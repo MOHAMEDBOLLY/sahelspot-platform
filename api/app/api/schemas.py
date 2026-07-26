@@ -16,9 +16,37 @@ class DestinationOut(BaseModel):
     aliases: list[str] | None = None
     boundary: dict | None = None
     notes: str | None = None
+    cover_image_url: str | None = None
     last_published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class DestinationListOut(BaseModel):
+    """Sprint 29 — mirrors `VenueListOut` exactly: `GET /destinations` gains
+    search + pagination, so the bare list response needs `total` too."""
+
+    items: list[DestinationOut]
+    total: int
+    page: int
+    page_size: int
+
+
+class DestinationCreate(BaseModel):
+    """Sprint 29 — the one field venues never needed an equivalent of:
+    `id`. Destinations' primary key *is* the slug (see docs/DATABASE.md's
+    Sprint 2.5 "Primary keys" decision) — there's no surrogate id to
+    generate, so the caller supplies it directly, the same way it already
+    exists as a plain, unelevated PK column. `status` isn't accepted here;
+    every new destination starts `draft`, the same as how a row would
+    begin its life in any of this schema's other editorial tables.
+    """
+
+    id: str
+    name: str
+    region: str
+    aliases: list[str] | None = None
+    notes: str | None = None
 
 
 class DestinationUpdate(BaseModel):
@@ -27,12 +55,17 @@ class DestinationUpdate(BaseModel):
     (a geometry blob with no editor built yet), and timestamps are
     structural or workflow-controlled and aren't part of this write path,
     exactly the same reasoning `VenueUpdate` already documents.
+
+    `cover_image_url` (Sprint 29) is here only so clearing the cover can go
+    through this same partial-update path — same reasoning `VenueUpdate`
+    already gives for its own `cover_image_url`/`gallery_image_urls`.
     """
 
     name: str | None = None
     region: str | None = None
     aliases: list[str] | None = None
     notes: str | None = None
+    cover_image_url: str | None = None
 
 
 class DestinationRef(BaseModel):

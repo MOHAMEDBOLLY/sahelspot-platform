@@ -37,7 +37,10 @@ export function VenueFilters({
   status,
   onStatusChange,
 }: VenueFiltersProps) {
-  const { data: destinations } = useDestinations()
+  // Sprint 29: useDestinations() now returns a paginated envelope
+  // ({items, total, ...}), not a bare array — .items is the list itself.
+  const { data: destinationsData } = useDestinations()
+  const destinations = destinationsData?.items
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3">
