@@ -326,3 +326,35 @@ class MeOut(BaseModel):
     id: str
     email: str | None = None
     role: str
+
+
+class UserOut(BaseModel):
+    """Sprint 32 — `GET /editor/users`'s response, and `PATCH
+    /editor/users/{id}/role`'s. Unlike `MeOut` (which only ever describes
+    the caller), this describes *any* `app_users` row — the one new thing
+    User Role Management needs that "who am I" didn't. `created_at` is
+    included so the frontend can show when a user first appeared (their
+    first login, per `_provision_viewer`); `updated_at` isn't, since
+    nothing about "when was this last edited" is part of this sprint's
+    scope.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    email: str | None = None
+    role: str
+    created_at: datetime
+
+
+class UserRoleUpdate(BaseModel):
+    """Sprint 32 — the one field this endpoint ever changes. `role` is a
+    plain `str`, validated against `APP_USER_ROLES` in the route itself
+    (the same "validate against the fixed list, fail cleanly with a 422"
+    pattern `bulk_update_category` already uses for `category` — not a
+    `Permission`-style enum, since role names are already a CHECK-
+    constrained plain-text column, not a typed vocabulary used in code the
+    way `Permission` is).
+    """
+
+    role: str

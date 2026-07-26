@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from app.api.routes import activity, destinations, me, public, publish, system, venues
+from app.api.routes import activity, destinations, me, public, publish, system, users, venues
 from app.auth.dependencies import get_current_user
 
 # The API boundary (Sprint 23) — explicit, structural, not conventional.
@@ -30,6 +30,7 @@ editor_router.include_router(venues.router)
 editor_router.include_router(publish.router)
 editor_router.include_router(activity.router)
 editor_router.include_router(me.router)
+editor_router.include_router(users.router)
 
 public_router = APIRouter(prefix="/public")
 public_router.include_router(public.router)

@@ -4,6 +4,7 @@ import {
   MapPin,
   UploadCloud,
   Activity as ActivityIcon,
+  Users as UsersIcon,
   Settings as SettingsIcon,
   type LucideIcon,
 } from 'lucide-react'
@@ -21,5 +22,6 @@ export const navItems: NavItem[] = [
   { to: '/destinations', label: 'Destinations', icon: MapPin },
   { to: '/publishing', label: 'Publishing', icon: UploadCloud },
   { to: '/activity', label: 'Activity', icon: ActivityIcon },
+  { to: '/users', label: 'Users', icon: UsersIcon },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]

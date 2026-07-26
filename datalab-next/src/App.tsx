@@ -5,6 +5,7 @@ import { Venues } from './pages/Venues'
 import { Destinations } from './pages/Destinations'
 import { Publishing } from './pages/Publishing'
 import { Activity } from './pages/Activity'
+import { Users } from './pages/Users'
 import { Settings } from './pages/Settings'
 import { LoginPage } from './features/auth/LoginPage'
 import { ProtectedRoute } from './features/auth/ProtectedRoute'
@@ -22,6 +23,7 @@ function App() {
             <Route path="/destinations" element={<Destinations />} />
             <Route path="/publishing" element={<Publishing />} />
             <Route path="/activity" element={<Activity />} />
+            <Route path="/users" element={<Users />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>
