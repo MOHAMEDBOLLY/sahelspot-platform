@@ -33,7 +33,7 @@ class TestUploadDestinationCover:
 
         response = client.post(
             f"/editor/destinations/{destination.id}/media",
-            files={"file": ("cover.jpg", b"fake-image-bytes", "image/jpeg")},
+            files={"file": ("cover.jpg", b"\xff\xd8\xfffake-image-bytes", "image/jpeg")},
         )
 
         assert response.status_code == 200
@@ -44,7 +44,7 @@ class TestUploadDestinationCover:
 
         response = client.post(
             f"/editor/destinations/{destination.id}/media",
-            files={"file": ("cover.jpg", b"fake-image-bytes", "image/jpeg")},
+            files={"file": ("cover.jpg", b"\xff\xd8\xfffake-image-bytes", "image/jpeg")},
         )
 
         assert response.status_code == 200
@@ -64,7 +64,7 @@ class TestUploadDestinationCover:
     def test_unknown_destination_returns_404(self, client, mock_successful_upload):
         response = client.post(
             "/editor/destinations/does-not-exist/media",
-            files={"file": ("cover.jpg", b"fake-image-bytes", "image/jpeg")},
+            files={"file": ("cover.jpg", b"\xff\xd8\xfffake-image-bytes", "image/jpeg")},
         )
 
         assert response.status_code == 404
@@ -75,7 +75,7 @@ class TestUploadDestinationCover:
 
         response = client.post(
             f"/editor/destinations/{destination.id}/media",
-            files={"file": ("cover.jpg", b"fake-image-bytes", "image/jpeg")},
+            files={"file": ("cover.jpg", b"\xff\xd8\xfffake-image-bytes", "image/jpeg")},
         )
 
         assert response.status_code == 403

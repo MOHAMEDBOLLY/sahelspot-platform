@@ -1,3 +1,4 @@
+import logging
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -34,6 +35,7 @@ from app.workflow.transitions import require_status
 # request, so declaring it alongside `require_permission(...)` never
 # re-verifies the token.
 router = APIRouter(prefix="/venues", tags=["venues"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=VenueListOut)
@@ -249,7 +251,11 @@ def bulk_update_category(
             db.commit()
         except Exception as exc:
             db.rollback()
-            error = _error_message(exc) if isinstance(exc, HTTPException) else "Failed to update category."
+            if isinstance(exc, HTTPException):
+                error = _error_message(exc)
+            else:
+                logger.exception("Unexpected error updating category for venue %s", venue_id)
+                error = "Failed to update category."
             results.append(BulkResultItem(venue_id=venue_id, success=False, error=error))
             continue
         venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
@@ -290,7 +296,11 @@ def bulk_update_destination(
             db.commit()
         except Exception as exc:
             db.rollback()
-            error = _error_message(exc) if isinstance(exc, HTTPException) else "Failed to update destination."
+            if isinstance(exc, HTTPException):
+                error = _error_message(exc)
+            else:
+                logger.exception("Unexpected error updating destination for venue %s", venue_id)
+                error = "Failed to update destination."
             results.append(BulkResultItem(venue_id=venue_id, success=False, error=error))
             continue
         venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])

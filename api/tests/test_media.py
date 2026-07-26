@@ -67,7 +67,7 @@ class TestUploadCover:
         response = client.post(
             f"/editor/venues/{venue.id}/media",
             data={"slot": "cover"},
-            files={"file": ("cover.jpg", b"fake-image-bytes", "image/jpeg")},
+            files={"file": ("cover.jpg", b"\xff\xd8\xfffake-image-bytes", "image/jpeg")},
         )
 
         assert response.status_code == 200
@@ -81,7 +81,7 @@ class TestUploadCover:
         response = client.post(
             f"/editor/venues/{venue.id}/media",
             data={"slot": "cover"},
-            files={"file": ("cover.jpg", b"fake-image-bytes", "image/jpeg")},
+            files={"file": ("cover.jpg", b"\xff\xd8\xfffake-image-bytes", "image/jpeg")},
         )
 
         assert response.status_code == 200
@@ -95,7 +95,7 @@ class TestUploadGallery:
         response = client.post(
             f"/editor/venues/{venue.id}/media",
             data={"slot": "gallery"},
-            files={"file": ("photo.jpg", b"fake-image-bytes", "image/jpeg")},
+            files={"file": ("photo.jpg", b"\xff\xd8\xfffake-image-bytes", "image/jpeg")},
         )
 
         assert response.status_code == 200
@@ -109,7 +109,7 @@ class TestUploadGallery:
         response = client.post(
             f"/editor/venues/{venue.id}/media",
             data={"slot": "gallery"},
-            files={"file": ("photo.jpg", b"fake-image-bytes", "image/jpeg")},
+            files={"file": ("photo.jpg", b"\xff\xd8\xfffake-image-bytes", "image/jpeg")},
         )
 
         assert response.status_code == 200
@@ -148,7 +148,7 @@ class TestValidation:
         response = client.post(
             "/editor/venues/does-not-exist/media",
             data={"slot": "cover"},
-            files={"file": ("cover.jpg", b"fake-image-bytes", "image/jpeg")},
+            files={"file": ("cover.jpg", b"\xff\xd8\xfffake-image-bytes", "image/jpeg")},
         )
 
         assert response.status_code == 404
@@ -163,7 +163,7 @@ class TestStorageNotConfigured:
         response = client.post(
             f"/editor/venues/{venue.id}/media",
             data={"slot": "cover"},
-            files={"file": ("cover.jpg", b"fake-image-bytes", "image/jpeg")},
+            files={"file": ("cover.jpg", b"\xff\xd8\xfffake-image-bytes", "image/jpeg")},
         )
 
         assert response.status_code == 503
@@ -180,7 +180,7 @@ class TestUploadStorageFailure:
         response = client.post(
             f"/editor/venues/{venue.id}/media",
             data={"slot": "cover"},
-            files={"file": ("cover.jpg", b"fake-image-bytes", "image/jpeg")},
+            files={"file": ("cover.jpg", b"\xff\xd8\xfffake-image-bytes", "image/jpeg")},
         )
 
         assert response.status_code == 502
@@ -194,7 +194,7 @@ class TestUploadPermission:
         response = client.post(
             f"/editor/venues/{venue.id}/media",
             data={"slot": "cover"},
-            files={"file": ("cover.jpg", b"fake-image-bytes", "image/jpeg")},
+            files={"file": ("cover.jpg", b"\xff\xd8\xfffake-image-bytes", "image/jpeg")},
         )
 
         assert response.status_code == 403

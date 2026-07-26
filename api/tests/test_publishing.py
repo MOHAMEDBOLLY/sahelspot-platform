@@ -4,6 +4,9 @@ publish() and republish() are whole-dataset operations, so every test here
 requests `preserve_seed_state` — see tests/conftest.py for why.
 """
 
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 
 class TestPublish:
     def test_creates_current_revision_containing_approved_content(
@@ -77,6 +80,33 @@ class TestPublish:
         assert "Original Name" in names
         assert "Edited After Publish" not in names
 
+    def test_concurrent_publish_conflict_returns_409(self, client, make_venue, preserve_seed_state, monkeypatch):
+        """Sprint 31 — simulates the losing side of a concurrent publish
+        race. `publish()` calls `db.flush()` (to assign `revision.id`)
+        before it ever calls `db.commit()`, and `SessionLocal` is
+        `autoflush=False` (see `app/db/session.py`), so `flush()` is the
+        statement that actually sends the new revision's `INSERT` to the
+        database — that's the point where the partial unique index on
+        `is_current` would raise on a real concurrent publish, not the
+        later `db.commit()`, which by then has nothing new left to send.
+        This patches `Session.flush` (not `commit`) to raise once, so the
+        test exercises the same code path a real race would hit.
+        """
+        make_venue(status="approved")
+
+        original_flush = Session.flush
+
+        def _raise_once(self, *args, **kwargs):
+            monkeypatch.setattr(Session, "flush", original_flush)
+            raise IntegrityError("INSERT ...", {}, Exception("uq_publish_revisions_is_current"))
+
+        monkeypatch.setattr(Session, "flush", _raise_once)
+
+        response = client.post("/editor/publish")
+
+        assert response.status_code == 409
+        assert response.json()["detail"]["error"] == "concurrent_publish"
+
 
 class TestRepublish:
     def test_moves_current_pointer_to_target_revision(self, client, make_venue, preserve_seed_state):
@@ -142,3 +172,24 @@ class TestRepublish:
 
         published_names = {v["name"] for v in client.get("/public/venues").json()}
         assert "First Revision Venue" in published_names
+
+    def test_concurrent_republish_conflict_returns_409(self, client, make_venue, preserve_seed_state, monkeypatch):
+        """Sprint 31 — same race as `TestPublish`'s equivalent test, on the
+        republish path."""
+        make_venue(status="approved")
+        first = client.post("/editor/publish").json()
+        make_venue(status="approved")
+        client.post("/editor/publish")
+
+        original_commit = Session.commit
+
+        def _raise_once(self, *args, **kwargs):
+            monkeypatch.setattr(Session, "commit", original_commit)
+            raise IntegrityError("UPDATE ...", {}, Exception("uq_publish_revisions_is_current"))
+
+        monkeypatch.setattr(Session, "commit", _raise_once)
+
+        response = client.post(f"/editor/publish/revisions/{first['id']}/republish")
+
+        assert response.status_code == 409
+        assert response.json()["detail"]["error"] == "concurrent_publish"

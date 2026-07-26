@@ -30,7 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .finally(() => setLoading(false))
     }
 
-    getSession().then((session) => applyUser(session?.user ?? null))
+    // Sprint 31 — without a `.catch()` here, a rejected `getSession()` call
+    // (e.g. Supabase misconfigured) left `loading` stuck `true` forever,
+    // since `applyUser` — the only thing that flips it — was never
+    // reached. Treat a failed session restore the same as "no session".
+    getSession()
+      .then((session) => applyUser(session?.user ?? null))
+      .catch(() => applyUser(null))
 
     const unsubscribe = onAuthStateChange(applyUser)
 

@@ -8,22 +8,25 @@ import { Activity } from './pages/Activity'
 import { Settings } from './pages/Settings'
 import { LoginPage } from './features/auth/LoginPage'
 import { ProtectedRoute } from './features/auth/ProtectedRoute'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route element={<ProtectedRoute />}>
-        <Route element={<AppShell />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/venues" element={<Venues />} />
-          <Route path="/destinations" element={<Destinations />} />
-          <Route path="/publishing" element={<Publishing />} />
-          <Route path="/activity" element={<Activity />} />
-          <Route path="/settings" element={<Settings />} />
+    <ErrorBoundary>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppShell />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/venues" element={<Venues />} />
+            <Route path="/destinations" element={<Destinations />} />
+            <Route path="/publishing" element={<Publishing />} />
+            <Route path="/activity" element={<Activity />} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
         </Route>
-      </Route>
-    </Routes>
+      </Routes>
+    </ErrorBoundary>
   )
 }
 

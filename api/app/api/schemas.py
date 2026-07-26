@@ -40,13 +40,18 @@ class DestinationCreate(BaseModel):
     exists as a plain, unelevated PK column. `status` isn't accepted here;
     every new destination starts `draft`, the same as how a row would
     begin its life in any of this schema's other editorial tables.
+
+    Sprint 31 — `min_length`/`max_length` on the required fields: blank
+    names/regions were previously accepted and persisted as-is; the caps
+    just guard against an accidentally-pasted wall of text, not a real
+    content limit.
     """
 
-    id: str
-    name: str
-    region: str
+    id: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=200)
+    region: str = Field(min_length=1, max_length=200)
     aliases: list[str] | None = None
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class DestinationUpdate(BaseModel):
@@ -59,12 +64,17 @@ class DestinationUpdate(BaseModel):
     `cover_image_url` (Sprint 29) is here only so clearing the cover can go
     through this same partial-update path — same reasoning `VenueUpdate`
     already gives for its own `cover_image_url`/`gallery_image_urls`.
+
+    Sprint 31 — `name`/`region` get the same `min_length`/`max_length` caps
+    as `DestinationCreate`, applied only when the field is actually sent
+    (still optional/partial-update — `None` means "don't touch this field",
+    unaffected by the length constraint).
     """
 
-    name: str | None = None
-    region: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    region: str | None = Field(default=None, min_length=1, max_length=200)
     aliases: list[str] | None = None
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=2000)
     cover_image_url: str | None = None
 
 
@@ -137,14 +147,22 @@ class VenueUpdate(BaseModel):
     those get set), but so removing a gallery image or clearing the cover
     can go through this same partial-update path instead of a dedicated
     "remove media" endpoint.
+
+    Sprint 31 — `name` gets a `min_length`/`max_length` cap (same reasoning
+    as `DestinationUpdate`'s: a blank name was previously accepted and
+    persisted via Save Draft even though `validate_venue()` would flag it
+    as not review-ready). `short_description`/`internal_notes` get the same
+    `max_length` caps `venueValidation.ts` already enforces client-side —
+    this is the backend catching up to a limit the frontend already had,
+    not a new rule.
     """
 
-    name: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=200)
     category: str | None = None
     district: str | None = None
     is_featured: bool | None = None
     is_verified: bool | None = None
-    short_description: str | None = None
+    short_description: str | None = Field(default=None, max_length=500)
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     maps_url: str | None = None
@@ -154,7 +172,7 @@ class VenueUpdate(BaseModel):
     instagram_handle: str | None = None
     facebook_handle: str | None = None
     tiktok_handle: str | None = None
-    internal_notes: str | None = None
+    internal_notes: str | None = Field(default=None, max_length=2000)
     cover_image_url: str | None = None
     gallery_image_urls: list[str] | None = None
 

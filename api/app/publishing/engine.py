@@ -11,10 +11,16 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.activity.service import log_activity
 from app.db.models import Destination, PublishRevision, Venue
+
+_CONCURRENT_PUBLISH_DETAIL = {
+    "error": "concurrent_publish",
+    "message": "Another publish is already in progress. Please try again.",
+}
 
 
 def _decimal_to_str(value: Decimal | None) -> str | None:
@@ -123,7 +129,18 @@ def publish(db: Session, *, actor: str) -> PublishRevision:
         venue_count=len(venues),
     )
     db.add(revision)
-    db.flush()  # assigns revision.id, needed for the activity entry below
+    # Sprint 31 — this `flush()` (needed to assign `revision.id` for the
+    # activity entry below) is what actually sends the new row's `INSERT`
+    # to the database, so it's where the partial unique index on
+    # `is_current` (see `PublishRevision`) would raise on a concurrent
+    # publish — not the later `db.commit()`, which by then has nothing new
+    # left to send. Both are guarded the same way so the loser gets a
+    # clean 409 regardless of which of the two actually raises.
+    try:
+        db.flush()  # assigns revision.id, needed for the activity entry below
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=_CONCURRENT_PUBLISH_DETAIL) from None
     log_activity(
         db,
         action="publish",
@@ -132,7 +149,11 @@ def publish(db: Session, *, actor: str) -> PublishRevision:
         actor=actor,
         metadata={"destination_count": len(destinations), "venue_count": len(venues)},
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=_CONCURRENT_PUBLISH_DETAIL) from None
     db.refresh(revision)
     return revision
 
@@ -187,6 +208,11 @@ def republish(db: Session, revision_id: int, *, actor: str) -> PublishRevision:
         entity_id=str(revision.id),
         actor=actor,
     )
-    db.commit()
+    # Sprint 31 — same concurrent-publish guard as `publish()` above.
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=_CONCURRENT_PUBLISH_DETAIL) from None
     db.refresh(revision)
     return revision
