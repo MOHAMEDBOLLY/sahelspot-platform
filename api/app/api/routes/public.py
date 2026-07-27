@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.schemas import DestinationRef, PublishedDestinationOut, PublishedVenueOut
@@ -13,6 +13,26 @@ from app.publishing.engine import get_current_revision
 # it being an obvious, reviewable new import. Mounted under /public by
 # app/api/router.py, with no auth — this is the public-facing contract.
 router = APIRouter(tags=["public"])
+
+
+def resolve_published_venue(venue: dict, destinations_by_id: dict) -> dict | None:
+    """Merges one snapshot venue with its resolved `destination` ref, or
+    returns `None` if its destination isn't itself part of this snapshot
+    (e.g. approved separately but its destination isn't — see
+    docs/ROADMAP.md's Sprint 16 entry for why this is flagged as
+    follow-up, not resolved here). The one place this resolution logic
+    exists — `list_published_venues`, `get_published_venue` (M5), and
+    `app/api/routes/search.py`'s `search_published_venues` (M7) all call
+    this instead of each re-deriving it. Not underscore-prefixed: it has
+    real consumers outside this module now, so it isn't private to it.
+    """
+    destination = destinations_by_id.get(venue["destination_id"])
+    if destination is None:
+        return None
+    return {
+        **venue,
+        "destination": DestinationRef(id=destination["id"], name=destination["name"]),
+    }
 
 
 @router.get("/venues", response_model=list[PublishedVenueOut])
@@ -30,21 +50,39 @@ def list_published_venues(db: Session = Depends(get_db)):
     destinations_by_id = {d["id"]: d for d in revision.snapshot.get("destinations", [])}
     published_venues = []
     for venue in revision.snapshot.get("venues", []):
-        destination = destinations_by_id.get(venue["destination_id"])
-        # A venue whose destination isn't itself part of this snapshot
-        # (e.g. approved separately but its destination isn't) has nothing
-        # to resolve a display name from — skipped rather than crashing.
-        # See docs/ROADMAP.md's Sprint 16 entry for why this is flagged as
-        # follow-up, not resolved here.
-        if destination is None:
-            continue
-        published_venues.append(
-            {
-                **venue,
-                "destination": DestinationRef(id=destination["id"], name=destination["name"]),
-            }
-        )
+        resolved = resolve_published_venue(venue, destinations_by_id)
+        if resolved is not None:
+            published_venues.append(resolved)
     return published_venues
+
+
+@router.get("/venues/{venue_id}", response_model=PublishedVenueOut)
+def get_published_venue(venue_id: str, db: Session = Depends(get_db)):
+    """M5 (consumer Release 1) — the single-venue lookup venue detail
+    pages need, that `list_published_venues` alone can't serve. Same
+    snapshot-only guarantee: reads the current revision, never the draft
+    `venues` table. `404` covers every reason a public caller shouldn't
+    see this id — it doesn't exist at all, it's draft/in-review and never
+    approved, it was approved but never published, or (the list
+    endpoint's one edge case) its destination isn't in this snapshot
+    either — all indistinguishable to a public caller, deliberately (see
+    docs/adr/0001-public-venue-urls.md for the URL scheme this endpoint
+    commits to).
+    """
+    revision = get_current_revision(db)
+    if revision is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    venue = next((v for v in revision.snapshot.get("venues", []) if v["id"] == venue_id), None)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    destinations_by_id = {d["id"]: d for d in revision.snapshot.get("destinations", [])}
+    resolved = resolve_published_venue(venue, destinations_by_id)
+    if resolved is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    return resolved
 
 
 @router.get("/destinations", response_model=list[PublishedDestinationOut])

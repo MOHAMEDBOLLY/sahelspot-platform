@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.schemas import DestinationCreate, DestinationListOut, DestinationOut, DestinationUpdate
@@ -6,7 +6,7 @@ from app.auth.dependencies import CurrentUser
 from app.auth.permissions import Permission, require_permission
 from app.db.models import Destination, Venue
 from app.db.session import get_db
-from app.media.service import upload_image
+from app.media.service import reject_if_declared_too_large, upload_image
 
 # Editorial only — mounted under /editor by app/api/router.py, which also
 # applies the router-level auth gate (see Sprint 23). As of Sprint 24,
@@ -156,6 +156,7 @@ def delete_destination(
 
 @router.post("/{destination_id}/media", response_model=DestinationOut)
 async def upload_destination_cover(
+    request: Request,
     destination_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -166,10 +167,16 @@ async def upload_destination_cover(
     of scope), so there's nothing to choose between. Reuses
     `app/media/service.py`'s `upload_image()` unchanged — the same
     function venues' upload endpoint calls, not a second implementation.
+
+    Security hardening — see `upload_venue_media`'s equivalent comment;
+    same early-rejection-by-Content-Length, same precedence (404 first,
+    unchanged).
     """
     destination = db.get(Destination, destination_id)
     if destination is None:
         raise HTTPException(status_code=404, detail="Destination not found")
+
+    reject_if_declared_too_large(request.headers.get("content-length"))
 
     file_bytes = await file.read()
     url = upload_image(

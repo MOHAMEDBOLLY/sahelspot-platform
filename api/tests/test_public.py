@@ -41,6 +41,68 @@ class TestPublicDestinations:
         assert "notes" not in entry
 
 
+class TestGetPublishedVenue:
+    """M5 (consumer Release 1) — `GET /public/venues/{venue_id}`, the
+    single-venue lookup venue detail pages need. See
+    docs/adr/0001-public-venue-urls.md for why this is keyed by `id`.
+    """
+
+    def test_returns_a_published_venue(self, client, make_venue, preserve_seed_state):
+        venue = make_venue(status="approved", name="Detail Fetch Check")
+
+        client.post("/editor/publish")
+
+        response = client.get(f"/public/venues/{venue.id}")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["id"] == venue.id
+        assert body["name"] == "Detail Fetch Check"
+        assert body["destination"]["id"] == venue.destination_id
+
+    def test_unpublished_venue_returns_404(self, client, make_venue, preserve_seed_state):
+        # Something has to actually be approved for /editor/publish to
+        # produce a current revision at all.
+        make_venue(status="approved")
+        draft_venue = make_venue(status="draft", name="Never Published")
+
+        client.post("/editor/publish")
+
+        response = client.get(f"/public/venues/{draft_venue.id}")
+
+        assert response.status_code == 404
+
+    def test_nonexistent_venue_returns_404(self, client, make_venue, preserve_seed_state):
+        make_venue(status="approved")
+
+        client.post("/editor/publish")
+
+        response = client.get("/public/venues/does-not-exist")
+
+        assert response.status_code == 404
+
+    def test_snapshot_isolation_ignores_draft_edits_after_publish(
+        self, client, make_venue, db, preserve_seed_state
+    ):
+        """Same guarantee `test_publishing.py`'s
+        `test_draft_edit_after_publish_does_not_affect_published_snapshot`
+        already proves for the list endpoint — this proves it holds for
+        the single-venue lookup too, since it reads the same frozen
+        snapshot, not the live row.
+        """
+        venue = make_venue(status="approved", name="Original Name")
+        client.post("/editor/publish")
+
+        venue.name = "Edited After Publish"
+        db.add(venue)
+        db.commit()
+
+        response = client.get(f"/public/venues/{venue.id}")
+
+        assert response.status_code == 200
+        assert response.json()["name"] == "Original Name"
+
+
 class TestDraftNeverLeaksPublicly:
     """A direct check, not just an absence-of-evidence one: a draft row
     that was never approved or published must not appear on either public

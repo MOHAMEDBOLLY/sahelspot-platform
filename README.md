@@ -40,7 +40,8 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the reasoning behind thes
 | Path | Purpose |
 |---|---|
 | [`api/`](api/) | Backend application — Python 3.12 / FastAPI / SQLAlchemy 2 / Alembic. |
-| [`datalab-next/`](datalab-next/) | Frontend application — React / Vite / TypeScript. |
+| [`datalab-next/`](datalab-next/) | Internal editorial Studio — React / Vite / TypeScript. Authenticated, reads/writes draft content. |
+| [`consumer/`](consumer/) | Public-facing website — Next.js / TypeScript. No authentication; reads only the published `/public/*` API. |
 | [`docs/`](docs/) | Product, architecture, database, API, and roadmap documentation. |
 
 ## Development philosophy

@@ -1,7 +1,7 @@
 import logging
 from typing import Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
 from app.activity.service import log_activity
@@ -20,7 +20,7 @@ from app.auth.dependencies import CurrentUser, get_current_user
 from app.auth.permissions import Permission, require_permission
 from app.db.models import VENUE_CATEGORIES, Destination, Venue
 from app.db.session import get_db
-from app.media.service import upload_image
+from app.media.service import reject_if_declared_too_large, upload_image
 from app.validation.schemas import ValidationResult
 from app.validation.venues import validate_venue
 from app.workflow.transitions import require_status
@@ -355,6 +355,7 @@ def update_venue(
 
 @router.post("/{venue_id}/media", response_model=VenueOut)
 async def upload_venue_media(
+    request: Request,
     venue_id: str,
     slot: Literal["cover", "gallery"] = Form(...),
     file: UploadFile = File(...),
@@ -369,10 +370,18 @@ async def upload_venue_media(
     activity-logged — same reasoning Sprint 19 gave for why Save Draft
     itself isn't logged) rather than a separate draft/commit step, since
     an uploaded image is already a committed fact, not something to stage.
+
+    Security hardening — `reject_if_declared_too_large` runs before the
+    body is ever read, using the request's own `Content-Length` header, so
+    an oversized upload is rejected without buffering it first. Kept
+    after the 404 check, preserving the existing precedence (a
+    nonexistent venue already 404s before any file handling, unchanged).
     """
     venue = db.get(Venue, venue_id)
     if venue is None:
         raise HTTPException(status_code=404, detail="Venue not found")
+
+    reject_if_declared_too_large(request.headers.get("content-length"))
 
     file_bytes = await file.read()
     url = upload_image(

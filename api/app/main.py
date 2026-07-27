@@ -11,7 +11,42 @@ from app.core.logging import setup_logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title=settings.app_name, version=settings.app_version)
+# Security hardening PR 1 — see `Settings.docs_enabled`'s docstring for
+# why this is gated at all.
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
+)
+
+
+# Security hardening PR 2 — conservative, zero-compatibility-risk response
+# headers applied to every response, API included even though it only
+# ever serves JSON: cheap, harmless insurance, and consistent with the
+# same headers being added to the consumer app in this PR. Deliberately
+# *not* Content-Security-Policy/HSTS/COOP/COEP/CORP — those need their own
+# dedicated review, later.
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    # Stops browsers from MIME-sniffing a response into a different
+    # content type than what's declared — irrelevant for JSON responses
+    # specifically, but zero cost and standard practice regardless.
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # Sends the full URL as a referrer only for same-origin requests;
+    # cross-origin requests get the origin only, never the full path
+    # (which could otherwise leak query strings to a third party).
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Explicitly denies browser features this app never uses — an
+    # allowlist of nothing, not a restriction of something in use today.
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    # This API is never meant to be framed by anything; DENY is simpler
+    # and more broadly supported than CSP's frame-ancestors, which is
+    # explicitly out of scope for this PR.
+    response.headers["X-Frame-Options"] = "DENY"
+    return response
 
 
 # Sprint 31 — every unhandled exception (i.e. anything that isn't already
@@ -32,11 +67,20 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 # staging/production) to call this API from the browser. Origins come from
 # `Settings.allowed_origins` (Sprint 30) — no wildcard, every deployed
 # frontend origin must be listed explicitly.
+#
+# Security hardening PR 4 — `allow_headers` was previously `["*"]`. The
+# only two headers either frontend ever actually sends are `Authorization`
+# (every authenticated `datalab-next` request, via `authHeaders()` in its
+# `apiClient.ts`) and `Content-Type` (every JSON request body) — verified
+# directly against both frontends' API clients, not assumed. `consumer/`
+# sends neither (it only calls unauthenticated `/public/*` routes with no
+# custom headers at all), so this list is already a superset of what it
+# needs.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,
     allow_methods=["GET", "PATCH", "POST", "DELETE"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(api_router)

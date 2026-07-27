@@ -21,6 +21,12 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
+      # Security hardening — pinned deps (Sprint 30) were never scanned for
+      # newly-disclosed CVEs after being pinned. Currently clean (verified
+      # before adding this step), so this is a real, blocking gate, not
+      # just a report — a future vulnerable pin fails the build here.
+      - run: pip install pip-audit
+      - run: pip-audit -r requirements.txt
 
   frontend:
     runs-on: ubuntu-latest
@@ -39,3 +45,34 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      # Security hardening — reporting only, not blocking: a real
+      # high-severity react-router advisory currently exists here with no
+      # fix available except a breaking downgrade, which is a deliberate
+      # upgrade decision out of scope for this change (see
+      # docs/SECURITY.md). `continue-on-error` surfaces the finding in the
+      # CI log/summary without failing builds over a known, tracked issue.
+      - run: npm audit --audit-level=high
+        continue-on-error: true
+
+  consumer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: consumer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: consumer/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      # Security hardening — same reporting-only reasoning as the
+      # `frontend` job above: current findings here are noise from
+      # transitive deps bundled inside `next` itself (postcss/sharp), with
+      # npm's suggested "fix" being an inappropriate downgrade to a much
+      # older Next.js major version. See docs/SECURITY.md.
+      - run: npm audit --audit-level=high
+        continue-on-error: true

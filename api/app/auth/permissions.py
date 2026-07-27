@@ -26,9 +26,9 @@ by changing code and shipping a deploy, not by an admin screen.
 
 from enum import Enum
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 
-from app.auth.dependencies import CurrentUser, get_current_user
+from app.auth.dependencies import CurrentUser, get_current_user, log_auth_failure
 
 
 class Permission(str, Enum):
@@ -90,9 +90,19 @@ def require_permission(permission: Permission):
     `require_status()` already established for status transitions.
     """
 
-    def _check(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    def _check(request: Request, user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
         granted = ROLE_PERMISSIONS.get(user.role, frozenset())
         if permission not in granted:
+            # Security hardening PR 5 — the caller is already authenticated
+            # here (this only runs after `get_current_user` succeeds), so
+            # logging their `user_id` is safe and useful; this is the one
+            # failure path where a real identity is already known.
+            log_auth_failure(
+                request,
+                event="permission_denied",
+                reason=f"role '{user.role}' lacks required permission '{permission.value}'",
+                user_id=user.id,
+            )
             raise HTTPException(
                 status_code=403,
                 detail={

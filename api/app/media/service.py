@@ -58,6 +58,38 @@ def _sanitize_filename(filename: str) -> str:
     return name or "upload"
 
 
+def _file_too_large_error() -> HTTPException:
+    return HTTPException(
+        status_code=422,
+        detail={
+            "error": "file_too_large",
+            "message": f"Image exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit.",
+        },
+    )
+
+
+def reject_if_declared_too_large(content_length_header: str | None) -> None:
+    """Security hardening — early rejection based on the request's
+    `Content-Length` header, called by route code *before* `await
+    file.read()` buffers the upload. A multipart body's declared total
+    includes some boundary/field overhead beyond the file's own bytes, so
+    this can't be exact — it only rejects when the declared total already
+    exceeds the limit, and does nothing when the header is absent (e.g.
+    chunked transfer encoding) or unparseable. `upload_image()`'s own
+    post-read size check below remains the authoritative one for
+    whatever this can't catch; this is a fast-path addition, not a
+    replacement for it.
+    """
+    if content_length_header is None:
+        return
+    try:
+        content_length = int(content_length_header)
+    except ValueError:
+        return
+    if content_length > MAX_UPLOAD_BYTES:
+        raise _file_too_large_error()
+
+
 def upload_image(file_bytes: bytes, *, filename: str, content_type: str, folder: str) -> str:
     """Uploads to Supabase Storage under `{folder}/{uuid}-{filename}` and
     returns the bucket's public URL for it. Raises a structured
@@ -66,13 +98,7 @@ def upload_image(file_bytes: bytes, *, filename: str, content_type: str, folder:
     never has to duplicate these checks.
     """
     if len(file_bytes) > MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "file_too_large",
-                "message": f"Image exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit.",
-            },
-        )
+        raise _file_too_large_error()
 
     # Sprint 31 — the declared `content_type` (from the client's
     # `Content-Type` header) is no longer trusted on its own: the file's

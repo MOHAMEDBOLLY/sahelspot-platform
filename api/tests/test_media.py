@@ -153,6 +153,22 @@ class TestValidation:
 
         assert response.status_code == 404
 
+    def test_unknown_venue_with_an_oversized_file_still_returns_404_not_422(
+        self, client, mock_successful_upload
+    ):
+        # Security hardening — `reject_if_declared_too_large` runs *after*
+        # the 404 check, preserving the existing precedence: a nonexistent
+        # venue must still 404 before any file-size handling, not 422.
+        oversized = b"x" * (MAX_UPLOAD_BYTES + 1)
+
+        response = client.post(
+            "/editor/venues/does-not-exist/media",
+            data={"slot": "cover"},
+            files={"file": ("cover.jpg", oversized, "image/jpeg")},
+        )
+
+        assert response.status_code == 404
+
 
 class TestStorageNotConfigured:
     def test_returns_503_when_supabase_settings_are_unset(self, client, make_venue, monkeypatch):

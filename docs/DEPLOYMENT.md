@@ -1,24 +1,35 @@
 # Deployment Guide
 
-Production deployment for the SahelSpot Platform API. Assumes a single
-Docker-capable host (a VPS or equivalent), Supabase as the managed
-database + storage, and GitHub Actions as CI. Nothing more elaborate than
-that is required — see `docs/ARCHITECTURE.md` for why.
+Production deployment for the SahelSpot Platform: the API, the internal
+editorial Studio (`datalab-next/`), and the public consumer site
+(`consumer/`). Assumes a single Docker-capable host (a VPS or
+equivalent), Supabase as the managed database + storage, and GitHub
+Actions as CI. Nothing more elaborate than that is required — see
+`docs/ARCHITECTURE.md` for why.
 
-The frontend (`datalab-next/`) is a static build (`npm run build` →
-`dist/`) and can be served by any static host or the same VPS behind a
-reverse proxy; it has no server-side runtime of its own, so it isn't
-covered step-by-step here beyond the env vars it needs.
+**Studio** (`datalab-next/`) is a static build (`npm run build` → `dist/`)
+with no server-side runtime of its own — served by any static host or the
+same VPS behind a reverse proxy, covered here only for its env vars.
+
+**Consumer** (`consumer/`) is a Next.js app with server-rendered dynamic
+routes (`/search`, `/venues/[id]`) — unlike Studio, it **cannot** be
+deployed as static files; it needs a running Node process. See its own
+section below.
 
 ## Prerequisites
 
 - A Supabase project (Postgres database + Storage bucket + Auth already
   configured — this predates this guide, see `docs/DATABASE.md` and
   `docs/ARCHITECTURE.md`).
-- Docker installed on the target host.
-- A reverse proxy in front of the container that terminates HTTPS (nginx,
-  Caddy, or your host's managed load balancer). The container itself only
-  serves plain HTTP on port 8000 — it does not handle TLS.
+- Docker installed on the target host, for the API.
+- Node.js 20+ installed on the target host, for `consumer/` — it runs as
+  a persistent Node process (`next start`), not a static file host. There
+  is no Dockerfile for it today (see the Consumer Deployment section
+  below for exactly what that means in practice).
+- A reverse proxy in front of both the API container and the consumer
+  Node process that terminates HTTPS (nginx, Caddy, or your host's
+  managed load balancer). Neither serves TLS itself — the API listens on
+  plain HTTP on port 8000, `consumer/` on port 3000 by default.
 - PostgreSQL client tools (`pg_dump`, `psql`) installed wherever you run
   backups/restores from (see `api/scripts/`) — not required on the host
   running the container itself, only wherever you operate on the database.
@@ -40,15 +51,21 @@ summary:
 | `MEDIA_BUCKET` | No | Defaults to `venue-media`. |
 | `BOOTSTRAP_ADMIN_USER_ID` | Recommended | The Supabase user id that gets auto-promoted to `admin` on first login. Without it, the first `app_users` row must be promoted manually (see `docs/RUNBOOK.md`). |
 | `LOG_LEVEL` | No | Defaults to `INFO`. |
-| `ENVIRONMENT` | No | Informational only (`development`/`staging`/`production`); nothing branches on it today. |
+| `ENVIRONMENT` | **Yes, for a real deploy** | Controls real behavior, not just informational: `Settings.docs_enabled` (`api/app/core/config.py`) serves `/docs`, `/redoc`, and `/openapi.json` only when this is exactly `"development"` — anything else (`staging`, `production`, unset-and-defaulted, or a typo) disables all three. Set this explicitly to `production` (or `staging`) in any real deployment, or the API's full schema and route surface stays publicly browsable. |
 
-Frontend build-time variables (`datalab-next/.env.example`):
+Studio build-time variables (`datalab-next/.env.example`):
 
 | Variable | Required |
 |---|---|
 | `VITE_API_BASE_URL` | Yes — the deployed API's URL. |
 | `VITE_SUPABASE_URL` | Yes |
 | `VITE_SUPABASE_ANON_KEY` | Yes — safe to expose, identifies the project only. |
+
+Consumer build-time variables (`consumer/.env.example`):
+
+| Variable | Required | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_API_BASE_URL` | Yes | The deployed API's URL, `/public/*` only — `consumer/` has no authentication and never calls `/editor/*`. **Must be set before `npm run build`, not before `npm run start`** — `NEXT_PUBLIC_`-prefixed variables are inlined into the build output at build time (verified directly: setting it only at start time has no effect at all). Defaults to `http://localhost:8000` if unset at build time, **silently** — there is no fail-fast check on this variable today, so an unset value doesn't crash the build, it just bakes in a value that will make every page show "unavailable" in production, with nothing in the logs pointing at why. |
 
 ## Migration process
 
@@ -74,6 +91,48 @@ To preview the SQL a pending migration would run, without applying it:
 alembic upgrade head --sql
 ```
 
+## Consumer deployment
+
+`consumer/` (the public site) is a Next.js app with server-rendered
+dynamic routes (`/search`, `/venues/[id]`) — it needs a running Node
+process, not a static file host. This is the one thing worth getting
+right before deploying it: following Studio's "any static host" pattern
+for `consumer/` would leave those two routes broken in production.
+
+- **Runtime:** Node.js 20+ (matches the CI job's `node-version`, see
+  `.github/workflows/ci.yml`).
+- **Build command:** `npm ci && npm run build`, run from `consumer/`,
+  **with `NEXT_PUBLIC_API_BASE_URL` already set in the environment** —
+  see the note below.
+- **Start command:** `npm run start` (runs `next start`), run from
+  `consumer/`, after the build above. This is a long-running foreground
+  process — it needs to stay running (a process manager, your platform's
+  native Node/Next.js support, or an equivalent) the same way `uvicorn`
+  does for the API; there is no Dockerfile or process-supervisor config
+  for it in this repository today, so that choice is yours to make at
+  deploy time, not something this guide prescribes.
+- **Port:** `3000` by default (Next.js's own default; not currently
+  overridden anywhere in this repo). Pass `-p <port>` to `next start` to
+  change it.
+- **API endpoint configuration:** `NEXT_PUBLIC_API_BASE_URL`, set to the
+  deployed API's public URL — see the environment variables table above.
+  **This must be set before the build command runs, not before start** —
+  verified directly: `next build` inlines `NEXT_PUBLIC_*` variables into
+  the build output, so setting it only at start time has no effect at
+  all. Rebuild whenever this value needs to change; restarting alone
+  won't pick up a new one.
+- **Reverse proxy:** same expectation as the API — `next start` serves
+  plain HTTP, so put it behind the same TLS-terminating reverse proxy
+  (nginx, Caddy, or your host's load balancer), proxying to whatever port
+  it's actually listening on.
+
+**Rollback**, today, is less mature than the API's: there is no built-
+artifact versioning equivalent to the API's Docker image tags. Rolling
+back means checking out the previous release's source, rebuilding
+(`npm run build`), and restarting the process — slower than the API's
+"redeploy the previous tag," and worth knowing before an incident, not
+during one.
+
 ## Deployment sequence
 
 See **Production Startup** below for the full ordered sequence and why it
@@ -98,14 +157,23 @@ matters — this section is the command-level how-to for one deploy.
      --env-file /path/to/production.env \
      sahelspot-api:<tag>
    ```
-5. **Build and publish the frontend**:
+5. **Build and publish Studio** (`datalab-next/`):
    ```bash
    cd datalab-next
    npm ci
    npm run build
    # deploy dist/ to your static host / reverse-proxied path
    ```
-6. **Verify** — see Health Verification below.
+6. **Build and start Consumer** (`consumer/`) — see Consumer deployment
+   above. `NEXT_PUBLIC_API_BASE_URL` must be set **before** the build
+   step, not the start step:
+   ```bash
+   cd consumer
+   npm ci
+   NEXT_PUBLIC_API_BASE_URL=https://<your-api-host> npm run build
+   npm run start
+   ```
+7. **Verify** — see Health Verification below.
 
 ## Health verification
 
@@ -127,18 +195,44 @@ Also confirm the frontend can actually reach the API from a real browser
 matching the deployed frontend's origin) won't show up in `/health` at
 all, only as failed requests in the browser console.
 
+**Consumer has no equivalent `/health` endpoint.** Verify it directly:
+
+```bash
+curl -f https://<your-consumer-host>/
+curl -f https://<your-consumer-host>/search
+```
+
+Both should return `200` regardless of whether the API is reachable —
+the homepage and search page both catch a failed API call and render an
+"unavailable" message rather than erroring. That graceful handling does
+**not** extend to a venue detail page (`/venues/{id}`): if the API is
+unreachable, that specific route currently returns a bare `500` instead
+of a friendly message (there's no try/catch around its data fetch) — a
+`500` there specifically, with the homepage/search still `200`, points at
+an unreachable or misconfigured API, not a consumer deployment problem.
+If `NEXT_PUBLIC_API_BASE_URL` itself was wrong at build time, expect all
+three to show "unavailable"/fail consistently, not just the venue page —
+and remember a rebuild, not a restart, is what's needed to fix that.
+
 ## Rollback procedure
 
-Rollback has two independent parts — code and schema — because a bad
-deploy might involve either, both, or neither.
+Rollback has independent parts — API code, schema, Studio, and Consumer —
+because a bad deploy might involve any subset of them.
 
-**Application code:**
+**API code:**
 ```bash
 docker run -d --name sahelspot-api -p 8000:8000 --env-file /path/to/production.env sahelspot-api:<previous-tag>
 ```
 This only works if you keep previous image tags around — don't overwrite
 `latest` in place; tag builds so the last few are addressable (e.g. by git
 SHA or version).
+
+**Consumer code:** check out the previous release's source and rebuild
+(`npm ci && NEXT_PUBLIC_API_BASE_URL=... npm run build`), then restart the
+process. There is no image-tag equivalent for it today — this is
+necessarily slower than the API's rollback, which is exactly why it's
+worth deciding your process-management approach (and keeping a previous
+build or checkout on hand) before you need it, not during an incident.
 
 **Database schema** (only if the failed deploy included a migration):
 ```bash
@@ -166,9 +260,9 @@ Database
    ↓
 Migration
    ↓
-Backend
+API
    ↓
-Frontend
+Studio  +  Consumer
    ↓
 Health Check
 ```
@@ -177,22 +271,24 @@ Health Check
    and there's nothing to migrate or serve against a database that isn't
    up.
 2. **Migration** runs next, against the now-reachable database, *before*
-   the new backend code starts — the backend's models assume the schema
-   already matches what that code expects (there's no runtime schema
-   negotiation). Running migrations after starting the new backend risks
-   a window where running code queries columns/tables that don't exist
-   yet.
-3. **Backend** starts once the schema is current. It fails fast if
-   required config (`DATABASE_URL`, `SUPABASE_JWT_SECRET`) is missing,
-   and `/health` won't report healthy until it can actually reach the
+   the new API code starts — the API's models assume the schema already
+   matches what that code expects (there's no runtime schema
+   negotiation). Running migrations after starting the new API risks a
+   window where running code queries columns/tables that don't exist yet.
+3. **API** starts once the schema is current. It fails fast if required
+   config (`DATABASE_URL`, `SUPABASE_JWT_SECRET`) is missing, and
+   `/health` won't report healthy until it can actually reach the
    database — so this step is self-verifying to a degree, but isn't
    confirmed until step 5.
-4. **Frontend** is deployed last among the application pieces because it
-   has a hard runtime dependency on the backend already being live at
-   `VITE_API_BASE_URL` — deploying it first just means real users hit a
-   working UI backed by a nonexistent or stale API.
+4. **Studio and Consumer** are deployed last among the application pieces
+   because both have a hard runtime dependency on the API already being
+   live — Studio at `VITE_API_BASE_URL`, Consumer at
+   `NEXT_PUBLIC_API_BASE_URL` (baked in at Consumer's *build* time,
+   specifically — see Consumer deployment above). Deploying either first
+   just means real users hit a working UI backed by a nonexistent or
+   stale API.
 5. **Health Check** is the explicit confirmation step, not an assumption.
    Nothing earlier in this sequence guarantees the whole chain actually
    works end to end — CORS, network rules, and env var typos all pass
    silently through steps 1-4 and only surface here (or in a real browser
-   against the frontend).
+   against either frontend).

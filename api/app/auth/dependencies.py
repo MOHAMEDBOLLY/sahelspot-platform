@@ -15,11 +15,12 @@ frontend, using the project's JWT secret. This keeps the backend stateless
 with respect to auth beyond the one small `app_users` table Sprint 24 adds.
 """
 
+import logging
 from dataclasses import dataclass
 
 import jwt
-from fastapi import Depends, Header, HTTPException
-from jwt import InvalidTokenError
+from fastapi import Depends, Header, HTTPException, Request
+from jwt import ExpiredSignatureError, InvalidTokenError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -27,6 +28,34 @@ from app.activity.service import log_activity
 from app.core.config import settings
 from app.db.models import AppUser
 from app.db.session import get_db
+
+logger = logging.getLogger(__name__)
+
+
+def log_auth_failure(request: Request, *, event: str, reason: str, user_id: str | None = None) -> None:
+    """Security hardening PR 5 — one consistent log line for every
+    authentication/authorization failure, called from both this module's
+    401 paths and `app/auth/permissions.py`'s 403 path. Deliberately never
+    logs the `Authorization` header, the token itself, or any request
+    body — only the safe metadata the request already exposes (path,
+    method, client IP) plus a short, fixed `reason` string and, where the
+    caller is already known (the 403 case only — a 401 caller is by
+    definition not yet identified), their `user_id`. Uses `.warning`, not
+    `.exception`: these are expected, frequent, non-exceptional outcomes
+    (someone's token expired, not a bug), the same reasoning that already
+    separates `logger.exception` (bugs) from ordinary rejection paths
+    elsewhere in this codebase.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    logger.warning(
+        "auth_failure event=%s path=%s method=%s client_ip=%s user_id=%s reason=%s",
+        event,
+        request.url.path,
+        request.method,
+        client_ip,
+        user_id or "-",
+        reason,
+    )
 
 
 @dataclass(frozen=True)
@@ -84,6 +113,7 @@ def _provision_viewer(db: Session, *, user_id: str, email: str | None) -> AppUse
 
 
 def get_current_user(
+    request: Request,
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> CurrentUser:
@@ -97,8 +127,13 @@ def get_current_user(
     every caller of this dependency. Never raises `403` here — role
     *sufficiency* for a given action is `require_permission()`'s job, not
     this function's.
+
+    Security hardening PR 5 — `request` is a new parameter, added only so
+    each rejection path can log via `log_auth_failure`; it's not used for
+    any decision here, and no response/status code below changed.
     """
     if authorization is None or not authorization.startswith("Bearer "):
+        log_auth_failure(request, event="missing_token", reason="missing or malformed Authorization header")
         raise HTTPException(status_code=401, detail="Missing or malformed Authorization header")
 
     token = authorization.removeprefix("Bearer ").strip()
@@ -110,11 +145,16 @@ def get_current_user(
             algorithms=["HS256"],
             audience="authenticated",
         )
+    except ExpiredSignatureError:
+        log_auth_failure(request, event="expired_token", reason="token expired")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
     except InvalidTokenError:
+        log_auth_failure(request, event="invalid_token", reason="token failed validation")
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     user_id = payload.get("sub")
     if not user_id:
+        log_auth_failure(request, event="invalid_token", reason="token missing subject claim")
         raise HTTPException(status_code=401, detail="Token missing subject claim")
 
     email = payload.get("email")

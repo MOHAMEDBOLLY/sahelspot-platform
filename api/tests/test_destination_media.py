@@ -11,6 +11,7 @@ import httpx
 import pytest
 
 from app.core.config import settings
+from app.media.service import MAX_UPLOAD_BYTES
 
 
 @pytest.fixture(autouse=True)
@@ -65,6 +66,21 @@ class TestUploadDestinationCover:
         response = client.post(
             "/editor/destinations/does-not-exist/media",
             files={"file": ("cover.jpg", b"\xff\xd8\xfffake-image-bytes", "image/jpeg")},
+        )
+
+        assert response.status_code == 404
+
+    def test_unknown_destination_with_an_oversized_file_still_returns_404_not_422(
+        self, client, mock_successful_upload
+    ):
+        # Security hardening — `reject_if_declared_too_large` runs *after*
+        # the 404 check, preserving the existing precedence: a nonexistent
+        # destination must still 404 before any file-size handling.
+        oversized = b"x" * (MAX_UPLOAD_BYTES + 1)
+
+        response = client.post(
+            "/editor/destinations/does-not-exist/media",
+            files={"file": ("cover.jpg", oversized, "image/jpeg")},
         )
 
         assert response.status_code == 404
