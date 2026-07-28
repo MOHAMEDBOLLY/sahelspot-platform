@@ -11,16 +11,44 @@ jobs:
     defaults:
       run:
         working-directory: api
+    # The suite (see docs/TESTING.md) needs a real Postgres — it exercises
+    # Postgres-specific types (JSONB, ARRAY, a partial unique index) a
+    # SQLite substitute couldn't faithfully cover. Local development points
+    # at the shared Supabase project for that reason, but CI has no access
+    # to repo secrets for a database it doesn't own, so it gets its own
+    # disposable, empty Postgres instead — real Postgres, not a fake, and
+    # nothing to provision or credential. Every test's isolation is already
+    # convention-based (test-prefixed ids, self-cleaning fixtures — see
+    # conftest.py), not dependent on any pre-existing seed row, so this
+    # empty database needs schema only (via the migrations below), not data.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sahelspot_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/sahelspot_ci
+      # Only used to sign/verify tokens the test suite mints for itself
+      # (see tests/conftest.py) — never a real Supabase secret, and never
+      # used to reach a real Supabase project.
+      SUPABASE_JWT_SECRET: ci-only-test-secret-not-used-in-production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - run: pip install -r requirements-dev.txt
+      - run: alembic upgrade head
       - run: pytest
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
       # Security hardening — pinned deps (Sprint 30) were never scanned for
       # newly-disclosed CVEs after being pinned. Currently clean (verified
       # before adding this step), so this is a real, blocking gate, not
