@@ -17,6 +17,8 @@ class DestinationOut(BaseModel):
     boundary: dict | None = None
     notes: str | None = None
     cover_image_url: str | None = None
+    translations: dict | None = None
+    version: int
     last_published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
@@ -76,6 +78,11 @@ class DestinationUpdate(BaseModel):
     aliases: list[str] | None = None
     notes: str | None = Field(default=None, max_length=2000)
     cover_image_url: str | None = None
+    # PLATFORM_SPEC_v1.0_FROZEN.md §7.3 — boundary is now writable through
+    # this same path; shape-validated in the route (Polygon/MultiPolygon),
+    # not here, since Pydantic's job is presence/type, not GeoJSON geometry
+    # rules.
+    boundary: dict | None = None
 
 
 class DestinationRef(BaseModel):
@@ -118,6 +125,8 @@ class VenueOut(BaseModel):
     beach_details: dict | None = None
     internal_notes: str | None = None
     source: str | None = None
+    translations: dict | None = None
+    version: int
     last_published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
@@ -175,6 +184,42 @@ class VenueUpdate(BaseModel):
     internal_notes: str | None = Field(default=None, max_length=2000)
     cover_image_url: str | None = None
     gallery_image_urls: list[str] | None = None
+    # PLATFORM_SPEC_v1.0_FROZEN.md §6.3/§7.8 — accepted here (in addition
+    # to `category`) since setting a venue's category to 'Beach' and its
+    # beach_details in the same Save Draft call is the common case. Shape
+    # (both keys present, valid `publicAccess`) is validated in the route,
+    # against the venue's resulting category — not here, since that check
+    # needs the full picture of what's being set, not just this one field.
+    beach_details: dict | None = None
+
+
+class VenueCreate(BaseModel):
+    """PLATFORM_SPEC_v1.0_FROZEN.md §8.2 (`POST /editor/venues`) — the one
+    write path venues never had. `id`/`slug` are caller-supplied, same
+    reasoning `DestinationCreate` already gives for why destinations'
+    primary key isn't auto-generated: these are stable, human-legible
+    identifiers, not surrogate keys. `status` isn't accepted — every new
+    venue starts `draft`, same as `DestinationCreate`.
+    """
+
+    id: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=200)
+    slug: str = Field(min_length=1, max_length=200)
+    destination_id: str
+    category: str
+    district: str | None = None
+    beach_details: dict | None = None
+
+
+class RejectRequest(BaseModel):
+    """PLATFORM_SPEC_v1.0_FROZEN.md §7.4 — Reject (`review -> draft`) now
+    requires a non-blank reason, logged to `activity_log.metadata` so the
+    submitting editor can see why. Shared by venues and destinations —
+    same shape, same reasoning `ValidationResult`/`FieldError` already
+    give for one reusable contract rather than one per entity.
+    """
+
+    reason: str = Field(min_length=1, max_length=2000)
 
 
 class SetCoverImageRequest(BaseModel):
@@ -196,14 +241,18 @@ class BulkVenueIdsRequest(BaseModel):
     venue_ids: list[str] = Field(min_length=1, max_length=100)
 
 
-class BulkCategoryUpdateRequest(BaseModel):
-    venue_ids: list[str] = Field(min_length=1, max_length=100)
-    category: str
+class BulkUpdateRequest(BaseModel):
+    """PLATFORM_SPEC_v1.0_FROZEN.md §7.6 — replaces the two single-field
+    bulk endpoints (`PATCH bulk/category`, `PATCH bulk/destination`) with
+    one: a venue-id list plus whichever of `category`/`destination_id` the
+    caller wants to set, either or both in the same call. At least one of
+    the two must be present — validated in the route, not here, since
+    "both absent" needs a structured error, not a bare Pydantic 422.
+    """
 
-
-class BulkDestinationUpdateRequest(BaseModel):
     venue_ids: list[str] = Field(min_length=1, max_length=100)
-    destination_id: str
+    category: str | None = None
+    destination_id: str | None = None
 
 
 class BulkResultItem(BaseModel):
@@ -243,6 +292,14 @@ class PublishRevisionOut(BaseModel):
     label: str | None = None
     destination_count: int | None = None
     venue_count: int | None = None
+    # PLATFORM_SPEC_v1.0_FROZEN.md §1.3 — 0 in the overwhelmingly common
+    # case; the count of venues held out of *this* snapshot because their
+    # destination wasn't also `approved` at publish time (§1's
+    # referential-closure guarantee). Not persisted on `PublishRevision`
+    # itself — computed once at publish time and attached to the response
+    # object, since it describes an event, not a stored fact about the
+    # revision row.
+    excluded_venue_count: int = 0
 
 
 class PublishRevisionDetail(PublishRevisionOut):
@@ -345,6 +402,37 @@ class UserOut(BaseModel):
     email: str | None = None
     role: str
     created_at: datetime
+
+
+class DestinationStatsOut(BaseModel):
+    """PLATFORM_SPEC_v1.0_FROZEN.md §2.1/§8.1 (`GET /editor/destinations/
+    {id}/stats`) — replaces the legacy, stored `venueCount`/
+    `verifiedCount`/`categoryBreakdown` fields with the same facts,
+    computed live at request time (Principle 1.4 — computed, never
+    stored; the legacy data already showed why: `seashell` claimed 13
+    venues, actually had 10).
+    """
+
+    venue_count: int
+    verified_count: int
+    category_breakdown: dict[str, int]
+
+
+class PlatformStatsOut(BaseModel):
+    """PLATFORM_SPEC_v1.0_FROZEN.md §2.9 (`GET /editor/stats`) — the
+    Dashboard's data source. Every field computed live from `venues`/
+    `destinations`; no `stats` table or stored blob exists.
+    """
+
+    venues: int
+    destinations: int
+    categories: int
+    with_cover: int
+    with_instagram: int
+    with_website: int
+    with_phone: int
+    pct_cover: float
+    pct_instagram: float
 
 
 class UserRoleUpdate(BaseModel):
