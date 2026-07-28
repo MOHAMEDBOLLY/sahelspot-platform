@@ -35,6 +35,26 @@ VENUE_CATEGORIES = (
     "Services",
     "Entertainment",
     "Other",
+    "Resort",
+    "Spa",
+    "Beach Club",
+    "Activity",
+)
+
+# PLATFORM_SPEC_v1.0_FROZEN.md §7.2/§7.3 — a small, fixed, closed set, same
+# CHECK-constraint treatment as VENUE_CATEGORIES/CONTENT_STATUSES above.
+# Promote to a table only past the same trigger already named for
+# VENUE_CATEGORIES: >20 values, or per-value metadata becomes a real
+# requirement.
+DESTINATION_REGIONS = (
+    "Sidi Abdelrahman Area",
+    "Marina",
+    "New Alamein City",
+    "Telal North Coast",
+    "Ras El Hekma",
+    "Fouka Bay",
+    "Dabaa City",
+    "Almaza Bay",
 )
 
 # Sprint 24 — a small, fixed, closed set, same reasoning as CONTENT_STATUSES/
@@ -49,6 +69,10 @@ class Destination(Base):
     __tablename__ = "destinations"
     __table_args__ = (
         CheckConstraint(f"status IN {CONTENT_STATUSES}", name="ck_destinations_status"),
+        CheckConstraint(f"region IN {DESTINATION_REGIONS}", name="ck_destinations_region"),
+        # PLATFORM_SPEC_v1.0_FROZEN.md §3.1 — workflow queries; the
+        # destination side of the referential-closure publish join.
+        Index("ix_destinations_status", "status"),
     )
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
@@ -61,6 +85,13 @@ class Destination(Base):
     # Sprint 29 — cover only, no gallery (explicitly out of scope). Same
     # column shape as venues.cover_image_url.
     cover_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # PLATFORM_SPEC_v1.0_FROZEN.md §5.1 — {"<locale>": {"name": ..., ...}}.
+    # `name` remains the required, canonical, fallback value; see §5.2.
+    translations: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # §4.2 — optimistic-concurrency version, paired with the ETag/If-Match
+    # protocol §4.3 specifies. Incremented by the application on every
+    # successful update, never set directly by a client.
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     last_published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -80,6 +111,23 @@ class Venue(Base):
         CheckConstraint(f"status IN {CONTENT_STATUSES}", name="ck_venues_status"),
         CheckConstraint(f"category IN {VENUE_CATEGORIES}", name="ck_venues_category"),
         UniqueConstraint("destination_id", "slug", name="uq_venues_destination_id_slug"),
+        # PLATFORM_SPEC_v1.0_FROZEN.md §7.8 — key-presence only; deep
+        # value-shape validation (e.g. publicAccess's 3-value enum) remains
+        # the application layer's job, the same practical limit that
+        # already applies to opening_hours.
+        CheckConstraint(
+            "beach_details IS NULL OR "
+            "(category = 'Beach' AND beach_details ? 'type' AND beach_details ? 'publicAccess')",
+            name="ck_venues_beach_details_shape",
+        ),
+        # PLATFORM_SPEC_v1.0_FROZEN.md §3.1 — destination-scoped venue
+        # lists and FK join performance; category/status filters; the
+        # composite serves the referential-closure publish query directly
+        # ("approved venues for an approved destination").
+        Index("ix_venues_destination_id", "destination_id"),
+        Index("ix_venues_category", "category"),
+        Index("ix_venues_status", "status"),
+        Index("ix_venues_destination_id_status", "destination_id", "status"),
     )
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
@@ -111,9 +159,26 @@ class Venue(Base):
     cover_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     gallery_image_urls: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     opening_hours: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    beach_details: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # `none_as_null=True` — SQLAlchemy's JSONB otherwise binds a Python
+    # `None` as the JSON `null` literal, not SQL NULL. That distinction is
+    # invisible for every other JSONB column here, but ck_venues_beach_
+    # details_shape's `beach_details IS NULL OR ...` specifically checks
+    # for SQL NULL — without this flag, ordinary application code clearing
+    # the field (e.g. switching a venue's category away from 'Beach') would
+    # store JSON null and spuriously fail the constraint.
+    beach_details: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
     internal_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # PLATFORM_SPEC_v1.0_FROZEN.md §5.1 — see Destination.translations above.
+    translations: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # §2.2 (Legacy-only) / §7.13 — preserves the legacy geo-review object
+    # (status, reviewer, timestamp, history) verbatim at migration time.
+    # Opaque: never validated or interpreted by the platform, never part of
+    # any editing surface, not API-exposed. Drop-eligible per §7.13's
+    # pre-authorized condition, not before.
+    legacy_geo: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # §4.2 — see Destination.version above.
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     last_published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -134,6 +199,11 @@ class PublishRevision(Base):
             unique=True,
             postgresql_where=text("is_current"),
         ),
+        # PLATFORM_SPEC_v1.0_FROZEN.md §3.1 — revision-history list
+        # ordering (newest first). A plain ascending B-tree index also
+        # serves `ORDER BY published_at DESC` via a backward index scan —
+        # no separate descending index needed in Postgres.
+        Index("ix_publish_revisions_published_at", "published_at"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
