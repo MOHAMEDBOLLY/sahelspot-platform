@@ -7,6 +7,12 @@ RUN npm ci
 
 COPY . .
 
+# public/ is currently empty in the repo, and git doesn't track empty
+# directories — it won't exist after a fresh clone. Next.js doesn't
+# require it, but the second stage below copies it explicitly, so it
+# must exist here regardless of what a given checkout contains.
+RUN mkdir -p public
+
 # NEXT_PUBLIC_* variables are inlined into the build output at build time
 # (see docs/DEPLOYMENT.md) — must be present before `next build` runs, not
 # just at container start.
