@@ -31,7 +31,9 @@ work by the backlog's own field breakdown, not "Schema & Database."
 ## A contradiction found between the two frozen documents — resolved with your sign-off, not invented
 
 Before touching any code, I found that `venues.legacy_geo` is required by
-`PLATFORM_SPEC_v1.0_FROZEN.md` (§2.2, §7.13) but has **no corresponding
+`PLATFORM_SPEC_v1_FINAL.md` §2.2 (Venue entity table) and
+`PLATFORM_SPEC_v1.0_FROZEN.md` §7.13 (drop-eligibility condition), but has
+**no corresponding
 creation task anywhere in `IMPLEMENTATION_BACKLOG.md`** — only a task that
 writes data *into* it (Phase 5's `EP27-T04`) and one that tracks its later
 *removal* (Phase 7's `EP38`), both presupposing it already exists. I stopped,

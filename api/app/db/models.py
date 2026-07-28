@@ -41,7 +41,7 @@ VENUE_CATEGORIES = (
     "Activity",
 )
 
-# PLATFORM_SPEC_v1.0_FROZEN.md §7.2/§7.3 — a small, fixed, closed set, same
+# PLATFORM_SPEC_v1.0_FROZEN.md §7.3 — a small, fixed, closed set, same
 # CHECK-constraint treatment as VENUE_CATEGORIES/CONTENT_STATUSES above.
 # Promote to a table only past the same trigger already named for
 # VENUE_CATEGORIES: >20 values, or per-value metadata becomes a real
@@ -171,10 +171,11 @@ class Venue(Base):
     source: Mapped[str | None] = mapped_column(Text, nullable=True)
     # PLATFORM_SPEC_v1.0_FROZEN.md §5.1 — see Destination.translations above.
     translations: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    # §2.2 (Legacy-only) / §7.13 — preserves the legacy geo-review object
-    # (status, reviewer, timestamp, history) verbatim at migration time.
-    # Opaque: never validated or interpreted by the platform, never part of
-    # any editing surface, not API-exposed. Drop-eligible per §7.13's
+    # PLATFORM_SPEC_v1_FINAL.md §2.2 (Venue, Legacy-only) — preserves the
+    # legacy geo-review object (status, reviewer, timestamp, history)
+    # verbatim at migration time. Opaque: never validated or interpreted
+    # by the platform, never part of any editing surface, not API-exposed.
+    # Drop-eligible per PLATFORM_SPEC_v1.0_FROZEN.md §7.13's
     # pre-authorized condition, not before.
     legacy_geo: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # §4.2 — see Destination.version above.

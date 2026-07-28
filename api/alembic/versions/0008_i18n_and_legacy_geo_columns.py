@@ -9,10 +9,11 @@ to `venues` and `destinations`, backing the {"<locale>": {"name": ...}}
 internationalization model. `name`/`short_description` remain the required,
 canonical, fallback values (§5.2); this column carries locale overlays only.
 
-Also adds `venues.legacy_geo` (JSONB, nullable) per §2.2/§7.13 — preserves
-the legacy geo-review object verbatim at migration time. This column was
-specified in PLATFORM_SPEC_v1_FINAL.md's Venue entity table and confirmed
-required by PLATFORM_SPEC_v1.0_FROZEN.md §7.13, but had no corresponding
+Also adds `venues.legacy_geo` (JSONB, nullable) — preserves the legacy
+geo-review object verbatim at migration time. This column was specified
+in PLATFORM_SPEC_v1_FINAL.md §2.2 (Venue entity table) and its
+drop-eligibility condition confirmed required by
+PLATFORM_SPEC_v1.0_FROZEN.md §7.13, but had no corresponding
 creation task in docs/IMPLEMENTATION_BACKLOG.md's Phase 1 — a gap between
 the two frozen documents identified during Phase 1 execution and corrected
 here with the user's explicit sign-off, not a specification change.

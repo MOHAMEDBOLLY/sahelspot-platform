@@ -4,11 +4,17 @@ Revision ID: 0005
 Revises: 0004
 Create Date: 2026-07-28
 
-PLATFORM_SPEC_v1.0_FROZEN.md §3 — extends venues.category's legal-value set
-from 9 to 13 (adds Resort, Spa, Beach Club, Activity), closing the taxonomy
-collision the migration audit found (107 of 426 legacy venues had no legal
-value under the prior 9-value list). Purely additive — no existing row can
-violate the new, wider constraint.
+PLATFORM_SPEC_v1_FINAL.md §3 (Taxonomy Specification — FINAL) — extends
+venues.category's legal-value set from 9 to 13 (adds Resort, Spa, Beach
+Club, Activity), closing the taxonomy collision the migration audit found
+(107 of 426 legacy venues had no legal value under the prior 9-value
+list). This value list is inherited unchanged by PLATFORM_SPEC_v1.0_
+FROZEN.md, which does not restate it under its own numbering (per that
+document's own policy of not repeating decisions the architecture review
+didn't challenge) — §3 in the FROZEN document is a different topic
+(Database Indexing), so the citation here is deliberately to the FINAL
+spec, not the FROZEN one. Purely additive — no existing row can violate
+the new, wider constraint.
 """
 from typing import Sequence, Union
 
