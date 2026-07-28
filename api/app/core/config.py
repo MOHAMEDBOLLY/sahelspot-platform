@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     # Sprint 25 — Media Library Foundation. Optional: media upload returns a
     # clear 503 if unset rather than the app failing to start, since not
     # every environment needs media upload configured to run everything else.
+    #
+    # Also the base for the project's JWKS endpoint
+    # (`/auth/v1/.well-known/jwks.json`), which `app/auth/dependencies.py`
+    # verifies asymmetrically-signed tokens against. A deployment whose
+    # Supabase project issues those (the current default) must set this or
+    # every authenticated request fails closed with a 401 — it is only
+    # genuinely optional for a project still on the legacy shared secret.
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
     media_bucket: str = "venue-media"

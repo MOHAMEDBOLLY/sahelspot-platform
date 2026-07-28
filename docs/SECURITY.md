@@ -53,12 +53,41 @@ Configured in `app/main.py` via `CORSMiddleware`:
   either frontend ever sends (verified directly against both apps' API
   clients), not a wildcard.
 
+## Token verification
+
+`app/auth/dependencies.py` verifies the `Authorization: Bearer <token>`
+header as a Supabase-issued JWT. Which key it verifies against is chosen
+from the token's own `alg` header:
+
+- **Asymmetric (`ES256`/`RS256`)** — Supabase's current default ("JWT
+  Signing Keys"). Verified against the matching public key from the
+  project's JWKS endpoint, derived as
+  `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. The JWK set is cached
+  in-process (`PyJWKClient`, 300s lifespan) and re-fetched automatically
+  when a token presents an unseen `kid`, so a Supabase key rotation needs
+  no redeploy and no config change.
+- **`HS256`** — the legacy shared-secret model, verified against
+  `SUPABASE_JWT_SECRET`. Retained so a project that hasn't migrated to
+  asymmetric signing keys keeps working.
+
+Key material is strictly segregated per path — a JWKS public key is only
+ever used to verify an asymmetric token, and the shared secret only ever
+an `HS256` one — so reading `alg` from the token cannot be turned into an
+algorithm-confusion attack (the classic form of which needs one key to be
+accepted by both families).
+
+If the signing key can't be retrieved — JWKS endpoint unreachable, a `kid`
+with no matching key, or `SUPABASE_URL` unset while an asymmetric token is
+presented — the request **fails closed with a `401`**, never falls back to
+an unverified decode.
+
 ## Authentication failure logging
 
 Every rejection path in `app/auth/dependencies.py`'s `get_current_user`
 (missing/malformed header, invalid signature, expired token, missing
-subject claim) and `app/auth/permissions.py`'s `require_permission` (403,
-insufficient role) logs one `WARNING`-level line via `log_auth_failure()`:
+subject claim, signing key unretrievable) and `app/auth/permissions.py`'s
+`require_permission` (403, insufficient role) logs one `WARNING`-level
+line via `log_auth_failure()`:
 
 ```
 auth_failure event=<event> path=<path> method=<method> client_ip=<ip> user_id=<id-or-"-"> reason=<reason>
