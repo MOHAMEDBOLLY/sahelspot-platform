@@ -1,31 +1,38 @@
-from fastapi import HTTPException
+from typing import Protocol
 
-from app.db.models import Venue
+from fastapi import HTTPException
 
 # Deliberately generic — not Venue-specific, and not tied to any one
 # transition (Review, Approval, and any future one all call this). This is
 # the "reusable transition infrastructure" the workflow architecture is
 # meant to share: the one place that enforces "a row must currently be in
 # `expected` status to move toward `target`," so that check and its 409
-# shape exist exactly once, not once per endpoint.
+# shape exist exactly once, not once per endpoint. PLATFORM_SPEC_v1.0_
+# FROZEN.md §4/§7.4 extends this same shared vocabulary to destinations —
+# the `Venue`-only type hint this module always had in practice (only
+# `.status` is ever read) is widened to match, not redesigned.
 
 
-def require_status(venue: Venue, *, expected: str, target: str) -> None:
-    """Raises a structured 409 if `venue.status` isn't `expected`. Callers
-    are still responsible for the actual `venue.status = target` assignment
+class _HasStatus(Protocol):
+    status: str
+
+
+def require_status(entity: _HasStatus, *, expected: str, target: str) -> None:
+    """Raises a structured 409 if `entity.status` isn't `expected`. Callers
+    are still responsible for the actual `entity.status = target` assignment
     and any transition-specific preconditions (e.g. Review's Editorial
     Readiness gate) — this only centralizes the status-guard every
     transition needs, not the whole transition itself.
     """
-    if venue.status != expected:
+    if entity.status != expected:
         raise HTTPException(
             status_code=409,
             detail={
                 "error": "invalid_transition",
                 "message": (
-                    f"Venue is in '{venue.status}' status; only a "
-                    f"'{expected}' venue can move to '{target}'."
+                    f"Resource is in '{entity.status}' status; only a "
+                    f"'{expected}' resource can move to '{target}'."
                 ),
-                "current_status": venue.status,
+                "current_status": entity.status,
             },
         )

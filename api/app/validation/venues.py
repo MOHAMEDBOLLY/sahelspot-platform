@@ -1,8 +1,51 @@
 from decimal import Decimal
 
+from fastapi import HTTPException
+
 from app.db.models import VENUE_CATEGORIES, Venue
 
 from .schemas import FieldError, ValidationResult, build_validation_result
+
+# PLATFORM_SPEC_v1.0_FROZEN.md §6.3 — the values `ck_venues_beach_details_
+# shape` (Phase 1, EP5) accepts for `publicAccess`. The DB constraint only
+# enforces key *presence*; this is the application-layer value check the
+# frozen spec's §7.8 explicitly leaves to this layer.
+BEACH_PUBLIC_ACCESS_VALUES = ("yes", "no", "unknown")
+
+
+def validate_beach_details_shape(category: str, beach_details: dict | None) -> None:
+    """Raises a structured 422 for either half of the invariant `ck_venues_
+    beach_details_shape` enforces at the DB level: a 'Beach' venue must
+    have both keys with a legal `publicAccess` value; a non-'Beach' venue
+    must not have `beach_details` populated at all. Called by both
+    `POST /editor/venues` and `PATCH /editor/venues/{id}` so a malformed
+    payload fails cleanly here rather than as a raw `IntegrityError`.
+    """
+    if category == "Beach":
+        if not isinstance(beach_details, dict) or "type" not in beach_details or "publicAccess" not in beach_details:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "invalid_beach_details",
+                    "message": "A Beach venue requires beach_details with 'type' and 'publicAccess'.",
+                },
+            )
+        if beach_details["publicAccess"] not in BEACH_PUBLIC_ACCESS_VALUES:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "invalid_beach_details",
+                    "message": f"publicAccess must be one of: {', '.join(BEACH_PUBLIC_ACCESS_VALUES)}.",
+                },
+            )
+    elif beach_details is not None:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "invalid_beach_details",
+                "message": "beach_details may only be set when category is 'Beach'.",
+            },
+        )
 
 # The observed range of all current venue coordinates (see docs/DATABASE.md's
 # "Validation rules" section) — a sanity bound, not a hard DB constraint,
