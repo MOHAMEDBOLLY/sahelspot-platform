@@ -171,6 +171,14 @@ export function approveVenue(id: string): Promise<Venue> {
   return apiPost<Venue>(`/editor/venues/${encodeURIComponent(id)}/approve`)
 }
 
+/** EP21 — Reject (`review` -> `draft`), the counterpart to Approve. Same
+ * human editorial decision, requires a non-blank `reason` (enforced by
+ * the shared `RejectRequest` schema — a bare Pydantic 422, not a
+ * structured one, so there's nothing extra to special-case here). */
+export function rejectVenue(id: string, reason: string): Promise<Venue> {
+  return apiPostJson<Venue>(`/editor/venues/${encodeURIComponent(id)}/reject`, { reason })
+}
+
 /** Sprint 28 — Bulk Operations. Every bulk endpoint returns the same
  * `BulkOperationResponse` shape (one result row per id) regardless of
  * whether it's a read-only check or a mutation — partial failure is

@@ -5,6 +5,7 @@ import { useUpdateVenue } from '../useUpdateVenue'
 import { useValidateVenue } from '../useValidateVenue'
 import { useSubmitForReview } from '../useSubmitForReview'
 import { useApproveVenue } from '../useApproveVenue'
+import { useRejectVenue } from '../useRejectVenue'
 import { useUploadVenueMedia } from '../useUploadVenueMedia'
 import { useSetCoverFromGallery } from '../useSetCoverFromGallery'
 import { useDeleteVenueCoverImage, useDeleteVenueGalleryImage } from '../useDeleteVenueMedia'
@@ -59,6 +60,7 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
     error: approveError,
     reset: resetApproveError,
   } = useApproveVenue()
+  const { mutateAsync: rejectVenue, error: rejectError } = useRejectVenue()
   const {
     mutate: uploadMedia,
     isPending: isUploadingMedia,
@@ -169,6 +171,12 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
     approve(venueId, { onSuccess: commitSave })
   }
 
+  async function handleReject(reason: string) {
+    if (!venueId) return
+    const updatedVenue = await rejectVenue({ id: venueId, reason })
+    commitSave(updatedVenue)
+  }
+
   function handleUpload(file: File, slot: MediaSlot) {
     if (!venueId) return
     setUploadProgress(0)
@@ -253,6 +261,11 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
         approveError={
           approveError instanceof ApiError ? approveError.message : approveError ? 'Failed to approve.' : null
         }
+        canReject={canApprove}
+        rejectError={
+          rejectError instanceof ApiError ? rejectError.message : rejectError ? 'Failed to reject.' : null
+        }
+        onReject={handleReject}
         onEdit={startEditing}
         onCancel={handleCancel}
         onSave={handleSave}

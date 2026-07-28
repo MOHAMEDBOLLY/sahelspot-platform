@@ -3,6 +3,7 @@ import { MapPinOff, Trash2 } from 'lucide-react'
 import { useDestination } from '../useDestination'
 import { useUpdateDestination } from '../useUpdateDestination'
 import { useDeleteDestination } from '../useDeleteDestination'
+import { useRejectDestination } from '../useRejectDestination'
 import { useUploadDestinationCover } from '../useUploadDestinationCover'
 import { toDestinationPatch } from '../api'
 import { validateDestinationDraft } from '../destinationValidation'
@@ -12,6 +13,7 @@ import { LoadingState } from '../../../components/LoadingState'
 import { ErrorState } from '../../../components/ErrorState'
 import { PagePlaceholder } from '../../../components/PagePlaceholder'
 import { DraftToolbar } from '../../../components/workspace/DraftToolbar'
+import { RejectDialog } from '../../../components/RejectDialog'
 import { useAuth } from '../../auth/useAuth'
 import { hasPermission } from '../../auth/permissions'
 import { BasicInfoSection } from './sections/BasicInfoSection'
@@ -54,6 +56,7 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
   const { mutate: saveDraft, isPending: isSaving, error: saveError, reset: resetSaveError } =
     useUpdateDestination()
   const { mutate: deleteDestination, isPending: isDeleting, error: deleteError } = useDeleteDestination()
+  const { mutateAsync: rejectDestination, error: rejectError } = useRejectDestination()
   const {
     mutate: uploadCover,
     isPending: isUploadingCover,
@@ -65,6 +68,7 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const { role } = useAuth()
   const canEdit = hasPermission(role, 'content_edit')
+  const canReject = !isDirty && displayedDestination?.status === 'review' && hasPermission(role, 'content_approve')
 
   const fieldErrors =
     mode === 'edit' && displayedDestination ? validateDestinationDraft(displayedDestination) : {}
@@ -101,6 +105,12 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
       return
     }
     deleteDestination(destinationId, { onSuccess: () => onDeleted?.() })
+  }
+
+  async function handleReject(reason: string) {
+    if (!destinationId) return
+    const updatedDestination = await rejectDestination({ id: destinationId, reason })
+    commitSave(updatedDestination)
   }
 
   function handleUploadCover(file: File) {
@@ -162,28 +172,41 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
         onCancel={handleCancel}
         onSave={handleSave}
         extraActions={
-          canEdit && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={isDeleting || mode === 'edit'}
-              title={mode === 'edit' ? 'Cancel editing before deleting.' : 'Delete destination'}
-              className="flex items-center gap-1.5 rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Trash2 size={14} />
-              {isDeleting ? 'Deleting…' : 'Delete'}
-            </button>
-          )
+          <>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting || mode === 'edit'}
+                title={mode === 'edit' ? 'Cancel editing before deleting.' : 'Delete destination'}
+                className="flex items-center gap-1.5 rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+                {isDeleting ? 'Deleting…' : 'Delete'}
+              </button>
+            )}
+            {canReject && <RejectDialog onReject={handleReject} />}
+          </>
         }
         extraStatus={
-          deleteError && (
-            <span
-              className="truncate text-xs font-medium text-red-600"
-              title={deleteError instanceof ApiError ? deleteError.message : 'Failed to delete.'}
-            >
-              {deleteError instanceof ApiError ? deleteError.message : 'Failed to delete.'}
-            </span>
-          )
+          <>
+            {deleteError && (
+              <span
+                className="truncate text-xs font-medium text-red-600"
+                title={deleteError instanceof ApiError ? deleteError.message : 'Failed to delete.'}
+              >
+                {deleteError instanceof ApiError ? deleteError.message : 'Failed to delete.'}
+              </span>
+            )}
+            {rejectError && (
+              <span
+                className="truncate text-xs font-medium text-red-600"
+                title={rejectError instanceof ApiError ? rejectError.message : 'Failed to reject.'}
+              >
+                {rejectError instanceof ApiError ? rejectError.message : 'Failed to reject.'}
+              </span>
+            )}
+          </>
         }
       />
       <BasicInfoSection

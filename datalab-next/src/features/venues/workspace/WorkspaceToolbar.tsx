@@ -1,5 +1,6 @@
 import { CheckCheck, Loader2, Send, ThumbsUp } from 'lucide-react'
 import { DraftToolbar } from '../../../components/workspace/DraftToolbar'
+import { RejectDialog } from '../../../components/RejectDialog'
 import type { WorkspaceMode } from '../../../components/workspace/types'
 
 type WorkspaceToolbarProps = {
@@ -20,12 +21,15 @@ type WorkspaceToolbarProps = {
   canApprove: boolean
   isApproving: boolean
   approveError: string | null
+  canReject: boolean
+  rejectError: string | null
   onEdit: () => void
   onCancel: () => void
   onSave: () => void
   onValidate: () => void
   onSubmitForReview: () => void
   onApprove: () => void
+  onReject: (reason: string) => Promise<void>
 }
 
 /** The Venue Workspace's toolbar — the generic Edit/Cancel/Save Draft shell
@@ -47,12 +51,15 @@ export function WorkspaceToolbar({
   canApprove,
   isApproving,
   approveError,
+  canReject,
+  rejectError,
   onEdit,
   onCancel,
   onSave,
   onValidate,
   onSubmitForReview,
   onApprove,
+  onReject,
 }: WorkspaceToolbarProps) {
   return (
     <DraftToolbar
@@ -76,6 +83,11 @@ export function WorkspaceToolbar({
           {approveError && (
             <span className="truncate text-xs font-medium text-red-600" title={approveError}>
               {approveError}
+            </span>
+          )}
+          {rejectError && (
+            <span className="truncate text-xs font-medium text-red-600" title={rejectError}>
+              {rejectError}
             </span>
           )}
         </>
@@ -116,6 +128,7 @@ export function WorkspaceToolbar({
               {isApproving ? 'Approving…' : 'Approve'}
             </button>
           )}
+          {canReject && <RejectDialog onReject={onReject} />}
         </>
       }
     />

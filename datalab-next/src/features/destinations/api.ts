@@ -80,6 +80,12 @@ export function uploadDestinationCover(
   return apiUpload<Destination>(`/editor/destinations/${encodeURIComponent(id)}/media`, formData, onProgress)
 }
 
+/** EP21 — Reject (`review` -> `draft`), same shape/reasoning as venues'
+ * `rejectVenue`. */
+export function rejectDestination(id: string, reason: string): Promise<Destination> {
+  return apiPostJson<Destination>(`/editor/destinations/${encodeURIComponent(id)}/reject`, { reason })
+}
+
 /** EP20-T01 — `GET /editor/destinations/export`. */
 export function exportDestinations(format: 'csv' | 'json'): Promise<void> {
   return apiDownload(`/editor/destinations/export?format=${format}`, `destinations.${format}`)
