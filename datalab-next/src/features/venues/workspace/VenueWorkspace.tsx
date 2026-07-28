@@ -146,9 +146,15 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
   function handleSave() {
     if (!venueId || !displayedVenue) return
     saveDraft(
-      { id: venueId, patch: toVenuePatch(displayedVenue) },
+      { id: venueId, version: displayedVenue.version, patch: toVenuePatch(displayedVenue) },
       { onSuccess: commitSave },
     )
+  }
+
+  function handleReloadAfterConflict() {
+    resetSaveError()
+    cancelEditing()
+    refetch()
   }
 
   function handleValidate() {
@@ -199,7 +205,11 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
   function handleReorderGallery(newOrder: string[]) {
     if (!venueId || !displayedVenue) return
     saveMediaPatch(
-      { id: venueId, patch: { ...toVenuePatch(displayedVenue), gallery_image_urls: newOrder } },
+      {
+        id: venueId,
+        version: displayedVenue.version,
+        patch: { ...toVenuePatch(displayedVenue), gallery_image_urls: newOrder },
+      },
       { onSuccess: commitSave },
     )
   }
@@ -236,14 +246,36 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
     return null
   }
 
+  const isSaveConflict = saveError instanceof ApiError && saveError.status === 409
+
   return (
     <div className="flex flex-col gap-4">
+      {isSaveConflict && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span>{saveError.message}</span>
+          <button
+            type="button"
+            onClick={handleReloadAfterConflict}
+            className="shrink-0 rounded-lg border border-amber-400 px-3 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100"
+          >
+            Reload
+          </button>
+        </div>
+      )}
       <WorkspaceToolbar
         venueName={displayedVenue.name}
         mode={mode}
         isDirty={isDirty}
         isSaving={isSaving}
-        saveError={saveError instanceof ApiError ? saveError.message : saveError ? 'Failed to save.' : null}
+        saveError={
+          isSaveConflict
+            ? null
+            : saveError instanceof ApiError
+              ? saveError.message
+              : saveError
+                ? 'Failed to save.'
+                : null
+        }
         hasFieldErrors={hasFieldErrors}
         canEdit={canEdit}
         isValidating={isValidating}

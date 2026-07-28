@@ -88,8 +88,13 @@ export function toVenuePatch(venue: Venue): VenuePatch {
   }
 }
 
-export function updateVenue(id: string, patch: VenuePatch): Promise<Venue> {
-  return apiPatch<Venue>(`/editor/venues/${encodeURIComponent(id)}`, patch)
+/** EP22 — `version` is the venue's currently-loaded version, sent as
+ * `If-Match` (PLATFORM_SPEC_v1.0_FROZEN.md §4). A mismatch means someone
+ * else saved since this caller last read the venue; the backend responds
+ * `409` (surfaced as `ApiError` with `status === 409`), which callers use
+ * to offer a reload rather than silently overwriting or losing the edit. */
+export function updateVenue(id: string, version: number, patch: VenuePatch): Promise<Venue> {
+  return apiPatch<Venue>(`/editor/venues/${encodeURIComponent(id)}`, patch, { 'If-Match': String(version) })
 }
 
 /** EP19-T01 — the one write path venues never had, `POST /editor/venues`.

@@ -11,6 +11,9 @@ export interface Destination {
   boundary: Record<string, unknown> | null
   notes: string | null
   cover_image_url: string | null
+  /** PLATFORM_SPEC_v1.0_FROZEN.md §4 — optimistic concurrency, same
+   * reasoning as `Venue.version`. */
+  version: number
   last_published_at: string | null
   created_at: string
   updated_at: string

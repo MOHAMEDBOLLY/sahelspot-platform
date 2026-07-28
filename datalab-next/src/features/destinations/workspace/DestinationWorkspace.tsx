@@ -90,9 +90,15 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
   function handleSave() {
     if (!destinationId || !displayedDestination) return
     saveDraft(
-      { id: destinationId, patch: toDestinationPatch(displayedDestination) },
+      { id: destinationId, version: displayedDestination.version, patch: toDestinationPatch(displayedDestination) },
       { onSuccess: commitSave },
     )
+  }
+
+  function handleReloadAfterConflict() {
+    resetSaveError()
+    cancelEditing()
+    refetch()
   }
 
   function handleDelete() {
@@ -126,7 +132,11 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
   function handleRemoveCover() {
     if (!destinationId || !displayedDestination) return
     saveCoverPatch(
-      { id: destinationId, patch: { ...toDestinationPatch(displayedDestination), cover_image_url: null } },
+      {
+        id: destinationId,
+        version: displayedDestination.version,
+        patch: { ...toDestinationPatch(displayedDestination), cover_image_url: null },
+      },
       { onSuccess: commitSave },
     )
   }
@@ -158,14 +168,36 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
     return null
   }
 
+  const isSaveConflict = saveError instanceof ApiError && saveError.status === 409
+
   return (
     <div className="flex flex-col gap-4">
+      {isSaveConflict && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span>{saveError.message}</span>
+          <button
+            type="button"
+            onClick={handleReloadAfterConflict}
+            className="shrink-0 rounded-lg border border-amber-400 px-3 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100"
+          >
+            Reload
+          </button>
+        </div>
+      )}
       <DraftToolbar
         title={displayedDestination.name}
         mode={mode}
         isDirty={isDirty}
         isSaving={isSaving}
-        saveError={saveError instanceof ApiError ? saveError.message : saveError ? 'Failed to save.' : null}
+        saveError={
+          isSaveConflict
+            ? null
+            : saveError instanceof ApiError
+              ? saveError.message
+              : saveError
+                ? 'Failed to save.'
+                : null
+        }
         hasFieldErrors={hasFieldErrors}
         canEdit={canEdit}
         onEdit={startEditing}

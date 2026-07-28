@@ -44,8 +44,11 @@ export function toDestinationPatch(destination: Destination): DestinationPatch {
   }
 }
 
-export function updateDestination(id: string, patch: DestinationPatch): Promise<Destination> {
-  return apiPatch<Destination>(`/editor/destinations/${encodeURIComponent(id)}`, patch)
+/** EP22 — same `If-Match`/`version` reasoning as venues' `updateVenue`. */
+export function updateDestination(id: string, version: number, patch: DestinationPatch): Promise<Destination> {
+  return apiPatch<Destination>(`/editor/destinations/${encodeURIComponent(id)}`, patch, {
+    'If-Match': String(version),
+  })
 }
 
 /** Sprint 29 — Destination CRUD Parity. `id` is the destination's slug,

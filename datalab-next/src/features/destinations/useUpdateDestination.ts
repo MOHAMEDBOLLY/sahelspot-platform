@@ -9,7 +9,8 @@ export function useUpdateDestination() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: DestinationPatch }) => updateDestination(id, patch),
+    mutationFn: ({ id, version, patch }: { id: string; version: number; patch: DestinationPatch }) =>
+      updateDestination(id, version, patch),
     onSuccess: (updatedDestination) => {
       queryClient.setQueryData(['destination', updatedDestination.id], updatedDestination)
       queryClient.invalidateQueries({ queryKey: ['destinations'] })

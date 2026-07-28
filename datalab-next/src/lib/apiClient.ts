@@ -33,10 +33,18 @@ export async function apiGet<T>(path: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
-export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+/** EP22 — `extraHeaders` carries `If-Match` for the entities
+ * (venues/destinations) `PATCH .../{id}` now requires (PLATFORM_SPEC_
+ * v1.0_FROZEN.md §4); every other `PATCH` caller (bulk update) simply
+ * omits it, unaffected. */
+export async function apiPatch<T>(
+  path: string,
+  body: unknown,
+  extraHeaders?: Record<string, string>,
+): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()), ...extraHeaders },
     body: JSON.stringify(body),
   })
 
