@@ -12,18 +12,19 @@ export class ApiError extends Error {
   }
 }
 
-/** Every mutation route requires a Supabase-issued token as of Sprint 22
- * (see `api/app/auth/dependencies.py`); GETs don't. Goes through
- * `authService.getAccessToken()`, never the Supabase SDK directly — this
- * is the one non-`features/auth/` file that's allowed to know a token
- * exists at all. */
+/** Every `/editor/*` route requires a Supabase-issued token — the
+ * backend's router-level auth gate (`app/api/router.py`) covers reads as
+ * well as mutations, not just mutations as an earlier sprint's comment
+ * here used to say. Goes through `authService.getAccessToken()`, never
+ * the Supabase SDK directly — this is the one non-`features/auth/` file
+ * that's allowed to know a token exists at all. */
 async function authHeaders(): Promise<Record<string, string>> {
   const token = await getAccessToken()
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`)
+  const response = await fetch(`${API_BASE_URL}${path}`, { headers: await authHeaders() })
 
   if (!response.ok) {
     throw new ApiError(await extractErrorMessage(response, path), response.status)
