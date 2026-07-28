@@ -89,6 +89,15 @@ def publish(db: Session, *, actor: str) -> PublishRevision:
     Never reads or writes `status` on any row — Approval already decided
     what's eligible; Publish only freezes it. That separation is the whole
     point: this function has no concept of "review" or "draft" at all.
+
+    PLATFORM_SPEC_v1.0_FROZEN.md §1 — referential closure. An `approved`
+    venue whose destination is *not* `approved` (drift: the destination
+    was archived, or moved back to draft/review, after the venue was
+    already approved — the approve-time gate in `app/api/routes/venues.py`
+    only catches this at the moment of approval, not later) is excluded
+    from this snapshot, not a reason to fail the whole publish. Every
+    other destination and venue in the same snapshot is unaffected by one
+    orphaned venue.
     """
     now = datetime.now(timezone.utc)
 
@@ -98,12 +107,16 @@ def publish(db: Session, *, actor: str) -> PublishRevision:
         .order_by(Destination.name)
         .all()
     )
-    venues = (
+    approved_destination_ids = {d.id for d in destinations}
+
+    all_approved_venues = (
         db.query(Venue)
         .filter(Venue.status == "approved")
         .order_by(Venue.name)
         .all()
     )
+    venues = [v for v in all_approved_venues if v.destination_id in approved_destination_ids]
+    excluded_venues = [v for v in all_approved_venues if v.destination_id not in approved_destination_ids]
 
     snapshot = {
         "destinations": [_serialize_destination(d) for d in destinations],
@@ -149,12 +162,33 @@ def publish(db: Session, *, actor: str) -> PublishRevision:
         actor=actor,
         metadata={"destination_count": len(destinations), "venue_count": len(venues)},
     )
+    # PLATFORM_SPEC_v1.0_FROZEN.md §1.3 — one activity entry per excluded
+    # venue, so the drift is traceable via the existing Activity page with
+    # no new UI surface required.
+    for excluded_venue in excluded_venues:
+        log_activity(
+            db,
+            action="publish_excluded_orphan_venue",
+            entity_type="venue",
+            entity_id=excluded_venue.id,
+            actor=actor,
+            metadata={
+                "destination_id": excluded_venue.destination_id,
+                "destination_status": excluded_venue.destination.status,
+            },
+        )
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=409, detail=_CONCURRENT_PUBLISH_DETAIL) from None
     db.refresh(revision)
+    # Not persisted — §1.3 specifies this as a response-level fact about
+    # the publish event, not a stored column on the revision row (see
+    # PublishRevisionOut.excluded_venue_count). Attached as a plain
+    # instance attribute; FastAPI/Pydantic's from_attributes reads it like
+    # any mapped column.
+    revision.excluded_venue_count = len(excluded_venues)
     return revision
 
 
