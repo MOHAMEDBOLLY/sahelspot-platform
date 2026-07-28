@@ -14,4 +14,8 @@ export const VENUE_CATEGORIES = [
   'Services',
   'Entertainment',
   'Other',
+  'Resort',
+  'Spa',
+  'Beach Club',
+  'Activity',
 ] as const

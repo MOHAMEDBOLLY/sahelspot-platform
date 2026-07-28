@@ -19,6 +19,7 @@ import { PagePlaceholder } from '../../../components/PagePlaceholder'
 import { WorkspaceToolbar } from './WorkspaceToolbar'
 import { ValidationSummary } from './ValidationSummary'
 import { BasicInfoSection } from './sections/BasicInfoSection'
+import { BeachDetailsSection } from './sections/BeachDetailsSection'
 import { LocationSection } from './sections/LocationSection'
 import { ContactSection } from './sections/ContactSection'
 import { OpeningHoursSection } from './sections/OpeningHoursSection'
@@ -257,6 +258,9 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
       />
       {validationResult && <ValidationSummary result={validationResult} />}
       <BasicInfoSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} errors={fieldErrors} />
+      {displayedVenue.category === 'Beach' && (
+        <BeachDetailsSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} />
+      )}
       <LocationSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} errors={fieldErrors} />
       <ContactSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} errors={fieldErrors} />
       <OpeningHoursSection venue={displayedVenue} />

@@ -51,6 +51,7 @@ export type VenuePatch = Pick<
   | 'internal_notes'
   | 'cover_image_url'
   | 'gallery_image_urls'
+  | 'beach_details'
 >
 
 /** Empty strings from cleared text inputs mean "no value" for these nullable
@@ -79,11 +80,34 @@ export function toVenuePatch(venue: Venue): VenuePatch {
     internal_notes: emptyToNull(venue.internal_notes),
     cover_image_url: venue.cover_image_url,
     gallery_image_urls: venue.gallery_image_urls,
+    // Mirrors the backend's own gate (validate_beach_details_shape):
+    // beach_details may only be set when category is 'Beach' — cleared
+    // here so switching away from Beach in the editor can't submit a
+    // stale value the backend would reject with invalid_beach_details.
+    beach_details: venue.category === 'Beach' ? venue.beach_details : null,
   }
 }
 
 export function updateVenue(id: string, patch: VenuePatch): Promise<Venue> {
   return apiPatch<Venue>(`/editor/venues/${encodeURIComponent(id)}`, patch)
+}
+
+/** EP19-T01 — the one write path venues never had, `POST /editor/venues`.
+ * `id`/`slug` are caller-supplied (mirrors the backend's own reasoning,
+ * see `VenueCreate`'s docstring) — every new venue starts `draft`, so
+ * `status` isn't part of this input. */
+export interface VenueCreateInput {
+  id: string
+  name: string
+  slug: string
+  destination_id: string
+  category: string
+  district?: string | null
+  beach_details?: Record<string, unknown> | null
+}
+
+export function createVenue(input: VenueCreateInput): Promise<Venue> {
+  return apiPostJson<Venue>('/editor/venues', input)
 }
 
 /** Sprint 25 — Media Library Foundation. Uploads an image and returns the

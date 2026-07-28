@@ -2,8 +2,11 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { VenueListPanel } from '../features/venues/VenueListPanel'
 import { VenueFilters } from '../features/venues/VenueFilters'
+import { VenueCreateDialog } from '../features/venues/VenueCreateDialog'
 import { VenueWorkspace } from '../features/venues/workspace/VenueWorkspace'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import { useAuth } from '../features/auth/useAuth'
+import { hasPermission } from '../features/auth/permissions'
 
 /** Sprint 27 — search/filter state lives in the URL (`useSearchParams`),
  * not local component state, so a page refresh (or a shared/bookmarked
@@ -24,6 +27,8 @@ export function Venues() {
   const category = searchParams.get('category') ?? ''
   const status = searchParams.get('status') ?? ''
   const debouncedQ = useDebouncedValue(q, 300)
+  const { role } = useAuth()
+  const canCreate = hasPermission(role, 'content_edit')
 
   function setParam(key: string, value: string) {
     setSearchParams(
@@ -53,6 +58,9 @@ export function Venues() {
   return (
     <div className="flex h-full gap-6">
       <div className="flex w-80 shrink-0 flex-col gap-3 overflow-y-auto">
+        {canCreate && (
+          <VenueCreateDialog onCreated={(venue) => handleSelectVenue(venue.id)} />
+        )}
         <VenueFilters
           searchValue={q}
           onSearchChange={(value) => setParam('q', value)}
