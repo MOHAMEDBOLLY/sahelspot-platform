@@ -1,17 +1,33 @@
+import csv
+import io
 import logging
 from typing import Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 
 from app.activity.service import log_activity
+from app.api.concurrency import require_if_match, set_etag
+from app.api.identifiers import check_reserved_id
 from app.api.schemas import (
-    BulkCategoryUpdateRequest,
-    BulkDestinationUpdateRequest,
     BulkOperationResponse,
     BulkResultItem,
+    BulkUpdateRequest,
     BulkVenueIdsRequest,
+    RejectRequest,
     SetCoverImageRequest,
+    VenueCreate,
     VenueListOut,
     VenueOut,
     VenueUpdate,
@@ -20,9 +36,9 @@ from app.auth.dependencies import CurrentUser, get_current_user
 from app.auth.permissions import Permission, require_permission
 from app.db.models import VENUE_CATEGORIES, Destination, Venue
 from app.db.session import get_db
-from app.media.service import reject_if_declared_too_large, upload_image
+from app.media.service import delete_image, reject_if_declared_too_large, upload_image
 from app.validation.schemas import ValidationResult
-from app.validation.venues import validate_venue
+from app.validation.venues import validate_beach_details_shape, validate_venue
 from app.workflow.transitions import require_status
 
 # Editorial only — mounted under /editor by app/api/router.py, which also
@@ -81,6 +97,86 @@ def list_venues(
     items = query.order_by(Venue.name).offset((page - 1) * page_size).limit(page_size).all()
 
     return VenueListOut(items=items, total=total, page=page, page_size=page_size)
+
+
+@router.post("", response_model=VenueOut, status_code=201)
+def create_venue(
+    payload: VenueCreate,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
+):
+    """PLATFORM_SPEC_v1.0_FROZEN.md §8.2 — the one write path venues never
+    had. `id`/`slug` are caller-supplied (§8.2's own reasoning, mirroring
+    `create_destination` below). Always starts `draft`. `category` is
+    checked against the same 13-value set `validate_venue`/the DB `CHECK`
+    both already enforce, so a typo fails cleanly here rather than as a
+    raw integrity error; `beach_details` (if any) is checked against the
+    same shape rule the DB constraint enforces (Phase 1, EP5).
+    """
+    check_reserved_id(payload.id)
+
+    if db.get(Venue, payload.id) is not None:
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "venue_already_exists", "message": f"'{payload.id}' already exists."},
+        )
+    if db.get(Destination, payload.destination_id) is None:
+        raise HTTPException(status_code=404, detail="Destination not found")
+    if payload.category not in VENUE_CATEGORIES:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_category", "message": f"'{payload.category}' is not a recognized category."},
+        )
+    validate_beach_details_shape(payload.category, payload.beach_details)
+
+    venue = Venue(
+        id=payload.id,
+        name=payload.name,
+        slug=payload.slug,
+        destination_id=payload.destination_id,
+        category=payload.category,
+        district=payload.district,
+        beach_details=payload.beach_details,
+        status="draft",
+    )
+    db.add(venue)
+    db.commit()
+
+    venue = db.get(Venue, payload.id, options=[joinedload(Venue.destination)])
+    return venue
+
+
+@router.get("/export")
+def export_venues(
+    format: Literal["csv", "json"] = Query(default="json"),
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_VIEW)),
+):
+    """PLATFORM_SPEC_v1.0_FROZEN.md §8.7 — restores the legacy tool's
+    Export capability, which has no equivalent in this platform today
+    (write-only data is a regression, not a neutral gap). Registered here,
+    before `/{venue_id}`, for the same route-ordering reason the bulk-*
+    routes below are — `export` must never be swallowed by the
+    `/{venue_id}` path parameter (see `check_reserved_id`, which also
+    rejects `export` as a venue id at creation time).
+    """
+    venues = db.query(Venue).options(joinedload(Venue.destination)).order_by(Venue.name).all()
+    rows = [VenueOut.model_validate(v).model_dump(mode="json") for v in venues]
+
+    if format == "json":
+        return rows
+
+    buffer = io.StringIO()
+    if rows:
+        writer = csv.DictWriter(buffer, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({k: (v if not isinstance(v, (dict, list)) else str(v)) for k, v in row.items()})
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=venues.csv"},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -217,72 +313,39 @@ def bulk_approve_venues(
     return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
 
 
-@router.patch("/bulk/category", response_model=BulkOperationResponse)
-def bulk_update_category(
-    payload: BulkCategoryUpdateRequest,
+@router.patch("/bulk", response_model=BulkOperationResponse)
+def bulk_update(
+    payload: BulkUpdateRequest,
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
 ):
-    """A bulk Save Draft, narrowed to one field — the same "set the
-    attribute, commit" write `PATCH /venues/{id}` already does for
-    `category` (see `update_venue`), just applied across many ids. Not
-    activity-logged, for the same reason Save Draft itself isn't (Sprint
-    19): it's a draft-content edit, not a workflow transition or publish
-    event. `category` is validated once, up front, against the same fixed
-    list the database's own `CHECK` constraint enforces — this is a
-    mutation (unlike Sprint 27's search filter, which lets an unknown value
-    just match nothing), so a typo should fail cleanly here rather than as
-    a raw integrity-constraint error.
+    """PLATFORM_SPEC_v1.0_FROZEN.md §7.6 — replaces the two prior
+    single-field endpoints (`bulk/category`, `bulk/destination`) with one:
+    a venue-id list plus whichever of `category`/`destination_id` the
+    caller wants to set, either or both in the same call. A bulk Save
+    Draft, narrowed to these two fields — the same "set the attribute,
+    commit" write `PATCH /venues/{id}` already does (see `update_venue`),
+    just applied across many ids and not activity-logged, for the same
+    reason Save Draft itself isn't (Sprint 19).
+
+    Both fields are validated once, up front, exactly as the two prior
+    endpoints each validated their own field — a typo/missing target
+    should fail cleanly here, not as a raw integrity-constraint error.
     """
-    if payload.category not in VENUE_CATEGORIES:
+    if payload.category is None and payload.destination_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "no_fields_to_update",
+                "message": "At least one of category or destination_id must be provided.",
+            },
+        )
+    if payload.category is not None and payload.category not in VENUE_CATEGORIES:
         raise HTTPException(
             status_code=422,
             detail={"error": "invalid_category", "message": f"'{payload.category}' is not a recognized category."},
         )
-
-    results: list[BulkResultItem] = []
-    for venue_id in payload.venue_ids:
-        venue = db.get(Venue, venue_id)
-        if venue is None:
-            results.append(BulkResultItem(venue_id=venue_id, success=False, error="Venue not found"))
-            continue
-        try:
-            venue.category = payload.category
-            db.commit()
-        except Exception as exc:
-            db.rollback()
-            if isinstance(exc, HTTPException):
-                error = _error_message(exc)
-            else:
-                logger.exception("Unexpected error updating category for venue %s", venue_id)
-                error = "Failed to update category."
-            results.append(BulkResultItem(venue_id=venue_id, success=False, error=error))
-            continue
-        venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
-
-    succeeded = sum(1 for result in results if result.success)
-    return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
-
-
-@router.patch("/bulk/destination", response_model=BulkOperationResponse)
-def bulk_update_destination(
-    payload: BulkDestinationUpdateRequest,
-    db: Session = Depends(get_db),
-    _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
-):
-    """Same shape as `bulk_update_category` above — a bulk Save Draft
-    narrowed to one field. `destination_id` isn't part of `VenueUpdate`
-    (Sprint 9 deliberately excluded it from single-item editing, since it
-    "would need a real destination picker"); a bulk reassignment is a
-    distinct, explicitly-scoped capability this sprint adds, not a
-    backdoor into making it a free-text field on the single-item form.
-    The target destination is validated to exist once, up front — the
-    same 404-on-missing pattern every other route in this codebase uses,
-    just checked before the loop instead of per item, since it's the same
-    destination for every venue in the batch.
-    """
-    if db.get(Destination, payload.destination_id) is None:
+    if payload.destination_id is not None and db.get(Destination, payload.destination_id) is None:
         raise HTTPException(status_code=404, detail="Destination not found")
 
     results: list[BulkResultItem] = []
@@ -292,15 +355,18 @@ def bulk_update_destination(
             results.append(BulkResultItem(venue_id=venue_id, success=False, error="Venue not found"))
             continue
         try:
-            venue.destination_id = payload.destination_id
+            if payload.category is not None:
+                venue.category = payload.category
+            if payload.destination_id is not None:
+                venue.destination_id = payload.destination_id
             db.commit()
         except Exception as exc:
             db.rollback()
             if isinstance(exc, HTTPException):
                 error = _error_message(exc)
             else:
-                logger.exception("Unexpected error updating destination for venue %s", venue_id)
-                error = "Failed to update destination."
+                logger.exception("Unexpected error bulk-updating venue %s", venue_id)
+                error = "Failed to update venue."
             results.append(BulkResultItem(venue_id=venue_id, success=False, error=error))
             continue
         venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
@@ -313,12 +379,14 @@ def bulk_update_destination(
 @router.get("/{venue_id}", response_model=VenueOut)
 def get_venue(
     venue_id: str,
+    response: Response,
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(require_permission(Permission.CONTENT_VIEW)),
 ):
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
     if venue is None:
         raise HTTPException(status_code=404, detail="Venue not found")
+    set_etag(response, venue)
     return venue
 
 
@@ -326,6 +394,8 @@ def get_venue(
 def update_venue(
     venue_id: str,
     payload: VenueUpdate,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
 ):
@@ -339,13 +409,71 @@ def update_venue(
     this new order," which this endpoint already supports with no changes.
     No dedicated `/reorder` endpoint was added; that would duplicate a
     write path this one already provides.
+
+    PLATFORM_SPEC_v1.0_FROZEN.md §4 — requires a matching `If-Match`
+    (the venue's current `version`) before any write; a mismatch means
+    someone else saved since this caller last read the venue. `version`
+    increments by exactly one on a successful write, in the same
+    transaction as the field updates. `beach_details`' shape (§7.8) is
+    checked against the venue's *resulting* category — whichever of
+    current/incoming is in effect after this payload is applied — since a
+    single call may change both at once.
     """
     venue = db.get(Venue, venue_id)
     if venue is None:
         raise HTTPException(status_code=404, detail="Venue not found")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    require_if_match(request, venue, VenueOut)
+
+    updates = payload.model_dump(exclude_unset=True)
+    if "beach_details" in updates:
+        resulting_category = updates.get("category", venue.category)
+        validate_beach_details_shape(resulting_category, updates["beach_details"])
+
+    for field, value in updates.items():
         setattr(venue, field, value)
+    venue.version += 1
+
+    db.commit()
+
+    venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+    set_etag(response, venue)
+    return venue
+
+
+@router.delete("/{venue_id}/media", response_model=VenueOut)
+def delete_venue_media(
+    venue_id: str,
+    slot: Literal["cover", "gallery"] = Query(...),
+    url: str | None = Query(default=None, description="Required when slot=gallery"),
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
+):
+    """PLATFORM_SPEC_v1.0_FROZEN.md §8.4/§9.2 — the upload endpoints below
+    had no counterpart to remove an image; this closes that gap. Cover:
+    deletes the stored file and clears `cover_image_url`. Gallery: removes
+    exactly the given `url` from `gallery_image_urls` and deletes that
+    file — idempotent if `url` isn't present (matches the legacy tool's
+    own "deleting an already-missing file is not an error" precedent).
+    """
+    venue = db.get(Venue, venue_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    if slot == "cover":
+        if venue.cover_image_url:
+            delete_image(venue.cover_image_url)
+            venue.cover_image_url = None
+    else:
+        if not url:
+            raise HTTPException(
+                status_code=422,
+                detail={"error": "url_required", "message": "url is required when slot=gallery."},
+            )
+        gallery = venue.gallery_image_urls or []
+        if url in gallery:
+            delete_image(url)
+            venue.gallery_image_urls = [item for item in gallery if item != url]
 
     db.commit()
 
@@ -520,8 +648,28 @@ def _approve_or_raise(db: Session, venue: Venue, actor: str) -> None:
     reason `_submit_for_review_or_raise` was: `approve_venue` (single) and
     `bulk_approve_venues` (Sprint 28) call this one function rather than
     duplicating the status guard + write + activity log.
+
+    PLATFORM_SPEC_v1.0_FROZEN.md §1.2 — referential-closure prevention
+    gate: a venue cannot be approved unless its destination is also
+    `approved`. This is the common-case check; the publish engine's own
+    filter (§1's actual closure guarantee) additionally catches drift that
+    happens *after* this check passes (e.g. the destination is archived
+    later).
     """
     require_status(venue, expected="review", target="approved")
+
+    if venue.destination.status != "approved":
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "destination_not_approved",
+                "message": (
+                    f"Cannot approve this venue — its destination is "
+                    f"'{venue.destination.status}', not 'approved'."
+                ),
+                "destination_status": venue.destination.status,
+            },
+        )
 
     venue.status = "approved"
     log_activity(db, action="approve", entity_type="venue", entity_id=venue.id, actor=actor)
@@ -549,6 +697,41 @@ def approve_venue(
         raise HTTPException(status_code=404, detail="Venue not found")
 
     _approve_or_raise(db, venue, user.id)
+    db.commit()
+
+    venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+    return venue
+
+
+@router.post("/{venue_id}/reject", response_model=VenueOut)
+def reject_venue(
+    venue_id: str,
+    payload: RejectRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    """PLATFORM_SPEC_v1.0_FROZEN.md §7.4 — the `review -> draft` transition,
+    now requiring a non-blank `reason` (enforced by `RejectRequest`'s own
+    `min_length`), logged to `activity_log.metadata` so the submitting
+    editor can see why. Same permission as Approve — both are the
+    reviewer's decision on a submission, not the submitter's own.
+    """
+    venue = db.get(Venue, venue_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    require_status(venue, expected="review", target="draft")
+
+    venue.status = "draft"
+    log_activity(
+        db,
+        action="reject",
+        entity_type="venue",
+        entity_id=venue.id,
+        actor=user.id,
+        metadata={"reason": payload.reason},
+    )
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
