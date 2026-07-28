@@ -221,7 +221,7 @@ class TestBulkCategoryUpdate:
         second = make_venue(category="Cafe")
 
         response = client.patch(
-            "/editor/venues/bulk/category",
+            "/editor/venues/bulk",
             json={"venue_ids": [first.id, second.id], "category": "Hotel"},
         )
 
@@ -236,7 +236,7 @@ class TestBulkCategoryUpdate:
         venue = make_venue(category="Restaurant")
 
         response = client.patch(
-            "/editor/venues/bulk/category",
+            "/editor/venues/bulk",
             json={"venue_ids": [venue.id], "category": "NotARealCategory"},
         )
 
@@ -248,7 +248,7 @@ class TestBulkCategoryUpdate:
         venue = make_venue(category="Restaurant")
 
         response = client.patch(
-            "/editor/venues/bulk/category",
+            "/editor/venues/bulk",
             json={"venue_ids": ["does-not-exist", venue.id], "category": "Hotel"},
         )
 
@@ -265,7 +265,7 @@ class TestBulkCategoryUpdate:
         venue = make_venue(category="Restaurant")
 
         client.patch(
-            "/editor/venues/bulk/category", json={"venue_ids": [venue.id], "category": "Hotel"}
+            "/editor/venues/bulk", json={"venue_ids": [venue.id], "category": "Hotel"}
         )
 
         entry = latest_activity(db, entity_type="venue", entity_id=venue.id)
@@ -276,7 +276,7 @@ class TestBulkCategoryUpdate:
         as_role("viewer")
 
         response = client.patch(
-            "/editor/venues/bulk/category", json={"venue_ids": [venue.id], "category": "Hotel"}
+            "/editor/venues/bulk", json={"venue_ids": [venue.id], "category": "Hotel"}
         )
 
         assert response.status_code == 403
@@ -291,7 +291,7 @@ class TestBulkDestinationUpdate:
         second = make_venue()
 
         response = client.patch(
-            "/editor/venues/bulk/destination",
+            "/editor/venues/bulk",
             json={"venue_ids": [first.id, second.id], "destination_id": target.id},
         )
 
@@ -307,7 +307,7 @@ class TestBulkDestinationUpdate:
         original_destination_id = venue.destination_id
 
         response = client.patch(
-            "/editor/venues/bulk/destination",
+            "/editor/venues/bulk",
             json={"venue_ids": [venue.id], "destination_id": "does-not-exist"},
         )
 
@@ -322,7 +322,7 @@ class TestBulkDestinationUpdate:
         venue = make_venue()
 
         response = client.patch(
-            "/editor/venues/bulk/destination",
+            "/editor/venues/bulk",
             json={"venue_ids": ["does-not-exist", venue.id], "destination_id": target.id},
         )
 
@@ -337,7 +337,7 @@ class TestBulkDestinationUpdate:
         as_role("viewer")
 
         response = client.patch(
-            "/editor/venues/bulk/destination",
+            "/editor/venues/bulk",
             json={"venue_ids": [venue.id], "destination_id": target.id},
         )
 
@@ -356,3 +356,32 @@ class TestBulkRequestValidation:
         )
 
         assert response.status_code == 422
+
+
+class TestBulkUpdateUnified:
+    """PLATFORM_SPEC_v1.0_FROZEN.md §7.6 — the new capability the unified
+    endpoint adds over the two it replaced: setting both fields in one call.
+    """
+
+    def test_updates_category_and_destination_in_one_call(self, client, make_destination, make_venue, db):
+        target = make_destination()
+        venue = make_venue(category="Restaurant")
+
+        response = client.patch(
+            "/editor/venues/bulk",
+            json={"venue_ids": [venue.id], "category": "Cafe", "destination_id": target.id},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["succeeded"] == 1
+        db.refresh(venue)
+        assert venue.category == "Cafe"
+        assert venue.destination_id == target.id
+
+    def test_rejects_a_call_with_neither_field(self, client, make_venue):
+        venue = make_venue()
+
+        response = client.patch("/editor/venues/bulk", json={"venue_ids": [venue.id]})
+
+        assert response.status_code == 422
+        assert response.json()["detail"]["error"] == "no_fields_to_update"

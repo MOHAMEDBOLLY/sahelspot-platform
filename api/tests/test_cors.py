@@ -91,7 +91,7 @@ class TestCorsActualRequests:
         response = client.patch(
             f"/editor/venues/{venue.id}",
             json={"name": "Updated via CORS-narrowed headers"},
-            headers={"Origin": ALLOWED_ORIGIN},
+            headers={"Origin": ALLOWED_ORIGIN, "If-Match": str(venue.version)},
         )
 
         assert response.status_code == 200
@@ -109,3 +109,14 @@ class TestCorsActualRequests:
         # real browser would block the response from untrusted JS.
         assert response.status_code == 200
         assert "access-control-allow-origin" not in response.headers
+
+
+class TestApiVersionHeader:
+    """PLATFORM_SPEC_v1.0_FROZEN.md §6.1 — the current, unversioned
+    surface is retroactively declared v1 via a response header.
+    """
+
+    def test_api_version_header_present(self, client):
+        response = client.get("/health")
+
+        assert response.headers["api-version"] == "v1"

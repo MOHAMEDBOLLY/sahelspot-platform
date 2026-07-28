@@ -115,7 +115,11 @@ class TestEditPermission:
         as_role("editor")
         venue = make_venue()
 
-        response = client.patch(f"/editor/venues/{venue.id}", json={"name": "New Name"})
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"name": "New Name"},
+            headers={"If-Match": str(venue.version)},
+        )
 
         assert response.status_code == 200
 

@@ -55,6 +55,7 @@ class TestUpdateDestination:
         response = client.patch(
             f"/editor/destinations/{destination.id}",
             json={"name": "Updated Name", "region": "Fouka Bay"},
+            headers={"If-Match": str(destination.version)},
         )
 
         assert response.status_code == 200
@@ -66,7 +67,11 @@ class TestUpdateDestination:
     def test_partial_update_leaves_other_fields_unchanged(self, client, make_destination, db):
         destination = make_destination(name="Keep This Name", region="Marina")
 
-        response = client.patch(f"/editor/destinations/{destination.id}", json={"region": "Dabaa City"})
+        response = client.patch(
+            f"/editor/destinations/{destination.id}",
+            json={"region": "Dabaa City"},
+            headers={"If-Match": str(destination.version)},
+        )
 
         assert response.status_code == 200
         assert response.json()["name"] == "Keep This Name"
@@ -77,7 +82,11 @@ class TestUpdateDestination:
     def test_does_not_change_status(self, client, make_destination, db):
         destination = make_destination(status="draft")
 
-        client.patch(f"/editor/destinations/{destination.id}", json={"name": "Still Draft"})
+        client.patch(
+            f"/editor/destinations/{destination.id}",
+            json={"name": "Still Draft"},
+            headers={"If-Match": str(destination.version)},
+        )
 
         db.refresh(destination)
         assert destination.status == "draft"
@@ -86,7 +95,9 @@ class TestUpdateDestination:
         destination = make_destination()
 
         response = client.patch(
-            f"/editor/destinations/{destination.id}", json={"aliases": ["Alt Name One", "Alt Name Two"]}
+            f"/editor/destinations/{destination.id}",
+            json={"aliases": ["Alt Name One", "Alt Name Two"]},
+            headers={"If-Match": str(destination.version)},
         )
 
         assert response.status_code == 200
@@ -109,7 +120,11 @@ class TestUpdateDestination:
 
         destination = make_destination()
 
-        client.patch(f"/editor/destinations/{destination.id}", json={"name": "Edited"})
+        client.patch(
+            f"/editor/destinations/{destination.id}",
+            json={"name": "Edited"},
+            headers={"If-Match": str(destination.version)},
+        )
 
         entry = (
             db.query(ActivityLogEntry)

@@ -100,7 +100,9 @@ class TestUploadDestinationCover:
         destination = make_destination(cover_image_url="https://example.com/cover.jpg")
 
         response = client.patch(
-            f"/editor/destinations/{destination.id}", json={"cover_image_url": None}
+            f"/editor/destinations/{destination.id}",
+            json={"cover_image_url": None},
+            headers={"If-Match": str(destination.version)},
         )
 
         assert response.status_code == 200

@@ -301,7 +301,11 @@ class TestGalleryReordering:
             "https://example.com/b.jpg",
         ]
 
-        response = client.patch(f"/editor/venues/{venue.id}", json={"gallery_image_urls": reordered})
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"gallery_image_urls": reordered},
+            headers={"If-Match": str(venue.version)},
+        )
 
         assert response.status_code == 200
         assert response.json()["gallery_image_urls"] == reordered
@@ -309,7 +313,11 @@ class TestGalleryReordering:
     def test_reordered_order_survives_a_fresh_read(self, client, make_venue):
         venue = make_venue(gallery_image_urls=["https://example.com/a.jpg", "https://example.com/b.jpg"])
         reordered = ["https://example.com/b.jpg", "https://example.com/a.jpg"]
-        client.patch(f"/editor/venues/{venue.id}", json={"gallery_image_urls": reordered})
+        client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"gallery_image_urls": reordered},
+            headers={"If-Match": str(venue.version)},
+        )
 
         response = client.get(f"/editor/venues/{venue.id}")
 
@@ -324,6 +332,7 @@ class TestGalleryReordering:
         response = client.patch(
             f"/editor/venues/{venue.id}",
             json={"gallery_image_urls": ["https://example.com/b.jpg", "https://example.com/a.jpg"]},
+            headers={"If-Match": str(venue.version)},
         )
 
         assert response.json()["cover_image_url"] == "https://example.com/cover.jpg"
@@ -353,6 +362,7 @@ class TestGalleryDeletion:
         response = client.patch(
             f"/editor/venues/{venue.id}",
             json={"gallery_image_urls": ["https://example.com/b.jpg"]},
+            headers={"If-Match": str(venue.version)},
         )
 
         assert response.status_code == 200
@@ -361,7 +371,11 @@ class TestGalleryDeletion:
     def test_patch_can_clear_the_entire_gallery(self, client, make_venue):
         venue = make_venue(gallery_image_urls=["https://example.com/a.jpg"])
 
-        response = client.patch(f"/editor/venues/{venue.id}", json={"gallery_image_urls": []})
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"gallery_image_urls": []},
+            headers={"If-Match": str(venue.version)},
+        )
 
         assert response.status_code == 200
         assert response.json()["gallery_image_urls"] == []
@@ -369,7 +383,11 @@ class TestGalleryDeletion:
     def test_clearing_cover_image_url(self, client, make_venue):
         venue = make_venue(cover_image_url="https://example.com/cover.jpg")
 
-        response = client.patch(f"/editor/venues/{venue.id}", json={"cover_image_url": None})
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"cover_image_url": None},
+            headers={"If-Match": str(venue.version)},
+        )
 
         assert response.status_code == 200
         assert response.json()["cover_image_url"] is None
