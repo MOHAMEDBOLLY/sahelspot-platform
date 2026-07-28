@@ -7,6 +7,8 @@ import { DestinationWorkspace } from '../features/destinations/workspace/Destina
 import { useAuth } from '../features/auth/useAuth'
 import { hasPermission } from '../features/auth/permissions'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import { ExportButton } from '../components/ExportButton'
+import { exportDestinations } from '../features/destinations/api'
 
 /** Destination Workspace (Sprint 21) — same two-panel list/detail shape as
  * `Venues.tsx`, including the same dirty-check confirmation before
@@ -61,6 +63,7 @@ export function Destinations() {
         {canCreate && (
           <DestinationCreateDialog onCreated={(destination) => setSelectedDestinationId(destination.id)} />
         )}
+        <ExportButton label="Export destinations" onExport={exportDestinations} />
         <DestinationListPanel
           selectedDestinationId={selectedDestinationId}
           onSelectDestination={handleSelectDestination}

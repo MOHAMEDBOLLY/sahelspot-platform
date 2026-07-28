@@ -7,6 +7,7 @@ import { useSubmitForReview } from '../useSubmitForReview'
 import { useApproveVenue } from '../useApproveVenue'
 import { useUploadVenueMedia } from '../useUploadVenueMedia'
 import { useSetCoverFromGallery } from '../useSetCoverFromGallery'
+import { useDeleteVenueCoverImage, useDeleteVenueGalleryImage } from '../useDeleteVenueMedia'
 import { toVenuePatch, type MediaSlot } from '../api'
 import { validateVenueDraft } from '../venueValidation'
 import { ApiError } from '../../../lib/apiClient'
@@ -75,6 +76,16 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
     isPending: isSettingCover,
     error: setCoverError,
   } = useSetCoverFromGallery()
+  const {
+    mutate: deleteCoverImage,
+    isPending: isDeletingCover,
+    error: deleteCoverError,
+  } = useDeleteVenueCoverImage()
+  const {
+    mutate: deleteGalleryImage,
+    isPending: isDeletingGalleryImage,
+    error: deleteGalleryImageError,
+  } = useDeleteVenueGalleryImage()
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const { role } = useAuth()
@@ -168,20 +179,13 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
   }
 
   function handleRemoveCover() {
-    if (!venueId || !displayedVenue) return
-    saveMediaPatch(
-      { id: venueId, patch: { ...toVenuePatch(displayedVenue), cover_image_url: null } },
-      { onSuccess: commitSave },
-    )
+    if (!venueId) return
+    deleteCoverImage(venueId, { onSuccess: commitSave })
   }
 
   function handleRemoveGalleryImage(url: string) {
-    if (!venueId || !displayedVenue) return
-    const remaining = (displayedVenue.gallery_image_urls ?? []).filter((existing) => existing !== url)
-    saveMediaPatch(
-      { id: venueId, patch: { ...toVenuePatch(displayedVenue), gallery_image_urls: remaining } },
-      { onSuccess: commitSave },
-    )
+    if (!venueId) return
+    deleteGalleryImage({ id: venueId, url }, { onSuccess: commitSave })
   }
 
   function handleReorderGallery(newOrder: string[]) {
@@ -273,7 +277,9 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
         onRemoveGalleryImage={handleRemoveGalleryImage}
         onSetCover={handleSetCover}
         onReorderGallery={handleReorderGallery}
-        isUploading={isUploadingMedia || isSavingMediaPatch || isSettingCover}
+        isUploading={
+          isUploadingMedia || isSavingMediaPatch || isSettingCover || isDeletingCover || isDeletingGalleryImage
+        }
         uploadProgress={uploadProgress}
         uploadError={
           uploadMediaError instanceof ApiError
@@ -282,9 +288,17 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
               ? mediaPatchError.message
               : setCoverError instanceof ApiError
                 ? setCoverError.message
-                : uploadMediaError || mediaPatchError || setCoverError
-                  ? 'Failed to update images.'
-                  : null
+                : deleteCoverError instanceof ApiError
+                  ? deleteCoverError.message
+                  : deleteGalleryImageError instanceof ApiError
+                    ? deleteGalleryImageError.message
+                    : uploadMediaError ||
+                        mediaPatchError ||
+                        setCoverError ||
+                        deleteCoverError ||
+                        deleteGalleryImageError
+                      ? 'Failed to update images.'
+                      : null
         }
       />
       <PublishingStatusSection

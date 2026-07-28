@@ -7,6 +7,8 @@ import { VenueWorkspace } from '../features/venues/workspace/VenueWorkspace'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useAuth } from '../features/auth/useAuth'
 import { hasPermission } from '../features/auth/permissions'
+import { ExportButton } from '../components/ExportButton'
+import { exportVenues } from '../features/venues/api'
 
 /** Sprint 27 — search/filter state lives in the URL (`useSearchParams`),
  * not local component state, so a page refresh (or a shared/bookmarked
@@ -61,6 +63,7 @@ export function Venues() {
         {canCreate && (
           <VenueCreateDialog onCreated={(venue) => handleSelectVenue(venue.id)} />
         )}
+        <ExportButton label="Export venues" onExport={exportVenues} />
         <VenueFilters
           searchValue={q}
           onSearchChange={(value) => setParam('q', value)}

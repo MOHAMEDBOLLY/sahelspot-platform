@@ -74,6 +74,22 @@ export async function apiDelete(path: string): Promise<void> {
   }
 }
 
+/** EP20 — for a `DELETE` whose response has a body (`DELETE .../media`
+ * returns the updated `VenueOut`), unlike the `204 No Content` `apiDelete`
+ * above already covers. */
+export async function apiDeleteJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'DELETE',
+    headers: await authHeaders(),
+  })
+
+  if (!response.ok) {
+    throw new ApiError(await extractErrorMessage(response, path), response.status)
+  }
+
+  return response.json() as Promise<T>
+}
+
 /** Sprint 26 — for the rare action that's a `POST` but needs a JSON body
  * (e.g. "set cover to this gallery URL"), rather than the no-body actions
  * `apiPost` already covers (Validate, Submit for Review, Approve). */
@@ -137,6 +153,26 @@ export async function apiUpload<T>(
 
     xhr.send(formData)
   })
+}
+
+/** EP20-T01 — export downloads. `/editor/*` routes require a Bearer
+ * token, so a plain `<a href>` can't be used (no way to attach the
+ * header); this fetches the file authenticated, then triggers the
+ * browser's normal save behavior via a throwaway object URL. */
+export async function apiDownload(path: string, filename: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}${path}`, { headers: await authHeaders() })
+
+  if (!response.ok) {
+    throw new ApiError(await extractErrorMessage(response, path), response.status)
+  }
+
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 /** FastAPI's `HTTPException(detail=...)` can carry a plain string or a

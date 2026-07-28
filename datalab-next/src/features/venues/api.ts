@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost, apiPostJson, apiUpload } from '../../lib/apiClient'
+import { apiDeleteJson, apiDownload, apiGet, apiPatch, apiPost, apiPostJson, apiUpload } from '../../lib/apiClient'
 import type { BulkOperationResponse, Venue, VenueListResponse, VenueSearchParams } from '../../types/venue'
 import type { ValidationResult } from '../../types/validation'
 
@@ -137,6 +137,20 @@ export function setCoverFromGallery(id: string, url: string): Promise<Venue> {
   return apiPostJson<Venue>(`/editor/venues/${encodeURIComponent(id)}/media/set-cover`, { url })
 }
 
+/** EP20-T02 — deletes the stored file (not just the reference) via
+ * `DELETE .../media` (api/app/media/service.py's `delete_image`), unlike
+ * a plain `PATCH` clearing the field, which would only unlink it and
+ * leave the file orphaned in storage. */
+export function deleteVenueCoverImage(id: string): Promise<Venue> {
+  return apiDeleteJson<Venue>(`/editor/venues/${encodeURIComponent(id)}/media?slot=cover`)
+}
+
+export function deleteVenueGalleryImage(id: string, url: string): Promise<Venue> {
+  return apiDeleteJson<Venue>(
+    `/editor/venues/${encodeURIComponent(id)}/media?slot=gallery&url=${encodeURIComponent(url)}`,
+  )
+}
+
 /** Runs the canonical Validate gate against the venue's persisted draft
  * state (api/app/validation/venues.py) — read-only, doesn't change status. */
 export function validateVenue(id: string): Promise<ValidationResult> {
@@ -176,11 +190,17 @@ export function bulkApproveVenues(venueIds: string[]): Promise<BulkOperationResp
   return apiPostJson<BulkOperationResponse>('/editor/venues/bulk/approve', { venue_ids: venueIds })
 }
 
+/** EP15 unified `PATCH /editor/venues/bulk` — replaces the two
+ * single-field endpoints (`bulk/category`, `bulk/destination`) this
+ * frontend used to call, which no longer exist (Phase 2 removed them,
+ * see PLATFORM_SPEC_v1.0_FROZEN.md §7.6). Either field, or both, can be
+ * sent in one call; each of the two functions below sends just the one
+ * it's named for. */
 export function bulkUpdateVenueCategory(
   venueIds: string[],
   category: string,
 ): Promise<BulkOperationResponse> {
-  return apiPatch<BulkOperationResponse>('/editor/venues/bulk/category', {
+  return apiPatch<BulkOperationResponse>('/editor/venues/bulk', {
     venue_ids: venueIds,
     category,
   })
@@ -190,8 +210,13 @@ export function bulkUpdateVenueDestination(
   venueIds: string[],
   destinationId: string,
 ): Promise<BulkOperationResponse> {
-  return apiPatch<BulkOperationResponse>('/editor/venues/bulk/destination', {
+  return apiPatch<BulkOperationResponse>('/editor/venues/bulk', {
     venue_ids: venueIds,
     destination_id: destinationId,
   })
+}
+
+/** EP20-T01 — `GET /editor/venues/export`. */
+export function exportVenues(format: 'csv' | 'json'): Promise<void> {
+  return apiDownload(`/editor/venues/export?format=${format}`, `venues.${format}`)
 }

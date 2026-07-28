@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPostJson, apiUpload } from '../../lib/apiClient'
+import { apiDelete, apiDownload, apiGet, apiPatch, apiPostJson, apiUpload } from '../../lib/apiClient'
 import type { Destination, DestinationListResponse, DestinationSearchParams } from '../../types/destination'
 
 /** Sprint 29 — same search + pagination shape venues' `fetchVenues` already
@@ -78,4 +78,9 @@ export function uploadDestinationCover(
   const formData = new FormData()
   formData.append('file', file)
   return apiUpload<Destination>(`/editor/destinations/${encodeURIComponent(id)}/media`, formData, onProgress)
+}
+
+/** EP20-T01 — `GET /editor/destinations/export`. */
+export function exportDestinations(format: 'csv' | 'json'): Promise<void> {
+  return apiDownload(`/editor/destinations/export?format=${format}`, `destinations.${format}`)
 }
