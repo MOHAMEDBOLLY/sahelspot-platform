@@ -8,6 +8,7 @@ export interface PublishRevisionSummary {
   label: string | null
   destination_count: number | null
   venue_count: number | null
+  excluded_venue_count: number
 }
 
 /** The subset of a snapshot destination/venue worth showing in a read-only
