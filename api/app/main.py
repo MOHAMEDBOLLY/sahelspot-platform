@@ -46,6 +46,11 @@ async def security_headers_middleware(request: Request, call_next):
     # and more broadly supported than CSP's frame-ancestors, which is
     # explicitly out of scope for this PR.
     response.headers["X-Frame-Options"] = "DENY"
+    # PLATFORM_SPEC_v1.0_FROZEN.md §6.1 — the entire current, unversioned
+    # surface is retroactively declared v1. Purely informational; no route
+    # path changes. See §6.3 for how a future v2 would be introduced
+    # without touching this header's meaning for existing clients.
+    response.headers["API-Version"] = "v1"
     return response
 
 
@@ -69,18 +74,24 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 # frontend origin must be listed explicitly.
 #
 # Security hardening PR 4 — `allow_headers` was previously `["*"]`. The
-# only two headers either frontend ever actually sends are `Authorization`
-# (every authenticated `datalab-next` request, via `authHeaders()` in its
-# `apiClient.ts`) and `Content-Type` (every JSON request body) — verified
-# directly against both frontends' API clients, not assumed. `consumer/`
-# sends neither (it only calls unauthenticated `/public/*` routes with no
-# custom headers at all), so this list is already a superset of what it
-# needs.
+# headers either frontend ever actually sends are `Authorization` (every
+# authenticated `datalab-next` request, via `authHeaders()` in its
+# `apiClient.ts`), `Content-Type` (every JSON request body), and — as of
+# PLATFORM_SPEC_v1.0_FROZEN.md §4's concurrency protocol — `If-Match` on
+# `PATCH /editor/venues/{id}`/`PATCH /editor/destinations/{id}`. `consumer/`
+# sends none of these (it only calls unauthenticated `/public/*` routes),
+# so this list is already a superset of what it needs.
+#
+# `expose_headers=["ETag"]` — without this, a browser's `fetch()` cannot
+# read the `ETag` response header at all (it isn't one of the small set
+# of headers exposed to JS by default on a cross-origin response); the
+# concurrency protocol is unusable from Studio without it.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,
     allow_methods=["GET", "PATCH", "POST", "DELETE"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "If-Match"],
+    expose_headers=["ETag"],
 )
 
 app.include_router(api_router)
