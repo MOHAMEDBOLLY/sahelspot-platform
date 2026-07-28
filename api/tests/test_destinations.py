@@ -33,14 +33,14 @@ class TestListDestinations:
 
 class TestGetDestination:
     def test_returns_destination_by_id(self, client, make_destination):
-        destination = make_destination(name="Detail Test Destination", region="Test Region")
+        destination = make_destination(name="Detail Test Destination", region="Marina")
 
         response = client.get(f"/editor/destinations/{destination.id}")
 
         assert response.status_code == 200
         body = response.json()
         assert body["name"] == "Detail Test Destination"
-        assert body["region"] == "Test Region"
+        assert body["region"] == "Marina"
 
     def test_unknown_destination_returns_404(self, client):
         response = client.get("/editor/destinations/does-not-exist")
@@ -50,29 +50,29 @@ class TestGetDestination:
 
 class TestUpdateDestination:
     def test_success_persists_changes(self, client, make_destination, db):
-        destination = make_destination(name="Original Name", region="Original Region")
+        destination = make_destination(name="Original Name", region="Marina")
 
         response = client.patch(
             f"/editor/destinations/{destination.id}",
-            json={"name": "Updated Name", "region": "Updated Region"},
+            json={"name": "Updated Name", "region": "Fouka Bay"},
         )
 
         assert response.status_code == 200
         assert response.json()["name"] == "Updated Name"
         db.refresh(destination)
         assert destination.name == "Updated Name"
-        assert destination.region == "Updated Region"
+        assert destination.region == "Fouka Bay"
 
     def test_partial_update_leaves_other_fields_unchanged(self, client, make_destination, db):
-        destination = make_destination(name="Keep This Name", region="Original Region")
+        destination = make_destination(name="Keep This Name", region="Marina")
 
-        response = client.patch(f"/editor/destinations/{destination.id}", json={"region": "New Region"})
+        response = client.patch(f"/editor/destinations/{destination.id}", json={"region": "Dabaa City"})
 
         assert response.status_code == 200
         assert response.json()["name"] == "Keep This Name"
         db.refresh(destination)
         assert destination.name == "Keep This Name"
-        assert destination.region == "New Region"
+        assert destination.region == "Dabaa City"
 
     def test_does_not_change_status(self, client, make_destination, db):
         destination = make_destination(status="draft")
@@ -125,7 +125,7 @@ class TestCreateDestination:
         try:
             response = client.post(
                 "/editor/destinations",
-                json={"id": dest_id, "name": "New Destination", "region": "New Region"},
+                json={"id": dest_id, "name": "New Destination", "region": "New Alamein City"},
             )
 
             assert response.status_code == 201
@@ -145,7 +145,7 @@ class TestCreateDestination:
                 json={
                     "id": dest_id,
                     "name": "New Destination",
-                    "region": "New Region",
+                    "region": "New Alamein City",
                     "aliases": ["Alt One"],
                     "notes": "Some notes",
                 },
@@ -164,7 +164,7 @@ class TestCreateDestination:
 
         response = client.post(
             "/editor/destinations",
-            json={"id": destination.id, "name": "Duplicate", "region": "Somewhere"},
+            json={"id": destination.id, "name": "Duplicate", "region": "Almaza Bay"},
         )
 
         assert response.status_code == 409
@@ -175,7 +175,7 @@ class TestCreateDestination:
         as_role("viewer")
 
         response = client.post(
-            "/editor/destinations", json={"id": dest_id, "name": "Nope", "region": "Nowhere"}
+            "/editor/destinations", json={"id": dest_id, "name": "Nope", "region": "Telal North Coast"}
         )
 
         assert response.status_code == 403

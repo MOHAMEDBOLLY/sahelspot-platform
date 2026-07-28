@@ -114,7 +114,10 @@ def make_destination(db):
         destination = Destination(
             id=destination_id,
             name=overrides.pop("name", "Test Destination"),
-            region=overrides.pop("region", "Test Region"),
+            # Must be one of ck_destinations_region's 8 legal values
+            # (PLATFORM_SPEC_v1.0_FROZEN.md §7.3) — arbitrary free text is
+            # no longer accepted here.
+            region=overrides.pop("region", "Marina"),
             status=overrides.pop("status", "approved"),
             **overrides,
         )
