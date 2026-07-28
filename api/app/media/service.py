@@ -139,3 +139,36 @@ def upload_image(file_bytes: bytes, *, filename: str, content_type: str, folder:
         raise HTTPException(status_code=502, detail="Failed to upload media.")
 
     return f"{settings.supabase_url}/storage/v1/object/public/{settings.media_bucket}/{object_path}"
+
+
+def delete_image(url: str) -> None:
+    """PLATFORM_SPEC_v1.0_FROZEN.md §9.2/§8.4 (`DELETE .../media`) —
+    removes an image from Supabase Storage given the public URL
+    `upload_image()` returned. Derives the object path by stripping the
+    known public-URL prefix rather than requiring a caller to track paths
+    separately — the URL is the only handle route code already has (it's
+    what's stored in `cover_image_url`/`gallery_image_urls`).
+
+    Idempotent by design at the HTTP level (Supabase's delete endpoint
+    doesn't error on an already-missing object) — deleting a URL that
+    doesn't resolve to a real object silently no-ops rather than raising,
+    matching the legacy tool's own "deleting an already-missing file
+    returns {ok: true, deleted: false}" precedent.
+    """
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        raise HTTPException(status_code=503, detail="Media storage is not configured.")
+
+    prefix = f"{settings.supabase_url}/storage/v1/object/public/{settings.media_bucket}/"
+    if not url.startswith(prefix):
+        # Not a URL this service ever produced (e.g. hand-pasted via the
+        # PATCH path) — nothing in our bucket to delete; silently a no-op,
+        # same reasoning as the "already missing" case above.
+        return
+    object_path = url[len(prefix) :]
+
+    delete_url = f"{settings.supabase_url}/storage/v1/object/{settings.media_bucket}/{object_path}"
+    httpx.delete(
+        delete_url,
+        headers={"Authorization": f"Bearer {settings.supabase_service_role_key}"},
+        timeout=30.0,
+    )
