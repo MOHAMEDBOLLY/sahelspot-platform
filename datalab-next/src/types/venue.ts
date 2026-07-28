@@ -27,6 +27,12 @@ export interface Venue {
    * a `PATCH`'s `If-Match` header must match; increments by one on every
    * successful write (see api/app/api/concurrency.py). */
   version: number
+  /** PLATFORM_SPEC_v1.0_FROZEN.md §5 — i18n via a `translations` JSONB
+   * column; `{"<locale>": {"name": ...}}`, canonical `name` remains the
+   * fallback. EP23 exposes just `translations.ar.name` as an optional
+   * edit-mode field — no other locale/field combination has an editor
+   * built yet. */
+  translations: Record<string, { name?: string }> | null
   is_featured: boolean
   is_verified: boolean
   latitude: string | null

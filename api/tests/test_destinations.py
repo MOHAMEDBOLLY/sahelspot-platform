@@ -105,6 +105,24 @@ class TestUpdateDestination:
         db.refresh(destination)
         assert destination.aliases == ["Alt Name One", "Alt Name Two"]
 
+    def test_updates_translations(self, client, make_destination, db):
+        """EP23 — `translations` is writable via PATCH (PLATFORM_SPEC_v1.0_
+        FROZEN.md §5); previously readable on `DestinationOut` but absent
+        from `DestinationUpdate`, so it silently couldn't be saved.
+        """
+        destination = make_destination()
+
+        response = client.patch(
+            f"/editor/destinations/{destination.id}",
+            json={"translations": {"ar": {"name": "مارينا"}}},
+            headers={"If-Match": str(destination.version)},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["translations"] == {"ar": {"name": "مارينا"}}
+        db.refresh(destination)
+        assert destination.translations == {"ar": {"name": "مارينا"}}
+
     def test_unknown_destination_returns_404(self, client):
         response = client.patch("/editor/destinations/does-not-exist", json={"name": "Doesn't Matter"})
 

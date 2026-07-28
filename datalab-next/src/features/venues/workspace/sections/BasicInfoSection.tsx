@@ -47,6 +47,18 @@ export function BasicInfoSection({ venue, mode, onFieldChange, errors = {} }: Ba
           />
         )}
 
+        {mode === 'view' ? (
+          <WorkspaceField label="Arabic Name" value={venue.translations?.ar?.name ?? null} />
+        ) : (
+          <TextField
+            label="Arabic Name"
+            value={venue.translations?.ar?.name ?? ''}
+            onChange={(v) =>
+              onFieldChange('translations', { ...venue.translations, ar: { ...venue.translations?.ar, name: v } })
+            }
+          />
+        )}
+
         {/* Destination requires picking from the real destination list, which means an API
             call — out of scope for this sprint (no API calls). Read-only for now. */}
         <WorkspaceField label="Destination" value={venue.destination.name} />

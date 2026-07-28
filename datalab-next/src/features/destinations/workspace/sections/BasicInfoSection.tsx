@@ -57,6 +57,21 @@ export function BasicInfoSection({ destination, mode, onFieldChange, errors = {}
           />
         )}
 
+        {mode === 'view' ? (
+          <WorkspaceField label="Arabic Name" value={destination.translations?.ar?.name ?? null} />
+        ) : (
+          <TextField
+            label="Arabic Name"
+            value={destination.translations?.ar?.name ?? ''}
+            onChange={(v) =>
+              onFieldChange('translations', {
+                ...destination.translations,
+                ar: { ...destination.translations?.ar, name: v },
+              })
+            }
+          />
+        )}
+
         <div className="col-span-2">
           {mode === 'view' ? (
             <WorkspaceField label="Aliases" value={destination.aliases?.join(', ')} />

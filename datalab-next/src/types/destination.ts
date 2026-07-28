@@ -14,6 +14,8 @@ export interface Destination {
   /** PLATFORM_SPEC_v1.0_FROZEN.md §4 — optimistic concurrency, same
    * reasoning as `Venue.version`. */
   version: number
+  /** PLATFORM_SPEC_v1.0_FROZEN.md §5 — same reasoning as `Venue.translations`. */
+  translations: Record<string, { name?: string }> | null
   last_published_at: string | null
   created_at: string
   updated_at: string

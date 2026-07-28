@@ -52,6 +52,7 @@ export type VenuePatch = Pick<
   | 'cover_image_url'
   | 'gallery_image_urls'
   | 'beach_details'
+  | 'translations'
 >
 
 /** Empty strings from cleared text inputs mean "no value" for these nullable
@@ -85,6 +86,7 @@ export function toVenuePatch(venue: Venue): VenuePatch {
     // here so switching away from Beach in the editor can't submit a
     // stale value the backend would reject with invalid_beach_details.
     beach_details: venue.category === 'Beach' ? venue.beach_details : null,
+    translations: venue.translations,
   }
 }
 

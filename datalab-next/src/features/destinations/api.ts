@@ -26,7 +26,10 @@ export function fetchDestination(id: string): Promise<Destination> {
  * `cover_image_url` (Sprint 29) is here only so clearing the cover can go
  * through this same patch — same reasoning venues' `VenuePatch` already
  * gives for its own `cover_image_url`. */
-export type DestinationPatch = Pick<Destination, 'name' | 'region' | 'aliases' | 'notes' | 'cover_image_url'>
+export type DestinationPatch = Pick<
+  Destination,
+  'name' | 'region' | 'aliases' | 'notes' | 'cover_image_url' | 'translations'
+>
 
 /** Empty strings from cleared text inputs mean "no value" for nullable
  * fields — same convention `toVenuePatch` already established. */
@@ -41,6 +44,7 @@ export function toDestinationPatch(destination: Destination): DestinationPatch {
     aliases: destination.aliases,
     notes: emptyToNull(destination.notes),
     cover_image_url: destination.cover_image_url,
+    translations: destination.translations,
   }
 }
 

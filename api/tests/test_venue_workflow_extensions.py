@@ -92,3 +92,23 @@ class TestBeachDetailsPatch:
         assert response.status_code == 200
         assert response.json()["category"] == "Beach"
         assert response.json()["beach_details"] == {"type": "public", "publicAccess": "yes"}
+
+
+class TestTranslationsPatch:
+    def test_updates_translations(self, client, make_venue, db):
+        """EP23 — `translations` is writable via PATCH (PLATFORM_SPEC_v1.0_
+        FROZEN.md §5); previously readable on `VenueOut` but absent from
+        `VenueUpdate`, so it silently couldn't be saved.
+        """
+        venue = make_venue()
+
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"translations": {"ar": {"name": "مطعم النخيل"}}},
+            headers={"If-Match": str(venue.version)},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["translations"] == {"ar": {"name": "مطعم النخيل"}}
+        db.refresh(venue)
+        assert venue.translations == {"ar": {"name": "مطعم النخيل"}}

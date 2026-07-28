@@ -77,6 +77,11 @@ class DestinationUpdate(BaseModel):
     region: str | None = Field(default=None, min_length=1, max_length=200)
     aliases: list[str] | None = None
     notes: str | None = Field(default=None, max_length=2000)
+    # PLATFORM_SPEC_v1.0_FROZEN.md §5 — i18n via a `translations` JSONB
+    # column (EP4-T02), already readable on `DestinationOut` but missing
+    # here as a writable field since Phase 2 added this schema — the one
+    # write path this column never had until EP23.
+    translations: dict | None = None
     cover_image_url: str | None = None
     # PLATFORM_SPEC_v1.0_FROZEN.md §7.3 — boundary is now writable through
     # this same path; shape-validated in the route (Polygon/MultiPolygon),
@@ -184,6 +189,10 @@ class VenueUpdate(BaseModel):
     internal_notes: str | None = Field(default=None, max_length=2000)
     cover_image_url: str | None = None
     gallery_image_urls: list[str] | None = None
+    # PLATFORM_SPEC_v1.0_FROZEN.md §5 — same `translations` write-path gap
+    # as `DestinationUpdate` above: readable on `VenueOut` since Phase 1,
+    # never writable until EP23.
+    translations: dict | None = None
     # PLATFORM_SPEC_v1.0_FROZEN.md §6.3/§7.8 — accepted here (in addition
     # to `category`) since setting a venue's category to 'Beach' and its
     # beach_details in the same Save Draft call is the common case. Shape
