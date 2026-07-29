@@ -1,11 +1,36 @@
 {
-  "_meta": "One-time destination-slug -> region mapping for scripts/import_legacy_dataset.py (see docs/LEGACY_IMPORT_AUDIT_v19.md). Every value must be one of app.db.models.DESTINATION_REGIONS. A slug is listed here only once its region is confirmed by a human, never inferred at runtime — the importer aborts if any destination in the source dataset is missing from this file. Add the remaining slugs (see the importer's own error output for the exact list) once a real decision is made for each.",
   "marassi": "Sidi Abdelrahman Area",
-  "almaza-bay": "Almaza Bay",
-  "fouka-bay": "Fouka Bay",
+  "hacienda-bay": "Sidi Abdelrahman Area",
+  "hacienda-white": "Sidi Abdelrahman Area",
+  "hacienda-red": "Sidi Abdelrahman Area",
+  "amwaj": "Sidi Abdelrahman Area",
+  "seashell": "Sidi Abdelrahman Area",
+  "gaia": "Sidi Abdelrahman Area",
+  "la-vista-bay": "Sidi Abdelrahman Area",
+  "stella-heights": "Sidi Abdelrahman Area",
+
+  "ras-el-hekma": "Ras El Hekma",
   "mountain-view-ras-el-hekma": "Ras El Hekma",
+  "koun": "Ras El Hekma",
+  "june": "Ras El Hekma",
+  "salt": "Ras El Hekma",
+  "caesar": "Ras El Hekma",
+
   "new-alamein": "New Alamein City",
-  "dabaa-city": "Dabaa City",
+  "southmed": "New Alamein City",
+
+  "marina": "Marina",
+
   "telal": "Telal North Coast",
-  "marina": "Marina"
+
+  "fouka-bay": "Fouka Bay",
+
+  "dabaa-city": "Dabaa City",
+
+  "almaza-bay": "Almaza Bay",
+
+  "bo-islands": "Ras El Hekma",
+  "azha-north": "Ras El Hekma",
+  "direction-white": "Sidi Abdelrahman Area",
+  "la-vista-cascada": "Ras El Hekma"
 }
