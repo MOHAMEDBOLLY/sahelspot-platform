@@ -17,6 +17,8 @@ coordinates in the source — see the audit), cover images and gallery
 Usage:
     python scripts/import_legacy_dataset.py --dry-run <path-to-json>
     python scripts/import_legacy_dataset.py --apply   <path-to-json>
+    # optional: --region-map <path>, defaults to
+    # api/data/legacy_destination_regions.json next to this script.
 
 Matching order (never rely on the legacy `id` alone — see the audit's
 "Existing Data Strategy" section for why this exact order):
@@ -24,19 +26,27 @@ Matching order (never rely on the legacy `id` alone — see the audit's
     2. Google Maps URL  (venue only — destinations have no mapsUrl field)
     3. name + destination
     4. coordinates      (exact lat/lng match)
-A record that matches nothing at any tier is new. A record that matches
-is only ever *enriched* — a field is written only when the existing row's
-value is currently null/empty, never overwritten if already set. Status
-and region on an existing destination are never touched by this script,
-under any circumstance.
+A record that matches nothing at any tier is new.
+
+A record that *does* match is synchronized deterministically, but only
+for the fields in `DESTINATION_SYNC_FIELDS`/`VENUE_SYNC_FIELDS` below —
+an explicit whitelist of editorial content this import is actually
+responsible for, always set to the (normalized) legacy value regardless
+of what's currently there. Everything outside that whitelist —
+`status`, `region`, `version`, every timestamp, and any column this
+import was never told to touch — is administrative/system-managed and
+is never written to an existing row under any circumstance, matched or
+not. (`region` is the one field set at *creation* time for a brand-new
+destination, since the column is `NOT NULL` — but never re-synced once
+a destination exists.)
 
 Everything runs inside one transaction. `--dry-run` never calls
 `session.add()` at all (not just "adds then rolls back" — the objects
 that would be inserted are never constructed as pending session state),
 so there is no path by which a dry run can leave anything behind even
 under a partial failure. `--apply` commits only if every validation
-check across the entire dataset passes; a single unmapped region, or any
-other validation error, aborts the whole run before a single row is
+check across the entire dataset passes; a single unmapped region, or
+any other validation error, aborts the whole run before a single row is
 written — see `docs/LEGACY_IMPORT_AUDIT_v19.md`'s Import Plan, "never
 leave the database partially imported."
 """
@@ -49,6 +59,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -56,29 +67,7 @@ from sqlalchemy.orm import Session
 from app.db.models import DESTINATION_REGIONS, VENUE_CATEGORIES, Destination, Venue
 from app.db.session import SessionLocal
 
-# ---------------------------------------------------------------------------
-# Explicit, human-curated destination -> region mapping. Deliberately not
-# inferred at runtime, and deliberately incomplete: only slugs this script
-# can point to concrete evidence for are listed (an exact string match
-# against one of the 8 canonical DESTINATION_REGIONS values, or — for
-# `marassi` — the value already live in production, seeded independently
-# of this import). Every other legacy destination is well-known real North
-# Coast geography, but "well-known" is still a guess this script was
-# explicitly told not to make. Add the remaining slugs here, each mapped
-# to one of DESTINATION_REGIONS, once a real decision is made — the import
-# will refuse to run (see `_validate_regions`) until every destination in
-# the source file has an entry.
-# ---------------------------------------------------------------------------
-REGION_MAP: dict[str, str] = {
-    "marassi": "Sidi Abdelrahman Area",  # matches the existing production row
-    "almaza-bay": "Almaza Bay",  # exact name match
-    "fouka-bay": "Fouka Bay",  # exact name match
-    "mountain-view-ras-el-hekma": "Ras El Hekma",  # name contains the exact region
-    "new-alamein": "New Alamein City",  # destination's own `name` is "New Alamein City"
-    "dabaa-city": "Dabaa City",  # exact name match
-    "telal": "Telal North Coast",  # destination's own `name` is "Telal North Coast"
-    "marina": "Marina",  # exact name match
-}
+DEFAULT_REGION_MAP_PATH = Path(__file__).resolve().parent.parent / "data" / "legacy_destination_regions.json"
 
 # PLATFORM_SPEC_v1.0_FROZEN.md §7.3 / the audit's §2.4 — the only two
 # legacy category strings that don't already equal a value in
@@ -87,8 +76,38 @@ CATEGORY_MAP: dict[str, str] = {"Café": "Cafe", "Service": "Services"}
 
 # Provenance only (`venues.source` has no CHECK, no meaning to the
 # platform) — lets a future human tell an imported row apart from one
-# created through Studio, without touching any editorial field.
+# created through Studio. Set at creation only, never re-synced (it's
+# not "editorial content", it's a one-time creation fact).
 IMPORT_SOURCE = "legacy-import-v19"
+
+# ---------------------------------------------------------------------------
+# Explicit sync whitelist. Everything listed here is editorial content
+# within this import's scope, and is overwritten deterministically on a
+# matched row — the legacy (normalized) value always wins, regardless of
+# what the existing row currently has. Everything NOT listed — id, slug,
+# destination_id, status, region, version, source, created_at,
+# updated_at, last_published_at, and every field this import was told is
+# out of scope (cover_image_url on venues, gallery_image_urls,
+# beach_details, opening_hours, internal_notes, translations,
+# is_featured, is_verified) — is never written to an existing row.
+# ---------------------------------------------------------------------------
+DESTINATION_SYNC_FIELDS: tuple[str, ...] = ("name", "boundary", "notes", "cover_image_url")
+VENUE_SYNC_FIELDS: tuple[str, ...] = (
+    "name",
+    "district",
+    "category",
+    "latitude",
+    "longitude",
+    "phone",
+    "whatsapp",
+    "website",
+    "maps_url",
+    "instagram_handle",
+    "facebook_handle",
+    "tiktok_handle",
+    "short_description",
+    "legacy_geo",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +158,20 @@ class Report:
 
 
 # ---------------------------------------------------------------------------
+# Region map — loaded from a standalone JSON file, not the Python source.
+# Deliberately not inferred at runtime, and deliberately allowed to be
+# incomplete: `_validate` aborts the entire run (before anything else
+# happens) if any destination in the source dataset has no entry here.
+# ---------------------------------------------------------------------------
+
+
+def load_region_map(path: Path) -> dict[str, str]:
+    with open(path, encoding="utf-8") as f:
+        raw = json.load(f)
+    return {slug: region for slug, region in raw.items() if not slug.startswith("_")}
+
+
+# ---------------------------------------------------------------------------
 # Normalization — deliberately minimal. Only what the task authorized:
 # trim strings, normalize URLs/phone numbers (whitespace only — no
 # reformatting, no invented country codes), and the category conversion
@@ -166,22 +199,58 @@ def _norm_decimal(value: float | None) -> Decimal | None:
         return None
 
 
+def _is_real_url(value: str | None) -> bool:
+    return bool(value) and value.startswith(("http://", "https://"))
+
+
+def _legacy_destination_values(legacy: dict) -> dict:
+    """Normalized legacy values for exactly `DESTINATION_SYNC_FIELDS`."""
+    cover = legacy.get("coverUrl")
+    return {
+        "name": _norm_str(legacy["name"]) or legacy["slug"],
+        "boundary": legacy.get("boundary"),
+        "notes": _norm_str(legacy.get("shortDesc")),
+        "cover_image_url": _norm_str(cover) if _is_real_url(cover) else None,
+    }
+
+
+def _legacy_venue_values(legacy: dict, *, category: str) -> dict:
+    """Normalized legacy values for exactly `VENUE_SYNC_FIELDS`."""
+    return {
+        "name": _norm_str(legacy["name"]) or legacy["id"],
+        "district": _norm_str(legacy.get("district")),
+        "category": category,
+        "latitude": _norm_decimal(legacy.get("lat")),
+        "longitude": _norm_decimal(legacy.get("lng")),
+        "phone": _norm_str(legacy.get("phone")),
+        "whatsapp": _norm_str(legacy.get("whatsapp")),
+        "website": _norm_str(legacy.get("website")),
+        "maps_url": _norm_str(legacy.get("mapsUrl")),
+        "instagram_handle": _norm_str(legacy.get("instagram")),
+        "facebook_handle": _norm_str(legacy.get("facebook")),
+        "tiktok_handle": _norm_str(legacy.get("tiktok")),
+        "short_description": _norm_str(legacy.get("shortDesc")),
+        "legacy_geo": legacy.get("geo"),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Validation — runs over the *entire* dataset before anything else. Any
 # error found here aborts the whole run; nothing partial is ever written.
 # ---------------------------------------------------------------------------
 
 
-def _validate(data: dict, report: Report) -> bool:
+def _validate(data: dict, region_map: dict[str, str], report: Report) -> bool:
     ok = True
 
-    missing_regions = [d["slug"] for d in data["destinations"] if d["slug"] not in REGION_MAP]
+    missing_regions = [d["slug"] for d in data["destinations"] if d["slug"] not in region_map]
     if missing_regions:
         for slug in missing_regions:
             dest = next(d for d in data["destinations"] if d["slug"] == slug)
             report.errors.append(
                 f"destination '{slug}' ({dest['name']!r}, {dest['venueCount']} venues) "
-                f"has no REGION_MAP entry — add one of {DESTINATION_REGIONS} before re-running"
+                f"has no region-map entry — add one of {DESTINATION_REGIONS} to the region "
+                f"map file before re-running"
             )
         ok = False
 
@@ -243,16 +312,18 @@ def _match_venue(db: Session, legacy: dict, destination_id: str) -> Venue | None
     return None
 
 
-def _enrich(obj: object, attr: str, new_value, diff: dict) -> None:
-    """Only ever fills a currently-empty field. Never overwrites a value
-    that's already set — the "never downgrade production data" rule.
+def _sync_whitelisted_fields(obj: object, whitelist: tuple[str, ...], values: dict, diff: dict) -> None:
+    """Deterministically sets every whitelisted field to its (normalized)
+    legacy value, unconditionally — not gated on the field currently
+    being empty. Anything not in `whitelist` is never touched, no matter
+    what. `diff` only records fields whose value actually changed, for
+    reporting.
     """
-    if new_value in (None, "", [], {}):
-        return
-    current = getattr(obj, attr)
-    if current in (None, "", [], {}):
-        setattr(obj, attr, new_value)
-        diff[attr] = new_value
+    for attr in whitelist:
+        new_value = values[attr]
+        if getattr(obj, attr) != new_value:
+            setattr(obj, attr, new_value)
+            diff[attr] = new_value
 
 
 # ---------------------------------------------------------------------------
@@ -260,7 +331,7 @@ def _enrich(obj: object, attr: str, new_value, diff: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-def run_import(db: Session, data: dict, *, apply: bool) -> Report:
+def run_import(db: Session, data: dict, region_map: dict[str, str], *, apply: bool) -> Report:
     report = Report()
     started = time.monotonic()
 
@@ -268,7 +339,7 @@ def run_import(db: Session, data: dict, *, apply: bool) -> Report:
     if beach_count:
         report.skipped.append(f"{beach_count} beaches — deferred, out of scope (no id/slug/coordinates in source)")
 
-    if not _validate(data, report):
+    if not _validate(data, region_map, report):
         report.aborted = True
         report.elapsed_seconds = time.monotonic() - started
         return report
@@ -277,16 +348,14 @@ def run_import(db: Session, data: dict, *, apply: bool) -> Report:
     dest_id_by_slug: dict[str, str] = {}
     for legacy in data["destinations"]:
         slug = legacy["slug"]
+        values = _legacy_destination_values(legacy)
         existing = _match_destination(db, slug)
         if existing is None:
             dest = Destination(
                 id=slug,
-                name=_norm_str(legacy["name"]) or slug,
-                region=REGION_MAP[slug],
+                region=region_map[slug],
                 status="draft",
-                boundary=legacy.get("boundary"),
-                notes=_norm_str(legacy.get("shortDesc")),
-                cover_image_url=_norm_str(legacy.get("coverUrl")) if _is_real_url(legacy.get("coverUrl")) else None,
+                **values,
             )
             report.new_destinations.append(f"{slug} ({legacy['name']})")
             if apply:
@@ -294,66 +363,47 @@ def run_import(db: Session, data: dict, *, apply: bool) -> Report:
             dest_id_by_slug[slug] = slug
         else:
             diff: dict = {}
-            _enrich(existing, "boundary", legacy.get("boundary"), diff)
-            _enrich(existing, "notes", _norm_str(legacy.get("shortDesc")), diff)
-            if _is_real_url(legacy.get("coverUrl")):
-                _enrich(existing, "cover_image_url", _norm_str(legacy.get("coverUrl")), diff)
-            # region/status are never touched for an existing row, full stop.
+            _sync_whitelisted_fields(existing, DESTINATION_SYNC_FIELDS, values, diff)
+            # status/region/version/timestamps: administrative/system-managed,
+            # never written to an existing row, full stop.
             if diff:
                 report.updated_destinations.append((f"{slug} ({legacy['name']})", diff))
             else:
-                report.skipped.append(f"destination '{slug}' — already up to date, nothing to enrich")
+                report.skipped.append(f"destination '{slug}' — already in sync")
             dest_id_by_slug[slug] = existing.id
 
     # --- venues ---
     for legacy in data["venues"]:
         destination_id = dest_id_by_slug[legacy["destSlug"]]
-        existing = _match_venue(db, legacy, destination_id)
         category = _norm_category(legacy["category"])
+        values = _legacy_venue_values(legacy, category=category)
+        existing = _match_venue(db, legacy, destination_id)
 
         if existing is None:
             venue = Venue(
                 id=legacy["id"],
-                name=_norm_str(legacy["name"]) or legacy["id"],
                 slug=legacy["vslug"],
                 destination_id=destination_id,
-                district=_norm_str(legacy.get("district")),
-                category=category,
                 status="draft",
-                latitude=_norm_decimal(legacy.get("lat")),
-                longitude=_norm_decimal(legacy.get("lng")),
-                phone=_norm_str(legacy.get("phone")),
-                whatsapp=_norm_str(legacy.get("whatsapp")),
-                website=_norm_str(legacy.get("website")),
-                maps_url=_norm_str(legacy.get("mapsUrl")),
-                instagram_handle=_norm_str(legacy.get("instagram")),
-                facebook_handle=_norm_str(legacy.get("facebook")),
-                tiktok_handle=_norm_str(legacy.get("tiktok")),
-                short_description=_norm_str(legacy.get("shortDesc")),
-                legacy_geo=legacy.get("geo"),
                 source=IMPORT_SOURCE,
+                **values,
             )
             report.new_venues.append(f"{legacy['id']} ({legacy['name']})")
             if apply:
                 db.add(venue)
         else:
             diff = {}
-            _enrich(existing, "district", _norm_str(legacy.get("district")), diff)
-            _enrich(existing, "phone", _norm_str(legacy.get("phone")), diff)
-            _enrich(existing, "whatsapp", _norm_str(legacy.get("whatsapp")), diff)
-            _enrich(existing, "website", _norm_str(legacy.get("website")), diff)
-            _enrich(existing, "maps_url", _norm_str(legacy.get("mapsUrl")), diff)
-            _enrich(existing, "instagram_handle", _norm_str(legacy.get("instagram")), diff)
-            _enrich(existing, "facebook_handle", _norm_str(legacy.get("facebook")), diff)
-            _enrich(existing, "tiktok_handle", _norm_str(legacy.get("tiktok")), diff)
-            _enrich(existing, "short_description", _norm_str(legacy.get("shortDesc")), diff)
-            _enrich(existing, "legacy_geo", legacy.get("geo"), diff)
+            _sync_whitelisted_fields(existing, VENUE_SYNC_FIELDS, values, diff)
+            # status/version/timestamps/source and every out-of-scope field
+            # (cover_image_url, gallery_image_urls, beach_details,
+            # opening_hours, internal_notes, translations, is_featured,
+            # is_verified): never written to an existing row.
             if diff:
                 report.updated_venues.append((f"{legacy['id']} ({legacy['name']})", diff))
             else:
-                report.skipped.append(f"venue '{legacy['id']}' — already up to date, nothing to enrich")
+                report.skipped.append(f"venue '{legacy['id']}' — already in sync")
 
-    if legacy_facebook_or_tiktok_are_urls(data):
+    if _any_facebook_or_tiktok_is_url(data):
         report.warnings.append(
             "facebook_handle/tiktok_handle were imported as full URLs (not bare handles) — "
             "the source data itself stores full URLs; no handle-extraction was in the "
@@ -376,11 +426,7 @@ def run_import(db: Session, data: dict, *, apply: bool) -> Report:
     return report
 
 
-def _is_real_url(value: str | None) -> bool:
-    return bool(value) and value.startswith(("http://", "https://"))
-
-
-def legacy_facebook_or_tiktok_are_urls(data: dict) -> bool:
+def _any_facebook_or_tiktok_is_url(data: dict) -> bool:
     return any(
         (v.get("facebook") and v["facebook"].startswith("http"))
         or (v.get("tiktok") and v["tiktok"].startswith("http"))
@@ -399,14 +445,20 @@ def main() -> None:
     mode.add_argument("--dry-run", action="store_true", help="validate, match, normalize — write nothing")
     mode.add_argument("--apply", action="store_true", help="perform the real import")
     parser.add_argument("path", help="path to the legacy dataset JSON file")
+    parser.add_argument(
+        "--region-map",
+        default=str(DEFAULT_REGION_MAP_PATH),
+        help=f"path to the destination-slug -> region JSON file (default: {DEFAULT_REGION_MAP_PATH})",
+    )
     args = parser.parse_args()
 
     with open(args.path, encoding="utf-8") as f:
         data = json.load(f)
+    region_map = load_region_map(Path(args.region_map))
 
     db = SessionLocal()
     try:
-        report = run_import(db, data, apply=args.apply)
+        report = run_import(db, data, region_map, apply=args.apply)
     finally:
         db.close()
 

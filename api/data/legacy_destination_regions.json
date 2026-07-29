@@ -1,0 +1,11 @@
+{
+  "_meta": "One-time destination-slug -> region mapping for scripts/import_legacy_dataset.py (see docs/LEGACY_IMPORT_AUDIT_v19.md). Every value must be one of app.db.models.DESTINATION_REGIONS. A slug is listed here only once its region is confirmed by a human, never inferred at runtime — the importer aborts if any destination in the source dataset is missing from this file. Add the remaining slugs (see the importer's own error output for the exact list) once a real decision is made for each.",
+  "marassi": "Sidi Abdelrahman Area",
+  "almaza-bay": "Almaza Bay",
+  "fouka-bay": "Fouka Bay",
+  "mountain-view-ras-el-hekma": "Ras El Hekma",
+  "new-alamein": "New Alamein City",
+  "dabaa-city": "Dabaa City",
+  "telal": "Telal North Coast",
+  "marina": "Marina"
+}
