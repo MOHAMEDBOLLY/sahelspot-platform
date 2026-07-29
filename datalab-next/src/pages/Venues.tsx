@@ -28,11 +28,18 @@ export function Venues() {
   const destinationId = searchParams.get('destination') ?? ''
   const category = searchParams.get('category') ?? ''
   const status = searchParams.get('status') ?? ''
+  const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1)
   const debouncedQ = useDebouncedValue(q, 300)
   const { role } = useAuth()
   const canCreate = hasPermission(role, 'content_edit')
 
-  function setParam(key: string, value: string) {
+  /** Changing a filter always resets to page 1 — the previous page number
+   * almost certainly doesn't make sense against a new result set (and
+   * may not even exist), so `setFilterParam` clears `page` from the URL
+   * on every call. `setPage` (used by the Pagination control itself)
+   * deliberately doesn't go through this — it's the one thing allowed to
+   * set `page` to something other than 1. */
+  function setFilterParam(key: string, value: string) {
     setSearchParams(
       (previous) => {
         const next = new URLSearchParams(previous)
@@ -40,6 +47,22 @@ export function Venues() {
           next.set(key, value)
         } else {
           next.delete(key)
+        }
+        next.delete('page')
+        return next
+      },
+      { replace: true },
+    )
+  }
+
+  function setPage(nextPage: number) {
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous)
+        if (nextPage <= 1) {
+          next.delete('page')
+        } else {
+          next.set('page', String(nextPage))
         }
         return next
       },
@@ -66,13 +89,13 @@ export function Venues() {
         <ExportButton label="Export venues" onExport={exportVenues} />
         <VenueFilters
           searchValue={q}
-          onSearchChange={(value) => setParam('q', value)}
+          onSearchChange={(value) => setFilterParam('q', value)}
           destinationId={destinationId}
-          onDestinationIdChange={(value) => setParam('destination', value)}
+          onDestinationIdChange={(value) => setFilterParam('destination', value)}
           category={category}
-          onCategoryChange={(value) => setParam('category', value)}
+          onCategoryChange={(value) => setFilterParam('category', value)}
           status={status}
-          onStatusChange={(value) => setParam('status', value)}
+          onStatusChange={(value) => setFilterParam('status', value)}
         />
         <VenueListPanel
           selectedVenueId={selectedVenueId}
@@ -82,7 +105,9 @@ export function Venues() {
             destinationId: destinationId || undefined,
             category: category || undefined,
             status: status || undefined,
+            page,
           }}
+          onPageChange={setPage}
         />
       </div>
       <div className="min-w-0 flex-1 overflow-y-auto">

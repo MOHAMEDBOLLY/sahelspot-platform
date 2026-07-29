@@ -6,12 +6,14 @@ import { BulkActionToolbar } from './BulkActionToolbar'
 import { LoadingState } from '../../components/LoadingState'
 import { ErrorState } from '../../components/ErrorState'
 import { PagePlaceholder } from '../../components/PagePlaceholder'
+import { Pagination } from '../../components/Pagination'
 import type { VenueSearchParams } from '../../types/venue'
 
 type VenueListPanelProps = {
   selectedVenueId: string | null
   onSelectVenue: (id: string) => void
   searchParams: VenueSearchParams
+  onPageChange: (page: number) => void
 }
 
 /** Sprint 27 — `searchParams` is fully owned by the parent page (URL
@@ -24,11 +26,20 @@ type VenueListPanelProps = {
  * (not lifted to the page), since it's purely a concern of "which of the
  * currently-loaded venues are checked" and never needs to interact with
  * the workspace or URL state the page owns. Pruned whenever the loaded
- * list changes (a new search/filter, or a bulk action moving a venue out
- * of the current view) so a stale checked id can never linger past the
- * item it referred to being gone from view.
+ * list changes (a new search/filter, a page change, or a bulk action
+ * moving a venue out of the current view) so a stale checked id can
+ * never linger past the item it referred to being gone from view — this
+ * is also what makes "selection only applies to the current page" true
+ * for free: `data.items` (and therefore `checkedVenueIds`) never
+ * contains anything outside the currently-loaded page.
+ *
+ * Pagination controls render `data.total`/`data.page`/`data.page_size` —
+ * the response shape already carried these; only the UI for them was
+ * missing (see docs — the backend's own `page_size` default was never
+ * the bug, the frontend just never asked for a second page or showed
+ * that more existed).
  */
-export function VenueListPanel({ selectedVenueId, onSelectVenue, searchParams }: VenueListPanelProps) {
+export function VenueListPanel({ selectedVenueId, onSelectVenue, searchParams, onPageChange }: VenueListPanelProps) {
   const { data, isPending, isError, error, refetch } = useVenues(searchParams)
   const [checkedVenueIds, setCheckedVenueIds] = useState<Set<string>>(new Set())
   const hasActiveFilters = Boolean(
@@ -107,7 +118,7 @@ export function VenueListPanel({ selectedVenueId, onSelectVenue, searchParams }:
           onChange={toggleSelectAll}
           className="h-4 w-4 rounded border-gray-300"
         />
-        Select all ({data.items.length})
+        Select all on this page ({data.items.length})
       </label>
       <VenueList
         venues={data.items}
@@ -116,6 +127,7 @@ export function VenueListPanel({ selectedVenueId, onSelectVenue, searchParams }:
         checkedVenueIds={checkedVenueIds}
         onToggleChecked={toggleChecked}
       />
+      <Pagination page={data.page} pageSize={data.page_size} total={data.total} onPageChange={onPageChange} />
     </div>
   )
 }
