@@ -165,9 +165,27 @@ class Report:
 # ---------------------------------------------------------------------------
 
 
+def _load_json_file(path: Path, *, description: str) -> dict | list:
+    """Every JSON file this script reads goes through here, so a missing
+    file or malformed JSON produces one clear, actionable line — not a
+    raw traceback — and exits cleanly before any database work starts.
+    """
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"ERROR: {description} not found: {path}", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as exc:
+        print(f"ERROR: {description} at {path} is not valid JSON: {exc}", file=sys.stderr)
+        sys.exit(1)
+    except OSError as exc:
+        print(f"ERROR: could not read {description} at {path}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
 def load_region_map(path: Path) -> dict[str, str]:
-    with open(path, encoding="utf-8") as f:
-        raw = json.load(f)
+    raw = _load_json_file(path, description="region map file")
     return {slug: region for slug, region in raw.items() if not slug.startswith("_")}
 
 
@@ -243,16 +261,21 @@ def _legacy_venue_values(legacy: dict, *, category: str) -> dict:
 def _validate(data: dict, region_map: dict[str, str], report: Report) -> bool:
     ok = True
 
-    missing_regions = [d["slug"] for d in data["destinations"] if d["slug"] not in region_map]
-    if missing_regions:
-        for slug in missing_regions:
-            dest = next(d for d in data["destinations"] if d["slug"] == slug)
+    for d in data["destinations"]:
+        slug = d["slug"]
+        if slug not in region_map:
             report.errors.append(
-                f"destination '{slug}' ({dest['name']!r}, {dest['venueCount']} venues) "
+                f"destination '{slug}' ({d['name']!r}, {d['venueCount']} venues) "
                 f"has no region-map entry — add one of {DESTINATION_REGIONS} to the region "
                 f"map file before re-running"
             )
-        ok = False
+            ok = False
+        elif region_map[slug] not in DESTINATION_REGIONS:
+            report.errors.append(
+                f"destination '{slug}' is mapped to {region_map[slug]!r} in the region map, "
+                f"which is not one of {DESTINATION_REGIONS} — fix the region map file before re-running"
+            )
+            ok = False
 
     dest_slugs = {d["slug"] for d in data["destinations"]}
     for v in data["venues"]:
@@ -277,39 +300,56 @@ def _match_destination(db: Session, legacy_slug: str) -> Destination | None:
 
 
 def _match_venue(db: Session, legacy: dict, destination_id: str) -> Venue | None:
-    # 1. slug, scoped to the resolved destination
+    # 1. slug, scoped to the resolved destination — DB-constraint-backed
+    # (uq_venues_destination_id_slug), so at most one row can ever match.
     existing = db.execute(
         select(Venue).where(Venue.destination_id == destination_id, Venue.slug == legacy["vslug"])
     ).scalar_one_or_none()
     if existing is not None:
         return existing
 
+    # 2-4 below have no such uniqueness guarantee — the source data itself
+    # has dozens of venues sharing one Google Maps URL (a shared pin for
+    # multiple businesses at one address), duplicate name+destination pairs,
+    # and duplicate coordinates (see the audit). `_first_match` picks the
+    # lowest-id candidate deterministically rather than raising when more
+    # than one row matches.
+
     # 2. Google Maps URL
     if legacy.get("mapsUrl"):
-        existing = db.execute(select(Venue).where(Venue.maps_url == legacy["mapsUrl"])).scalar_one_or_none()
+        existing = _first_match(db, select(Venue).where(Venue.maps_url == legacy["mapsUrl"]))
         if existing is not None:
             return existing
 
     # 3. name + destination (case-insensitive)
-    existing = db.execute(
+    existing = _first_match(
+        db,
         select(Venue).where(
             Venue.destination_id == destination_id,
             Venue.name.ilike(legacy["name"]),
-        )
-    ).scalar_one_or_none()
+        ),
+    )
     if existing is not None:
         return existing
 
     # 4. coordinates (last resort — see the audit for why this is weakest)
     lat, lng = _norm_decimal(legacy.get("lat")), _norm_decimal(legacy.get("lng"))
     if lat is not None and lng is not None:
-        existing = db.execute(
-            select(Venue).where(Venue.latitude == lat, Venue.longitude == lng)
-        ).scalar_one_or_none()
+        existing = _first_match(db, select(Venue).where(Venue.latitude == lat, Venue.longitude == lng))
         if existing is not None:
             return existing
 
     return None
+
+
+def _first_match(db: Session, stmt) -> Venue | None:
+    """Same intent as `scalar_one_or_none()`, but never raises on more
+    than one match — picks the lowest-id candidate deterministically.
+    Only safe to use where "more than one plausible match" is a real,
+    expected possibility (tiers 2-4 above), never as a substitute for an
+    actual uniqueness guarantee (tier 1 keeps `scalar_one_or_none()`).
+    """
+    return db.execute(stmt.order_by(Venue.id).limit(1)).scalars().first()
 
 
 def _sync_whitelisted_fields(obj: object, whitelist: tuple[str, ...], values: dict, diff: dict) -> None:
@@ -452,8 +492,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    with open(args.path, encoding="utf-8") as f:
-        data = json.load(f)
+    data = _load_json_file(Path(args.path), description="dataset file")
     region_map = load_region_map(Path(args.region_map))
 
     db = SessionLocal()
