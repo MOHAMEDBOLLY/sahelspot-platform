@@ -3,6 +3,8 @@ import type { Venue } from '../../../../types/venue'
 import { WorkspaceSection } from '../../../../components/workspace/WorkspaceSection'
 import { WorkspaceField } from '../../../../components/workspace/WorkspaceField'
 import { TextField } from '../../../../components/workspace/fields/TextField'
+import { ExternalLinkButton } from '../../../../components/ExternalLinkButton'
+import { buildMapsHref } from '../../../../lib/externalLinks'
 import type { WorkspaceMode } from '../../../../components/workspace/types'
 import type { FieldErrors } from '../../../../lib/validation'
 
@@ -15,7 +17,7 @@ type LocationSectionProps = {
 
 export function LocationSection({ venue, mode, onFieldChange, errors = {} }: LocationSectionProps) {
   return (
-    <WorkspaceSection title="Location" icon={MapPin}>
+    <WorkspaceSection id="venue-section-location" title="Location" icon={MapPin}>
       <dl className="grid grid-cols-2 gap-4">
         {mode === 'view' ? (
           <>
@@ -44,14 +46,26 @@ export function LocationSection({ venue, mode, onFieldChange, errors = {} }: Loc
               label="Maps Link"
               value={
                 venue.maps_url ? (
-                  <a
-                    href={venue.maps_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    {venue.maps_url}
-                  </a>
+                  <span className="flex items-center gap-1.5">
+                    <a
+                      href={venue.maps_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      {venue.maps_url}
+                    </a>
+                    {buildMapsHref(venue.maps_url) && (
+                      <ExternalLinkButton
+                        link={{
+                          key: 'maps',
+                          label: 'Open in Google Maps',
+                          href: buildMapsHref(venue.maps_url) as string,
+                          icon: MapPin,
+                        }}
+                      />
+                    )}
+                  </span>
                 ) : null
               }
             />

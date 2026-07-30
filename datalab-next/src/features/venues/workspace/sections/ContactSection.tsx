@@ -1,10 +1,20 @@
 import { Phone } from 'lucide-react'
+import type { ComponentType, ReactNode } from 'react'
 import type { Venue } from '../../../../types/venue'
 import { WorkspaceSection } from '../../../../components/workspace/WorkspaceSection'
 import { WorkspaceField } from '../../../../components/workspace/WorkspaceField'
 import { TextField } from '../../../../components/workspace/fields/TextField'
+import { ExternalLinkButton } from '../../../../components/ExternalLinkButton'
 import type { WorkspaceMode } from '../../../../components/workspace/types'
 import type { FieldErrors } from '../../../../lib/validation'
+import {
+  buildInstagramHref,
+  buildPhoneHref,
+  buildWebsiteHref,
+  buildWhatsappHref,
+  type VenueLink,
+} from '../../../../lib/externalLinks'
+import { AtSign, Globe, MessageCircle } from 'lucide-react'
 
 type ContactSectionProps = {
   venue: Venue
@@ -21,19 +31,81 @@ function ExternalLink({ href }: { href: string }) {
   )
 }
 
+/** Pairs a WorkspaceField's value with its one-click open action, when
+ * the field resolves to a usable link. Keeps link-building centralized in
+ * lib/externalLinks.ts rather than re-deriving hrefs per field here. */
+function FieldValueWithLink({ value, href, icon, label, linkKey }: {
+  value: ReactNode
+  href: string | null
+  icon: ComponentType<{ size?: number; className?: string }>
+  label: string
+  linkKey: VenueLink['key']
+}) {
+  if (!href) return <>{value}</>
+  return (
+    <span className="flex items-center gap-1.5">
+      {value}
+      <ExternalLinkButton link={{ key: linkKey, label, href, icon }} />
+    </span>
+  )
+}
+
 export function ContactSection({ venue, mode, onFieldChange, errors = {} }: ContactSectionProps) {
   return (
-    <WorkspaceSection title="Contact" icon={Phone}>
+    <WorkspaceSection id="venue-section-contact" title="Contact" icon={Phone}>
       <dl className="grid grid-cols-2 gap-4">
         {mode === 'view' ? (
           <>
-            <WorkspaceField label="Phone" value={venue.phone} />
-            <WorkspaceField label="WhatsApp" value={venue.whatsapp} />
+            <WorkspaceField
+              label="Phone"
+              value={
+                <FieldValueWithLink
+                  value={venue.phone}
+                  href={buildPhoneHref(venue.phone)}
+                  icon={Phone}
+                  label="Call phone"
+                  linkKey="phone"
+                />
+              }
+            />
+            <WorkspaceField
+              label="WhatsApp"
+              value={
+                <FieldValueWithLink
+                  value={venue.whatsapp}
+                  href={buildWhatsappHref(venue.whatsapp)}
+                  icon={MessageCircle}
+                  label="Open WhatsApp"
+                  linkKey="whatsapp"
+                />
+              }
+            />
             <WorkspaceField
               label="Website"
-              value={venue.website ? <ExternalLink href={venue.website} /> : null}
+              value={
+                venue.website ? (
+                  <FieldValueWithLink
+                    value={<ExternalLink href={venue.website} />}
+                    href={buildWebsiteHref(venue.website)}
+                    icon={Globe}
+                    label="Open website"
+                    linkKey="website"
+                  />
+                ) : null
+              }
             />
-            <WorkspaceField label="Instagram" value={venue.instagram_handle} />
+            <WorkspaceField
+              label="Instagram"
+              value={
+                <FieldValueWithLink
+                  value={venue.instagram_handle}
+                  href={buildInstagramHref(venue.instagram_handle)}
+                  icon={AtSign}
+                  label="Open Instagram"
+                  linkKey="instagram"
+                />
+              }
+            />
             <WorkspaceField label="Facebook" value={venue.facebook_handle} />
             <WorkspaceField label="TikTok" value={venue.tiktok_handle} />
           </>

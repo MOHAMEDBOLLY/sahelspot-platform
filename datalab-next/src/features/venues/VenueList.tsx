@@ -1,5 +1,8 @@
 import type { Venue } from '../../types/venue'
+import type { VenueQuality } from '../../lib/venueQuality'
 import { StatusBadge } from '../../components/StatusBadge'
+import { ExternalLinkGroup } from '../../components/ExternalLinkGroup'
+import { VenueQualityIndicators } from '../../components/VenueQualityIndicators'
 
 type VenueListProps = {
   venues: Venue[]
@@ -11,6 +14,9 @@ type VenueListProps = {
    * one currently open, and vice versa. */
   checkedVenueIds: ReadonlySet<string>
   onToggleChecked: (id: string) => void
+  /** Pre-computed by the parent (once per venue per fetch) — this
+   * component only renders results, never evaluates quality itself. */
+  qualityByVenueId: ReadonlyMap<string, VenueQuality>
 }
 
 export function VenueList({
@@ -19,6 +25,7 @@ export function VenueList({
   onSelectVenue,
   checkedVenueIds,
   onToggleChecked,
+  qualityByVenueId,
 }: VenueListProps) {
   return (
     <ul className="flex flex-col divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white">
@@ -64,8 +71,19 @@ export function VenueList({
               >
                 {venue.category} · {venue.destination.name}
               </span>
-              <StatusBadge status={venue.status} />
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <StatusBadge status={venue.status} />
+                {qualityByVenueId.get(venue.id) && (
+                  <VenueQualityIndicators quality={qualityByVenueId.get(venue.id)!} />
+                )}
+              </div>
             </button>
+            <div
+              className="flex shrink-0 items-center pr-3"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <ExternalLinkGroup venue={venue} />
+            </div>
           </li>
         )
       })}
