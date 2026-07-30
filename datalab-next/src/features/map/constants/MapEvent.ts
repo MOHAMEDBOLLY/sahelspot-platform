@@ -1,0 +1,15 @@
+/**
+ * Every map event name used anywhere in the Maps feature — no file may
+ * write a raw event string (`'load'`, `'click'`, ...) directly, even
+ * inside the adapter. `MapboxAdapter` is the only place these get
+ * translated into calls against the underlying SDK's own `.on(...)`.
+ */
+export const MapEvent = {
+  Load: 'load',
+  Click: 'click',
+  MoveEnd: 'moveend',
+  Zoom: 'zoom',
+  StyleLoaded: 'styledata',
+} as const
+
+export type MapEvent = (typeof MapEvent)[keyof typeof MapEvent]

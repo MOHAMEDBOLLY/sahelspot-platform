@@ -11,6 +11,8 @@ import type {
   MapProvider,
   MapSourceSpec,
 } from './mapProvider'
+import { MapEvent } from '../constants/MapEvent'
+import { MapLogger } from '../MapLogger'
 
 /**
  * The Mapbox Adapter — the only file in this codebase that imports
@@ -60,6 +62,20 @@ export class MapboxAdapter implements MapProvider {
       ],
       { padding: options.padding ?? 40, animate: !options.immediate },
     )
+  }
+
+  easeTo(options: FlyToOptions): void {
+    if (!this.map) return
+    this.map.easeTo({
+      center: [options.center.lng, options.center.lat],
+      zoom: options.zoom,
+      animate: !options.immediate,
+    })
+  }
+
+  zoomTo(zoom: number, options: { immediate?: boolean } = {}): void {
+    if (!this.map) return
+    this.map.zoomTo(zoom, { animate: !options.immediate })
   }
 
   getBounds(): Bounds {
@@ -115,6 +131,14 @@ export class MapboxAdapter implements MapProvider {
     }
   }
 
+  setLayerVisibility(id: string, visible: boolean): void {
+    if (!this.map?.getLayer(id)) {
+      MapLogger.warn('setLayerVisibility called for a layer that is not mounted', { id })
+      return
+    }
+    this.map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none')
+  }
+
   setFeatureState(sourceId: string, featureId: string | number, state: Record<string, unknown>): void {
     this.map?.setFeatureState({ source: sourceId, id: featureId }, state)
   }
@@ -132,14 +156,20 @@ export class MapboxAdapter implements MapProvider {
         features: (event.features ?? []) as unknown as Array<Feature<Geometry>>,
       })
     }
-    this.map.on('click', layerId, listener)
-    return () => this.map?.off('click', layerId, listener)
+    this.map.on(MapEvent.Click, layerId, listener)
+    return () => this.map?.off(MapEvent.Click, layerId, listener)
   }
 
   onLoad(handler: () => void): () => void {
     if (!this.map) return () => {}
-    this.map.on('load', handler)
-    return () => this.map?.off('load', handler)
+    this.map.on(MapEvent.Load, handler)
+    return () => this.map?.off(MapEvent.Load, handler)
+  }
+
+  on(event: MapEvent, handler: () => void): () => void {
+    if (!this.map) return () => {}
+    this.map.on(event, handler)
+    return () => this.map?.off(event, handler)
   }
 
   getNativeInstance(): unknown {

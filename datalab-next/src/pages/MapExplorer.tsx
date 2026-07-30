@@ -1,11 +1,24 @@
+import { useMemo, useRef } from 'react'
 import { MapPinOff } from 'lucide-react'
 import { MapEngine } from '../features/map/MapEngine'
 import { PagePlaceholder } from '../components/PagePlaceholder'
+import { LoadingState } from '../components/LoadingState'
+import { ErrorState } from '../components/ErrorState'
+import { useAllVenues } from '../features/stats/useAllVenues'
+import { useAllDestinations } from '../features/stats/useAllDestinations'
+import { venuesToFeatureCollection } from '../lib/geo/venueToGeoJSON'
+import { destinationsToFeatureCollection } from '../lib/geo/destinationToGeoJSON'
+import { VenueLayer } from '../features/map/layers/VenueLayer'
+import { ClusterLayer } from '../features/map/layers/ClusterLayer'
+import { BoundaryLayer } from '../features/map/layers/BoundaryLayer'
+import { LayerId } from '../features/map/constants/LayerId'
+import type { MapLayer } from '../features/map/layers/types'
 
 const ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string | undefined
 
-// North Coast, Egypt — a sensible default center. Placeholder until
-// Phase 2/3 fit the view to real venue/destination data.
+// North Coast, Egypt — a sensible default center. Fitting the view to
+// real venue/destination bounds is a later phase's concern (Camera API
+// interaction, not spatial data).
 const DEFAULT_CENTER = { lng: 28.7, lat: 30.95 }
 const DEFAULT_ZOOM = 10
 
@@ -19,8 +32,45 @@ const DEFAULT_ZOOM = 10
  * `100vh` minus the header — filling all remaining viewport space
  * without AppShell needing to know Maps exists. Every other page is
  * completely unaffected.
+ *
+ * Data reuses the existing `useAllVenues`/`useAllDestinations` hooks
+ * (already used by Dashboard/Quality Center) — no new fetching
+ * mechanism. Layer registration order matters: Boundary before Venue
+ * before Cluster, so compounds draw beneath markers and the venues
+ * source exists before the Cluster Layer's GL layers reference it (see
+ * `LayerManager`'s docstring on mount-order-as-draw-order).
  */
 export function MapExplorer() {
+  const { data: venues, isPending: isVenuesPending, isError: isVenuesError, error: venuesError, refetch: refetchVenues } =
+    useAllVenues()
+  const {
+    data: destinations,
+    isPending: isDestinationsPending,
+    isError: isDestinationsError,
+    error: destinationsError,
+    refetch: refetchDestinations,
+  } = useAllDestinations()
+
+  const venueFeatures = useMemo(() => (venues ? venuesToFeatureCollection(venues) : null), [venues])
+  const boundaryFeatures = useMemo(
+    () => (destinations ? destinationsToFeatureCollection(destinations) : null),
+    [destinations],
+  )
+
+  // Stateless layer instances — created once, never recreated across
+  // re-renders (MapEngine only reads `layers` at mount anyway, but these
+  // are also referenced by identity nowhere else, so a stable instance
+  // avoids any ambiguity).
+  const layersRef = useRef<MapLayer[]>([new BoundaryLayer(), new VenueLayer(), new ClusterLayer()])
+
+  const layerData = useMemo(() => {
+    if (!venueFeatures || !boundaryFeatures) return undefined
+    return {
+      [LayerId.VENUES_SOURCE]: venueFeatures,
+      [LayerId.DESTINATIONS_SOURCE]: boundaryFeatures,
+    }
+  }, [venueFeatures, boundaryFeatures])
+
   if (!ACCESS_TOKEN) {
     return (
       <PagePlaceholder
@@ -31,9 +81,37 @@ export function MapExplorer() {
     )
   }
 
+  if (isVenuesPending || isDestinationsPending) {
+    return <LoadingState label="Loading map data…" />
+  }
+
+  if (isVenuesError) {
+    return (
+      <ErrorState
+        message={venuesError instanceof Error ? venuesError.message : 'Failed to load venues.'}
+        onRetry={() => refetchVenues()}
+      />
+    )
+  }
+
+  if (isDestinationsError) {
+    return (
+      <ErrorState
+        message={destinationsError instanceof Error ? destinationsError.message : 'Failed to load destinations.'}
+        onRetry={() => refetchDestinations()}
+      />
+    )
+  }
+
   return (
     <div className="-m-4 h-[calc(100vh-4rem)] sm:-m-6 lg:-m-8">
-      <MapEngine accessToken={ACCESS_TOKEN} center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} layers={[]} />
+      <MapEngine
+        accessToken={ACCESS_TOKEN}
+        center={DEFAULT_CENTER}
+        zoom={DEFAULT_ZOOM}
+        layers={layersRef.current}
+        layerData={layerData}
+      />
     </div>
   )
 }

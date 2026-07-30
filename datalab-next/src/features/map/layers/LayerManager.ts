@@ -41,4 +41,17 @@ export class LayerManager {
   get(id: string): MapLayer | undefined {
     return this.layers.get(id)
   }
+
+  /** Phase 2 — the choke point `SelectionManager` writes selection
+   * through (see `selection/SelectionManager.ts`), rather than calling
+   * `provider.setFeatureState` itself. Selection logic never lives
+   * inside a layer; a layer only ever *styles* a `selected`/`faded`
+   * feature-state key via its own paint expressions, it doesn't set one. */
+  setFeatureState(provider: MapProvider, sourceId: string, featureId: string | number, state: Record<string, unknown>): void {
+    provider.setFeatureState(sourceId, featureId, state)
+  }
+
+  clearFeatureState(provider: MapProvider, sourceId: string, featureId?: string | number): void {
+    provider.removeFeatureState(sourceId, featureId)
+  }
 }

@@ -1,4 +1,5 @@
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
+import type { MapEvent } from '../constants/MapEvent'
 
 /**
  * The Provider Interface — the one contract the rest of the Maps feature
@@ -83,6 +84,11 @@ export interface MapProvider {
   flyTo(options: FlyToOptions): void
   fitBounds(bounds: Bounds, options?: FitBoundsOptions): void
   getBounds(): Bounds
+  /** Phase 2 Camera API — an un-animated (or lightly animated) camera
+   * transition, distinct from `flyTo`'s arc animation. */
+  easeTo(options: FlyToOptions): void
+  /** Phase 2 Camera API — zoom only, center unchanged. */
+  zoomTo(zoom: number, options?: { immediate?: boolean }): void
 
   addSource(spec: MapSourceSpec): void
   updateSource(id: string, data: FeatureCollection | Feature<Geometry>): void
@@ -90,6 +96,8 @@ export interface MapProvider {
 
   addLayer(spec: MapLayerSpec, beforeId?: string): void
   removeLayer(id: string): void
+  /** Phase 2 — the Boundary Layer's visibility-toggle requirement. */
+  setLayerVisibility(id: string, visible: boolean): void
 
   /** Per-feature ephemeral state (selected/highlighted/faded) — the
    * mechanism every "selection" and "focus mode" interaction must use
@@ -101,6 +109,13 @@ export interface MapProvider {
 
   onClick(layerId: string, handler: MapClickHandler): () => void
   onLoad(handler: () => void): () => void
+  /** Phase 2 — generic subscription for events with no per-feature
+   * payload (MoveEnd/Zoom/StyleLoaded). Click stays its own method since
+   * it needs a layer id and returns hit-tested features; Load stays its
+   * own method since every existing caller already depends on it
+   * (Phase 1, unchanged). Nothing outside `MapboxAdapter` passes a raw
+   * event string here — always a `MapEvent` member. */
+  on(event: MapEvent, handler: () => void): () => void
 
   /** Escape hatch for the one thing the interface can't reasonably
    * abstract (converting a screen point / feature query in ways specific

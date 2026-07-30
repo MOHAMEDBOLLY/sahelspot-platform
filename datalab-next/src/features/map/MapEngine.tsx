@@ -1,40 +1,58 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MapboxAdapter } from './providers/mapboxAdapter'
 import { LayerManager } from './layers/LayerManager'
+import { SelectionManager } from './selection/SelectionManager'
+import { CameraController } from './camera/CameraController'
 import type { LngLat, MapProvider } from './providers/mapProvider'
 import type { MapLayer } from './layers/types'
+
+/** What `MapEngine` hands back once the provider has mounted and every
+ * layer is registered — the concrete realization of "MapEngine →
+ * SelectionManager → LayerManager" and the Camera API, all owned here
+ * and handed outward rather than constructed ad hoc by callers. */
+export interface MapEngineContext {
+  provider: MapProvider
+  camera: CameraController
+  selection: SelectionManager
+  layerManager: LayerManager
+}
 
 export type MapEngineProps = {
   accessToken: string
   center: LngLat
   zoom: number
-  /** Declarative — Phase 1 passes `[]` (empty map). Later phases add
-   * Venue/Boundary/Cluster/Selection/Popup/Controls layers here with no
-   * change to this component: mount/unmount is driven entirely by this
-   * array via the Layer Manager. */
+  /** Declarative — Phase 1 passed `[]` (empty map); Phase 2 passes real
+   * layers (Venue/Cluster/Boundary). Mount/unmount is driven entirely by
+   * this array via the Layer Manager, read once at mount. */
   layers: MapLayer[]
+  /** Phase 2 — per-layer data, keyed by layer id (see `LayerId`). Unlike
+   * `layers` (mount-time config, static), this is watched for changes
+   * and pushed through `LayerManager.update` on every change — this is
+   * how real venue/destination data reaches an already-mounted map. */
+  layerData?: Record<string, unknown>
   className?: string
-  /** Fires once the underlying provider is ready — later phases use this
-   * to reach the provider imperatively (fitBounds on load, etc.) without
-   * `MapEngine` needing to know what any caller wants to do with it. */
-  onReady?: (provider: MapProvider) => void
+  /** Fires once the underlying provider is ready. */
+  onReady?: (context: MapEngineContext) => void
 }
 
 /**
  * The Map Engine — the only component anything in the UI layer imports
- * to get a map. Owns the `MapProvider` instance and the `LayerManager`
- * lifecycle; nothing above this component ever touches `mapbox-gl` or
- * even knows which provider is in use.
+ * to get a map. Owns the `MapProvider`, `LayerManager`, `SelectionManager`,
+ * and `CameraController` lifecycle; nothing above this component ever
+ * touches `mapbox-gl` or even knows which provider is in use.
  */
-export function MapEngine({ accessToken, center, zoom, layers, className, onReady }: MapEngineProps) {
+export function MapEngine({ accessToken, center, zoom, layers, layerData, className, onReady }: MapEngineProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const layerManagerRef = useRef(new LayerManager())
+  const providerRef = useRef<MapProvider | null>(null)
+  const [isReady, setIsReady] = useState(false)
 
   useEffect(() => {
     if (!containerRef.current) return
 
     const provider = new MapboxAdapter()
     const layerManager = layerManagerRef.current
+    providerRef.current = provider
 
     provider.init(containerRef.current, { center, zoom, accessToken })
 
@@ -43,23 +61,35 @@ export function MapEngine({ accessToken, center, zoom, layers, className, onRead
         layerManager.register(layer)
       }
       layerManager.mountAll(provider)
-      onReady?.(provider)
+      const selection = new SelectionManager(layerManager)
+      const camera = new CameraController(provider)
+      setIsReady(true)
+      onReady?.({ provider, camera, selection, layerManager })
     })
 
     return () => {
       unsubscribeLoad()
+      setIsReady(false)
       layerManager.unmountAll(provider)
       provider.destroy()
+      providerRef.current = null
     }
     // Mounted once. `center`/`zoom` are only the *initial* view — moving
-    // the map afterwards goes through the provider's imperative
-    // flyTo/fitBounds (later phases), not by tearing down and recreating
-    // the whole map on every prop change. `layers`/`onReady` are read
-    // once at mount for the same reason; a later phase that needs layers
-    // to change after mount does so via the layer's own `update`, not by
-    // re-running this effect.
+    // the map afterwards goes through the Camera API, not by tearing down
+    // and recreating the whole map on every prop change. `layers`/
+    // `onReady` are read once at mount for the same reason; `layerData`
+    // is intentionally NOT a dependency of this effect (see the effect
+    // below) — data updates must never remount the map.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!isReady || !layerData || !providerRef.current) return
+    const provider = providerRef.current
+    for (const [layerId, data] of Object.entries(layerData)) {
+      layerManagerRef.current.update(layerId, provider, data)
+    }
+  }, [isReady, layerData])
 
   return (
     <div
