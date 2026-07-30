@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from './layouts/AppShell'
 import { Dashboard } from './pages/Dashboard'
@@ -11,6 +12,12 @@ import { Settings } from './pages/Settings'
 import { LoginPage } from './features/auth/LoginPage'
 import { ProtectedRoute } from './features/auth/ProtectedRoute'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { LoadingState } from './components/LoadingState'
+
+// `mapbox-gl` is a large dependency (~200KB+ gzipped) — code-split so it
+// only loads when someone actually visits /map, never inflating every
+// other page's bundle.
+const MapExplorer = lazy(() => import('./pages/MapExplorer').then((m) => ({ default: m.MapExplorer })))
 
 function App() {
   return (
@@ -24,6 +31,14 @@ function App() {
             <Route path="/venues" element={<Venues />} />
             <Route path="/destinations" element={<Destinations />} />
             <Route path="/publishing" element={<Publishing />} />
+            <Route
+              path="/map"
+              element={
+                <Suspense fallback={<LoadingState label="Loading map…" />}>
+                  <MapExplorer />
+                </Suspense>
+              }
+            />
             <Route path="/activity" element={<Activity />} />
             <Route path="/users" element={<Users />} />
             <Route path="/settings" element={<Settings />} />
