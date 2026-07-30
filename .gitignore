@@ -36,3 +36,8 @@ dist/
 
 # Claude Code
 .claude/
+
+# Local data exports / operational backups -- generated artifacts, not
+# source. Legitimate to keep on disk for reference, never committed.
+/exports/
+/deployment_backups/
