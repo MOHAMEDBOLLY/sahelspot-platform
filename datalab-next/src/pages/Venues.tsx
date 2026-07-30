@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { ArrowLeft, SlidersHorizontal } from 'lucide-react'
 import { VenueListPanel } from '../features/venues/VenueListPanel'
 import { VenueFilters } from '../features/venues/VenueFilters'
+import { VenueSearchInput } from '../features/venues/VenueSearchInput'
 import { AdvancedFilters } from '../features/venues/AdvancedFilters'
 import { ActiveFilterChips } from '../features/venues/ActiveFilterChips'
 import { SavedViewsPanel } from '../features/venues/SavedViewsPanel'
 import { VenueCreateDialog } from '../features/venues/VenueCreateDialog'
 import { VenueWorkspace } from '../features/venues/workspace/VenueWorkspace'
+import { BottomSheet } from '../components/BottomSheet'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useAuth } from '../features/auth/useAuth'
 import { hasPermission } from '../features/auth/permissions'
@@ -37,6 +40,7 @@ import {
 export function Venues() {
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null)
   const [isWorkspaceDirty, setIsWorkspaceDirty] = useState(false)
+  const [filtersSheetOpen, setFiltersSheetOpen] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const q = searchParams.get('q') ?? ''
@@ -139,6 +143,18 @@ export function Venues() {
     setSelectedVenueId(id)
   }
 
+  /** Phone/tablet only (`lg:` always shows both panes, so this control
+   * never renders there) — same dirty-check as switching between venues,
+   * since leaving the workspace for the list is the same kind of
+   * potential-data-loss action. */
+  function handleBackToList() {
+    if (isWorkspaceDirty) {
+      const confirmed = window.confirm('You have unsaved changes in this venue. Discard them and go back?')
+      if (!confirmed) return
+    }
+    setSelectedVenueId(null)
+  }
+
   // The exact params a Saved View should persist — everything in the URL
   // except pagination, which is never part of "what search is this."
   const currentParamsForSavedView = useMemo(() => {
@@ -150,9 +166,21 @@ export function Venues() {
     return params
   }, [searchParams])
 
+  // Phone/tablet (below `lg:`): show either the list pane or the
+  // workspace pane, never both — there isn't room for a real side-by-side
+  // master-detail layout under 1024px. `lg:` always shows both, exactly
+  // as before this sprint (both wrappers force `lg:flex`/`lg:w-80`
+  // regardless of `selectedVenueId`).
+  const showWorkspacePane = selectedVenueId !== null
+
   return (
     <div className="flex h-full gap-6">
-      <div className="flex w-80 shrink-0 flex-col gap-3 overflow-y-auto">
+      <div
+        className={[
+          showWorkspacePane ? 'hidden lg:flex' : 'flex',
+          'w-full shrink-0 flex-col gap-3 overflow-y-auto lg:w-80',
+        ].join(' ')}
+      >
         {canCreate && (
           <VenueCreateDialog onCreated={(venue) => handleSelectVenue(venue.id)} />
         )}
@@ -171,17 +199,54 @@ export function Venues() {
           onQualityFilterChange={updateQualityFilter}
           onClearAll={clearAllFilters}
         />
-        <VenueFilters
-          searchValue={q}
-          onSearchChange={(value) => setFilterParam('q', value)}
-          destinationId={destinationId}
-          onDestinationIdChange={(value) => setFilterParam('destination', value)}
-          category={category}
-          onCategoryChange={(value) => setFilterParam('category', value)}
-          status={status}
-          onStatusChange={(value) => setFilterParam('status', value)}
-        />
-        <AdvancedFilters params={qualityFilter} onChange={updateQualityFilter} />
+
+        {/* Desktop: unchanged inline filters panel. */}
+        <div className="hidden lg:flex lg:flex-col lg:gap-3">
+          <VenueFilters
+            searchValue={q}
+            onSearchChange={(value) => setFilterParam('q', value)}
+            destinationId={destinationId}
+            onDestinationIdChange={(value) => setFilterParam('destination', value)}
+            category={category}
+            onCategoryChange={(value) => setFilterParam('category', value)}
+            status={status}
+            onStatusChange={(value) => setFilterParam('status', value)}
+          />
+          <AdvancedFilters params={qualityFilter} onChange={updateQualityFilter} />
+        </div>
+
+        {/* Phone/tablet: search stays visible; everything else (the same
+            VenueFilters selects + AdvancedFilters, unchanged) moves into
+            a BottomSheet — no second filtering UI, just a different
+            container for the same controls. */}
+        <div className="flex flex-col gap-2 lg:hidden">
+          <VenueSearchInput value={q} onChange={(value) => setFilterParam('q', value)} />
+          <button
+            type="button"
+            onClick={() => setFiltersSheetOpen(true)}
+            className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <SlidersHorizontal size={14} />
+            Filters
+          </button>
+        </div>
+        <BottomSheet open={filtersSheetOpen} onClose={() => setFiltersSheetOpen(false)} title="Filters">
+          <div className="flex flex-col gap-3">
+            <VenueFilters
+              showSearch={false}
+              searchValue={q}
+              onSearchChange={(value) => setFilterParam('q', value)}
+              destinationId={destinationId}
+              onDestinationIdChange={(value) => setFilterParam('destination', value)}
+              category={category}
+              onCategoryChange={(value) => setFilterParam('category', value)}
+              status={status}
+              onStatusChange={(value) => setFilterParam('status', value)}
+            />
+            <AdvancedFilters params={qualityFilter} onChange={updateQualityFilter} />
+          </div>
+        </BottomSheet>
+
         <VenueListPanel
           selectedVenueId={selectedVenueId}
           onSelectVenue={handleSelectVenue}
@@ -196,7 +261,22 @@ export function Venues() {
           onPageChange={setPage}
         />
       </div>
-      <div className="min-w-0 flex-1 overflow-y-auto">
+      <div
+        className={[
+          showWorkspacePane ? 'flex' : 'hidden lg:flex',
+          'min-w-0 flex-1 flex-col overflow-y-auto',
+        ].join(' ')}
+      >
+        {selectedVenueId && (
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="flex min-h-11 items-center gap-1.5 self-start px-1 text-sm font-medium text-gray-600 hover:text-gray-900 lg:hidden"
+          >
+            <ArrowLeft size={16} />
+            Back to venues
+          </button>
+        )}
         <VenueWorkspace venueId={selectedVenueId} onDirtyChange={setIsWorkspaceDirty} />
       </div>
     </div>
