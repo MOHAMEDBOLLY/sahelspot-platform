@@ -65,7 +65,9 @@ export class InteractionController {
     this.unsubscribers = [
       this.provider.onClick(LayerId.VENUES_UNCLUSTERED, (event) => this.handleVenueClick(event)),
       this.provider.onClick(LayerId.CLUSTERS, (event) => this.handleClusterClick(event)),
-      this.provider.on(MapEvent.Click, () => this.emit({ type: InteractionEvent.MapClick })),
+      this.provider.onBackgroundClick([LayerId.VENUES_UNCLUSTERED, LayerId.CLUSTERS], () =>
+        this.emit({ type: InteractionEvent.MapClick }),
+      ),
       this.provider.on(MapEvent.MoveEnd, () =>
         this.emit({ type: InteractionEvent.MapMoveEnd, bounds: this.provider.getBounds() }),
       ),

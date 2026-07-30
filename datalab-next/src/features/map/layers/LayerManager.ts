@@ -27,8 +27,17 @@ export class LayerManager {
     }
   }
 
+  /** Phase 6 — tears down in the *reverse* of mount order. Mount order
+   * matters because later layers can depend on earlier ones (the
+   * Cluster Layer's GL layers read the Venue Layer's source); unwinding
+   * in the same order broke that dependency the other way — the Venue
+   * Layer would try to remove the "venues" source while the Cluster
+   * Layer's layers were still attached to it, and Mapbox rejects that
+   * (`Source "venues" cannot be removed while layer "clusters" is using
+   * it`). Standard teardown-is-reverse-of-setup, same reasoning any
+   * stack-of-effects cleanup already follows. */
   unmountAll(provider: MapProvider): void {
-    for (const layer of this.layers.values()) {
+    for (const layer of [...this.layers.values()].reverse()) {
       layer.unmount(provider)
     }
     this.layers.clear()

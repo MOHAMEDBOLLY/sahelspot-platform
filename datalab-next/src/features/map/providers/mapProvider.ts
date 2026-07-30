@@ -118,6 +118,16 @@ export interface MapProvider {
   removeFeatureState(sourceId: string, featureId?: string | number): void
 
   onClick(layerId: string, handler: MapClickHandler): () => void
+  /** The complement of `onClick`: fires only when a click hits none of
+   * `layerIds`. Needed because a delegated `onClick` listener and a
+   * plain map-wide click listener both observe the *same* native click
+   * — Mapbox invokes every registered 'click' listener for a single
+   * click, so a listener with no layer filter fires unconditionally,
+   * even on a click that also matched a layer-delegated listener. This
+   * performs the same hit-test `onClick` already does internally and
+   * inverts it, so "background click" can be told apart from "click
+   * that also selected a venue/cluster" without any extra state. */
+  onBackgroundClick(layerIds: string[], handler: () => void): () => void
   onLoad(handler: () => void): () => void
   /** Phase 2 — generic subscription for events with no per-feature
    * payload (MoveEnd/Zoom/StyleLoaded). Click stays its own method since

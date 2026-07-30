@@ -87,13 +87,17 @@ export class MapboxAdapter implements MapProvider {
 
   addSource(spec: MapSourceSpec): void {
     if (!this.map || this.map.getSource(spec.id)) return
+    // Mapbox's style validator treats an explicitly-`undefined`-valued
+    // key as "present but wrong type", not "absent" — so optional spec
+    // fields must be omitted entirely when unset, never passed through
+    // as `undefined`, or `addSource`/`addLayer` reject the whole call.
     this.map.addSource(spec.id, {
       type: 'geojson',
       data: spec.data,
-      cluster: spec.cluster,
-      clusterRadius: spec.clusterRadius,
-      clusterMaxZoom: spec.clusterMaxZoom,
       promoteId: 'id',
+      ...(spec.cluster !== undefined && { cluster: spec.cluster }),
+      ...(spec.clusterRadius !== undefined && { clusterRadius: spec.clusterRadius }),
+      ...(spec.clusterMaxZoom !== undefined && { clusterMaxZoom: spec.clusterMaxZoom }),
     })
   }
 
@@ -117,9 +121,15 @@ export class MapboxAdapter implements MapProvider {
         id: spec.id,
         source: spec.sourceId,
         type: spec.type,
-        paint: spec.paint,
-        layout: spec.layout,
-        filter: spec.filter,
+        // This mapbox-gl version's style validator requires `layout`
+        // and `filter` to be present on every layer (unlike `paint`,
+        // which is genuinely optional) — omitting them fails validation
+        // the same way an explicit `undefined` does, so a layer that
+        // doesn't need them still needs the neutral defaults below
+        // ("no layout properties set", "match every feature").
+        layout: spec.layout ?? {},
+        filter: spec.filter ?? true,
+        ...(spec.paint !== undefined && { paint: spec.paint }),
       } as mapboxgl.AnyLayer,
       beforeId,
     )
@@ -174,6 +184,21 @@ export class MapboxAdapter implements MapProvider {
     }
     this.map.on(MapEvent.Click, layerId, listener)
     return () => this.map?.off(MapEvent.Click, layerId, listener)
+  }
+
+  onBackgroundClick(layerIds: string[], handler: () => void): () => void {
+    if (!this.map) return () => {}
+    const listener = (event: mapboxgl.MapMouseEvent) => {
+      const existingLayerIds = layerIds.filter((id) => this.map?.getLayer(id))
+      const features = existingLayerIds.length
+        ? this.map?.queryRenderedFeatures(event.point, { layers: existingLayerIds })
+        : []
+      if (!features || features.length === 0) {
+        handler()
+      }
+    }
+    this.map.on(MapEvent.Click, listener)
+    return () => this.map?.off(MapEvent.Click, listener)
   }
 
   onLoad(handler: () => void): () => void {
