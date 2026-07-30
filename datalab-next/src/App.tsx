@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from './layouts/AppShell'
 import { Dashboard } from './pages/Dashboard'
+import { QualityCenter } from './pages/QualityCenter'
 import { Venues } from './pages/Venues'
 import { Destinations } from './pages/Destinations'
 import { Publishing } from './pages/Publishing'
@@ -19,6 +20,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppShell />}>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/quality" element={<QualityCenter />} />
             <Route path="/venues" element={<Venues />} />
             <Route path="/destinations" element={<Destinations />} />
             <Route path="/publishing" element={<Publishing />} />
