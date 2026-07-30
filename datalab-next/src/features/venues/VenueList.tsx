@@ -35,7 +35,7 @@ export function VenueList({
         return (
           <li key={venue.id} className="flex items-stretch">
             <label
-              className="flex shrink-0 items-center pl-3"
+              className="flex min-w-11 shrink-0 items-center justify-center pl-3 lg:min-w-0 lg:justify-start"
               onClick={(event) => event.stopPropagation()}
             >
               <input

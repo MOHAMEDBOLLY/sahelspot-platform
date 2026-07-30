@@ -223,13 +223,18 @@ export function ImagesSection({
                   className="aspect-square w-full rounded-lg object-cover"
                 />
                 {mode === 'edit' && (
-                  <div className="absolute inset-x-0 top-0 flex justify-end gap-1 p-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  // Desktop (`lg:`): unchanged hover-reveal (opacity-0,
+                  // group-hover:opacity-100). Below `lg:`: permanently
+                  // visible (opacity-100) -- hover doesn't exist on touch
+                  // devices, so these actions were previously unreachable
+                  // there; this is a real bug fix, not new styling.
+                  <div className="absolute inset-x-0 top-0 flex justify-end gap-1 p-1 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
                     {url !== venue.cover_image_url && (
                       <button
                         type="button"
                         onClick={() => onSetCover(url)}
                         disabled={isUploading}
-                        className="rounded-full bg-black/60 p-1 text-white disabled:cursor-not-allowed"
+                        className="relative rounded-full bg-black/60 p-1 text-white disabled:cursor-not-allowed max-lg:after:absolute max-lg:after:inset-[-12px] max-lg:after:content-['']"
                         title="Set as cover image"
                       >
                         <ImageUp size={12} />
@@ -239,7 +244,7 @@ export function ImagesSection({
                       type="button"
                       onClick={() => onRemoveGalleryImage(url)}
                       disabled={isUploading}
-                      className="rounded-full bg-black/60 p-1 text-white disabled:cursor-not-allowed"
+                      className="relative rounded-full bg-black/60 p-1 text-white disabled:cursor-not-allowed max-lg:after:absolute max-lg:after:inset-[-12px] max-lg:after:content-['']"
                       title="Remove image"
                     >
                       <X size={12} />

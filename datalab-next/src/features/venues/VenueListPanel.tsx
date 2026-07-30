@@ -129,7 +129,7 @@ export function VenueListPanel({ selectedVenueId, onSelectVenue, searchParams, o
           onClearSelection={() => setCheckedVenueIds(new Set())}
         />
       )}
-      <label className="flex items-center gap-2 px-1 text-xs font-medium text-gray-500">
+      <label className="flex min-h-11 items-center gap-2 px-1 text-xs font-medium text-gray-500 lg:min-h-0">
         <input
           type="checkbox"
           checked={checkedVenueIds.size > 0 && checkedVenueIds.size === data.items.length}

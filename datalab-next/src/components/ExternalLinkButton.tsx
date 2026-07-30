@@ -18,7 +18,7 @@ export function ExternalLinkButton({ link }: ExternalLinkButtonProps) {
       title={link.label}
       aria-label={link.label}
       onClick={(event) => event.stopPropagation()}
-      className="flex h-6 w-6 items-center justify-center rounded text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-gray-900"
+      className="relative flex h-6 w-6 items-center justify-center rounded text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-gray-900 max-lg:after:absolute max-lg:after:inset-[-10px] max-lg:after:content-['']"
     >
       <Icon size={14} />
     </a>
