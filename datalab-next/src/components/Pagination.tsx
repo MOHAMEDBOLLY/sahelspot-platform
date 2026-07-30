@@ -22,7 +22,7 @@ export function Pagination({ page, pageSize, total, onPageChange }: PaginationPr
       <p className="text-xs text-gray-500">
         Showing {start}–{end} of {total} venues
       </p>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-gray-500">
           Page {page} of {totalPages}
         </span>
@@ -31,7 +31,7 @@ export function Pagination({ page, pageSize, total, onPageChange }: PaginationPr
             type="button"
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1}
-            className="flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex min-h-11 items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
           >
             <ChevronLeft size={12} />
             Previous
@@ -40,7 +40,7 @@ export function Pagination({ page, pageSize, total, onPageChange }: PaginationPr
             type="button"
             onClick={() => onPageChange(page + 1)}
             disabled={page >= totalPages}
-            className="flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex min-h-11 items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
           >
             Next
             <ChevronRight size={12} />

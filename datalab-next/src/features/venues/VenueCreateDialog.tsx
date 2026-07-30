@@ -94,14 +94,14 @@ export function VenueCreateDialog({ onCreated }: VenueCreateDialogProps) {
       <button
         type="button"
         onClick={openDialog}
-        className="flex items-center justify-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+        className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700 lg:min-h-0"
       >
         + New Venue
       </button>
 
       <dialog
         ref={dialogRef}
-        className="w-full max-w-sm rounded-xl border border-gray-200 p-0 backdrop:bg-black/40"
+        className="m-auto max-h-[85vh] w-[calc(100%-2rem)] max-w-sm overflow-y-auto rounded-xl border border-gray-200 p-0 backdrop:bg-black/40"
         onClose={() => resetSubmitError()}
       >
         <div className="flex flex-col gap-4 p-5">
@@ -119,7 +119,7 @@ export function VenueCreateDialog({ onCreated }: VenueCreateDialogProps) {
               value={id}
               onChange={(event) => setId(event.target.value)}
               placeholder="e.g. beach-bar-marassi"
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none"
+              className="min-h-11 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none lg:min-h-0"
             />
           </label>
 
@@ -129,7 +129,7 @@ export function VenueCreateDialog({ onCreated }: VenueCreateDialogProps) {
               type="text"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none"
+              className="min-h-11 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none lg:min-h-0"
             />
           </label>
 
@@ -139,7 +139,7 @@ export function VenueCreateDialog({ onCreated }: VenueCreateDialogProps) {
               type="text"
               value={slug}
               onChange={(event) => setSlug(event.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none"
+              className="min-h-11 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none lg:min-h-0"
             />
           </label>
 
@@ -148,7 +148,7 @@ export function VenueCreateDialog({ onCreated }: VenueCreateDialogProps) {
             <select
               value={destinationId}
               onChange={(event) => setDestinationId(event.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none"
+              className="min-h-11 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none lg:min-h-0"
             >
               <option value="">Select a destination…</option>
               {destinations?.map((destination) => (
@@ -164,7 +164,7 @@ export function VenueCreateDialog({ onCreated }: VenueCreateDialogProps) {
             <select
               value={category}
               onChange={(event) => setCategory(event.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none"
+              className="min-h-11 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none lg:min-h-0"
             >
               {VENUE_CATEGORIES.map((value) => (
                 <option key={value} value={value}>
@@ -183,7 +183,7 @@ export function VenueCreateDialog({ onCreated }: VenueCreateDialogProps) {
                   value={beachType}
                   onChange={(event) => setBeachType(event.target.value)}
                   placeholder="e.g. sandy"
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none"
+                  className="min-h-11 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none lg:min-h-0"
                 />
               </label>
 
@@ -192,7 +192,7 @@ export function VenueCreateDialog({ onCreated }: VenueCreateDialogProps) {
                 <select
                   value={publicAccess}
                   onChange={(event) => setPublicAccess(event.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none"
+                  className="min-h-11 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none lg:min-h-0"
                 >
                   {BEACH_PUBLIC_ACCESS_VALUES.map((value) => (
                     <option key={value} value={value}>
@@ -210,7 +210,7 @@ export function VenueCreateDialog({ onCreated }: VenueCreateDialogProps) {
             <button
               type="button"
               onClick={closeDialog}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="min-h-11 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 lg:min-h-0"
             >
               Cancel
             </button>
@@ -218,7 +218,7 @@ export function VenueCreateDialog({ onCreated }: VenueCreateDialogProps) {
               type="button"
               onClick={handleSubmit}
               disabled={isPending}
-              className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-11 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
             >
               {isPending ? 'Creating…' : 'Create'}
             </button>

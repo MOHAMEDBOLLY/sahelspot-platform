@@ -57,7 +57,7 @@ export function RejectDialog({ onReject }: RejectDialogProps) {
       <button
         type="button"
         onClick={openDialog}
-        className="flex items-center gap-1.5 rounded-lg bg-red-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-800"
+        className="flex min-h-11 items-center gap-1.5 rounded-lg bg-red-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-800 lg:min-h-0"
       >
         <ThumbsDown size={14} />
         Reject
@@ -65,7 +65,7 @@ export function RejectDialog({ onReject }: RejectDialogProps) {
 
       <dialog
         ref={dialogRef}
-        className="w-full max-w-sm rounded-xl border border-gray-200 p-0 backdrop:bg-black/40"
+        className="m-auto w-[calc(100%-2rem)] max-w-sm rounded-xl border border-gray-200 p-0 backdrop:bg-black/40"
       >
         <div className="flex flex-col gap-4 p-5">
           <div className="flex items-center justify-between">
@@ -82,7 +82,7 @@ export function RejectDialog({ onReject }: RejectDialogProps) {
               onChange={(event) => setReason(event.target.value)}
               rows={3}
               placeholder="Why is this being sent back to draft?"
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none"
+              className="min-h-11 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none lg:min-h-0"
             />
           </label>
 
@@ -92,7 +92,7 @@ export function RejectDialog({ onReject }: RejectDialogProps) {
             <button
               type="button"
               onClick={closeDialog}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="min-h-11 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 lg:min-h-0"
             >
               Cancel
             </button>
@@ -100,7 +100,7 @@ export function RejectDialog({ onReject }: RejectDialogProps) {
               type="button"
               onClick={handleSubmit}
               disabled={isPending}
-              className="rounded-lg bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-11 rounded-lg bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
             >
               {isPending ? 'Rejecting…' : 'Reject'}
             </button>

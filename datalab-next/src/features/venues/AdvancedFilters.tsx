@@ -11,7 +11,7 @@ type AdvancedFiltersProps = {
 
 const CHECKBOX_CLASSNAME = 'h-3.5 w-3.5 rounded border-gray-300'
 const NUMBER_INPUT_CLASSNAME =
-  'w-16 rounded-lg border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-gray-900 focus:outline-none'
+  'min-h-11 w-16 rounded-lg border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-gray-900 focus:outline-none lg:min-h-0'
 
 function toggleField(list: QualityField[] | undefined, field: QualityField): QualityField[] | undefined {
   const current = list ?? []
@@ -38,7 +38,7 @@ export function AdvancedFilters({ params, onChange }: AdvancedFiltersProps) {
         type="button"
         onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
-        className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-gray-700"
+        className="flex min-h-11 w-full items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 lg:min-h-0"
       >
         Advanced Filters
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -50,35 +50,35 @@ export function AdvancedFilters({ params, onChange }: AdvancedFiltersProps) {
             <button
               type="button"
               onClick={() => onChange({ ...params, missingCount: 1 })}
-              className="rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              className="min-h-11 rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 lg:min-h-0"
             >
               Nearly Complete
             </button>
             <button
               type="button"
               onClick={() => onChange({ ...params, minCompletion: 100, maxCompletion: undefined })}
-              className="rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              className="min-h-11 rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 lg:min-h-0"
             >
               Complete Only
             </button>
             <button
               type="button"
               onClick={() => onChange({ ...params, maxCompletion: 100, minCompletion: undefined })}
-              className="rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              className="min-h-11 rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 lg:min-h-0"
             >
               Needs Attention
             </button>
             <button
               type="button"
               onClick={() => onChange({ ...params, digitalPresence: 'any' })}
-              className="rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              className="min-h-11 rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 lg:min-h-0"
             >
               Has Digital Presence
             </button>
             <button
               type="button"
               onClick={() => onChange({ ...params, digitalPresence: 'none' })}
-              className="rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              className="min-h-11 rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 lg:min-h-0"
             >
               No Digital Presence
             </button>
@@ -88,7 +88,7 @@ export function AdvancedFilters({ params, onChange }: AdvancedFiltersProps) {
             <legend className="text-xs font-medium uppercase tracking-wide text-gray-500">Has</legend>
             <div className="grid grid-cols-2 gap-1.5">
               {QUALITY_FIELD_PRESENTATION.map(({ id, label }) => (
-                <label key={id} className="flex items-center gap-1.5 text-sm text-gray-700">
+                <label key={id} className="flex min-h-11 items-center gap-1.5 text-sm text-gray-700 lg:min-h-0">
                   <input
                     type="checkbox"
                     className={CHECKBOX_CLASSNAME}
@@ -105,7 +105,7 @@ export function AdvancedFilters({ params, onChange }: AdvancedFiltersProps) {
             <legend className="text-xs font-medium uppercase tracking-wide text-gray-500">Missing</legend>
             <div className="grid grid-cols-2 gap-1.5">
               {QUALITY_FIELD_PRESENTATION.map(({ id, label }) => (
-                <label key={id} className="flex items-center gap-1.5 text-sm text-gray-700">
+                <label key={id} className="flex min-h-11 items-center gap-1.5 text-sm text-gray-700 lg:min-h-0">
                   <input
                     type="checkbox"
                     className={CHECKBOX_CLASSNAME}

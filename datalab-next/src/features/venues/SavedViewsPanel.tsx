@@ -75,7 +75,7 @@ export function SavedViewsPanel({ userId, currentParams }: SavedViewsPanelProps)
             <li key={view.id} className="flex items-center justify-between gap-1">
               <Link
                 to={viewHref(view)}
-                className="flex min-w-0 flex-1 items-center gap-1.5 truncate rounded-lg px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-gray-900"
+                className="flex min-h-11 min-w-0 flex-1 items-center gap-1.5 truncate rounded-lg px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-gray-900 lg:min-h-0"
               >
                 <Star size={12} className="shrink-0 text-gray-400" />
                 <span className="truncate">{view.name}</span>
@@ -84,7 +84,7 @@ export function SavedViewsPanel({ userId, currentParams }: SavedViewsPanelProps)
                 type="button"
                 onClick={() => handleDelete(view.id)}
                 aria-label={`Delete saved view "${view.name}"`}
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-gray-900"
+                className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-gray-900 max-lg:after:absolute max-lg:after:inset-[-10px] max-lg:after:content-['']"
               >
                 <Trash2 size={12} />
               </button>
@@ -95,7 +95,7 @@ export function SavedViewsPanel({ userId, currentParams }: SavedViewsPanelProps)
 
       <dialog
         ref={dialogRef}
-        className="w-full max-w-xs rounded-xl border border-gray-200 p-0 backdrop:bg-black/40"
+        className="m-auto w-[calc(100%-2rem)] max-w-xs rounded-xl border border-gray-200 p-0 backdrop:bg-black/40"
       >
         <div className="flex flex-col gap-4 p-5">
           <div className="flex items-center justify-between">
@@ -115,7 +115,7 @@ export function SavedViewsPanel({ userId, currentParams }: SavedViewsPanelProps)
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="e.g. Missing Covers"
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none"
+              className="min-h-11 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-gray-900 focus:outline-none lg:min-h-0"
               autoFocus
             />
           </label>
@@ -123,7 +123,7 @@ export function SavedViewsPanel({ userId, currentParams }: SavedViewsPanelProps)
             <button
               type="button"
               onClick={() => dialogRef.current?.close()}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="min-h-11 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 lg:min-h-0"
             >
               Cancel
             </button>
@@ -131,7 +131,7 @@ export function SavedViewsPanel({ userId, currentParams }: SavedViewsPanelProps)
               type="button"
               onClick={handleSave}
               disabled={!name.trim()}
-              className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-11 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
             >
               Save
             </button>

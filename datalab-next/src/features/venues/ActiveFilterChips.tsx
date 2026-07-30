@@ -115,7 +115,7 @@ export function ActiveFilterChips({
             type="button"
             onClick={chip.onRemove}
             aria-label={`Remove filter: ${chip.label}`}
-            className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-gray-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-gray-900"
+            className="relative flex h-4 w-4 items-center justify-center rounded-full hover:bg-gray-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-gray-900 max-lg:after:absolute max-lg:after:inset-[-14px] max-lg:after:content-['']"
           >
             <X size={10} />
           </button>
@@ -125,7 +125,7 @@ export function ActiveFilterChips({
         <button
           type="button"
           onClick={onClearAll}
-          className="rounded-full px-2 py-1 text-xs font-medium text-gray-500 underline hover:text-gray-900"
+          className="min-h-11 rounded-full px-2 py-1 text-xs font-medium text-gray-500 underline hover:text-gray-900 lg:min-h-0"
         >
           Clear all
         </button>
