@@ -25,6 +25,14 @@ export function fetchVenue(id: string): Promise<Venue> {
   return apiGet<Venue>(`/editor/venues/${encodeURIComponent(id)}`)
 }
 
+/** Reuses the existing `GET /editor/venues/export?format=json` endpoint
+ * (already deployed for file download via `exportVenues` below) to fetch
+ * every venue unpaginated, for client-side dashboard aggregation. No new
+ * backend route — same data the CSV/JSON download already returns. */
+export function fetchAllVenues(): Promise<Venue[]> {
+  return apiGet<Venue[]>('/editor/venues/export?format=json')
+}
+
 /** Exactly the fields Edit Mode exposes as editable — see the workspace
  * sections. Everything else (id, slug, destination, status, timestamps, ...)
  * is structural or workflow-controlled and isn't part of Save Draft.

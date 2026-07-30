@@ -18,6 +18,14 @@ export function fetchDestination(id: string): Promise<Destination> {
   return apiGet<Destination>(`/editor/destinations/${encodeURIComponent(id)}`)
 }
 
+/** Reuses the existing `GET /editor/destinations/export?format=json`
+ * endpoint (already deployed for file download, see `exportDestinations`
+ * below) to fetch every destination unpaginated, for client-side dashboard
+ * aggregation. No new backend route. */
+export function fetchAllDestinations(): Promise<Destination[]> {
+  return apiGet<Destination[]>('/editor/destinations/export?format=json')
+}
+
 /** Exactly the fields Edit Mode exposes as editable — same reasoning as
  * `features/venues/api.ts`'s `VenuePatch`. `id`, `status` (workflow-
  * controlled — no Review/Approval exists for destinations yet, but `status`

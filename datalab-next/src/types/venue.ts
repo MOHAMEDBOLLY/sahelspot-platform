@@ -1,4 +1,5 @@
 import type { ValidationResult } from './validation'
+import type { QualityFilterParams } from '../lib/venueQualityFilter'
 
 export type VenueStatus = 'draft' | 'review' | 'approved' | 'archived'
 
@@ -67,7 +68,13 @@ export interface VenueListResponse {
 
 /** All optional — an unset field means "don't filter on this." Matches
  * the backend's query params exactly (`destinationId` -> `destination_id`
- * is the one naming translation `fetchVenues` does). */
+ * is the one naming translation `fetchVenues` does).
+ *
+ * `qualityFilter` (Phase 2 Quality Center) is the one field here with no
+ * backend equivalent — `fetchVenues` never reads it, so passing it through
+ * this same params object is safe; it's only consumed by `useVenueSearch`'s
+ * client-side path. Kept as a nested object (not flattened `missing`/
+ * `maxCompletion` fields) so its optionality is a single check, not two. */
 export interface VenueSearchParams {
   q?: string
   destinationId?: string
@@ -75,6 +82,7 @@ export interface VenueSearchParams {
   status?: string
   page?: number
   pageSize?: number
+  qualityFilter?: QualityFilterParams
 }
 
 /** Sprint 28 — Bulk Operations. Mirrors `BulkResultItem`/`BulkOperationResponse`
