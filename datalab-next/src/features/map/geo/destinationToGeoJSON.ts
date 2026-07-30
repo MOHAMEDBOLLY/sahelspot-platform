@@ -1,7 +1,7 @@
 import type { MultiPolygon, Polygon } from 'geojson'
-import type { Destination } from '../../types/destination'
-import type { DestinationFeature, DestinationFeatureCollection } from '../../features/map/types/features'
-import { MapLogger } from '../../features/map/MapLogger'
+import type { Destination } from '../../../types/destination'
+import type { DestinationFeature, DestinationFeatureCollection } from '../types/features'
+import { MapLogger } from '../MapLogger'
 
 const VALID_BOUNDARY_TYPES = new Set(['Polygon', 'MultiPolygon'])
 

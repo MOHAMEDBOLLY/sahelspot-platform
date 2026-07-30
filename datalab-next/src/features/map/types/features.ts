@@ -2,8 +2,8 @@ import type { Feature, FeatureCollection, MultiPolygon, Point, Polygon } from 'g
 
 /** Properties carried by every venue point feature — exactly what the
  * Venue Layer, Cluster Layer, and (in a later phase) the popup need, no
- * more. Sourced from `lib/geo/venueToGeoJSON.ts`, never constructed
- * ad hoc elsewhere. */
+ * more. Sourced from `features/map/geo/venueToGeoJSON.ts`, never
+ * constructed ad hoc elsewhere. */
 export interface VenueFeatureProperties {
   id: string
   name: string

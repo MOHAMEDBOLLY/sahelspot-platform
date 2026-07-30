@@ -1,5 +1,11 @@
 import type { Feature, FeatureCollection, Geometry, Position } from 'geojson'
-import type { Bounds } from '../../features/map/providers/mapProvider'
+
+/** [west, south, east, north] — the standard GeoJSON/most-map-SDKs bbox
+ * order. Defined here (a generic geo utility) rather than in the Maps
+ * feature's Provider Interface, which re-exports it — `lib/` must not
+ * depend on `features/`, and a bounding box is a generic concept with no
+ * map-provider knowledge, so this is its natural home. */
+export type Bounds = [number, number, number, number]
 
 /** Recursively walks any GeoJSON coordinate array (Point/Polygon/
  * MultiPolygon all nest `Position` differently) and extends `bounds` in

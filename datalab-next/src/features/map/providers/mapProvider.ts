@@ -1,5 +1,6 @@
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
 import type { MapEvent } from '../constants/MapEvent'
+import type { Bounds } from '../../../lib/geo/bounds'
 
 /**
  * The Provider Interface — the one contract the rest of the Maps feature
@@ -16,9 +17,12 @@ import type { MapEvent } from '../constants/MapEvent'
 
 export type LngLat = { lng: number; lat: number }
 
-/** [west, south, east, north] — the standard GeoJSON/most-map-SDKs bbox
- * order, used instead of a provider's own bounds type. */
-export type Bounds = [number, number, number, number]
+/** Re-exported, not defined here — `Bounds` is a generic geo primitive
+ * with no map-provider knowledge, so it lives in `lib/geo/bounds.ts`
+ * (`features/*` depends on `lib/*`, never the reverse). Re-exporting
+ * keeps this module's own public surface unchanged for every existing
+ * consumer of `import type { Bounds } from '.../mapProvider'`. */
+export type { Bounds }
 
 export interface FitBoundsOptions {
   /** Pixels of padding on every side, so a fitted polygon/marker set

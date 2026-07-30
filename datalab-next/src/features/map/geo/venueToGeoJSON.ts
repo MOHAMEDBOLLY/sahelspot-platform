@@ -1,5 +1,5 @@
-import type { Venue } from '../../types/venue'
-import type { VenueFeature, VenueFeatureCollection } from '../../features/map/types/features'
+import type { Venue } from '../../../types/venue'
+import type { VenueFeature, VenueFeatureCollection } from '../types/features'
 
 /** Venues with no/invalid coordinates simply can't be plotted — filtered
  * out here rather than producing a broken Point geometry the layer would
