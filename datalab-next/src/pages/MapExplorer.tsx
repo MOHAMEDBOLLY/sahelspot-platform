@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import { MapPinOff } from 'lucide-react'
 import { MapEngine } from '../features/map/MapEngine'
 import { PagePlaceholder } from '../components/PagePlaceholder'
@@ -21,6 +21,14 @@ const ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string | undefi
 // interaction, not spatial data).
 const DEFAULT_CENTER = { lng: 28.7, lat: 30.95 }
 const DEFAULT_ZOOM = 10
+
+// Stateless layer instances, module-scoped so they're allocated exactly
+// once (per module load), not once per MapExplorer render. Order matters
+// — see the docstring below. `useRef([...])` was the original approach
+// here but still evaluates the array literal (three `new` calls) on
+// every render before discarding it, since only the *assignment* into a
+// ref is skipped after the first render, not the initializer expression.
+const MAP_LAYERS: MapLayer[] = [new BoundaryLayer(), new VenueLayer(), new ClusterLayer()]
 
 /**
  * Full-bleed layout is solved entirely here, per the architecture
@@ -56,12 +64,6 @@ export function MapExplorer() {
     () => (destinations ? destinationsToFeatureCollection(destinations) : null),
     [destinations],
   )
-
-  // Stateless layer instances — created once, never recreated across
-  // re-renders (MapEngine only reads `layers` at mount anyway, but these
-  // are also referenced by identity nowhere else, so a stable instance
-  // avoids any ambiguity).
-  const layersRef = useRef<MapLayer[]>([new BoundaryLayer(), new VenueLayer(), new ClusterLayer()])
 
   const layerData = useMemo(() => {
     if (!venueFeatures || !boundaryFeatures) return undefined
@@ -109,7 +111,7 @@ export function MapExplorer() {
         accessToken={ACCESS_TOKEN}
         center={DEFAULT_CENTER}
         zoom={DEFAULT_ZOOM}
-        layers={layersRef.current}
+        layers={MAP_LAYERS}
         layerData={layerData}
       />
     </div>

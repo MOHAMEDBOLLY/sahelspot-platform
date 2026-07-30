@@ -31,8 +31,19 @@ export type MapEngineProps = {
    * how real venue/destination data reaches an already-mounted map. */
   layerData?: Record<string, unknown>
   className?: string
+  /** Which `MapProvider` implementation to construct — defaults to
+   * `MapboxAdapter`. A hardening-pass fix: without this, swapping
+   * providers (MapLibre, Google Maps, Leaflet) would mean editing this
+   * component's body directly, contradicting "future providers swappable
+   * without modifying React components." A caller (a page, a future
+   * provider-selection setting) now supplies a different factory instead. */
+  providerFactory?: () => MapProvider
   /** Fires once the underlying provider is ready. */
   onReady?: (context: MapEngineContext) => void
+}
+
+function defaultProviderFactory(): MapProvider {
+  return new MapboxAdapter()
 }
 
 /**
@@ -41,7 +52,16 @@ export type MapEngineProps = {
  * and `CameraController` lifecycle; nothing above this component ever
  * touches `mapbox-gl` or even knows which provider is in use.
  */
-export function MapEngine({ accessToken, center, zoom, layers, layerData, className, onReady }: MapEngineProps) {
+export function MapEngine({
+  accessToken,
+  center,
+  zoom,
+  layers,
+  layerData,
+  className,
+  providerFactory = defaultProviderFactory,
+  onReady,
+}: MapEngineProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const layerManagerRef = useRef(new LayerManager())
   const providerRef = useRef<MapProvider | null>(null)
@@ -50,7 +70,7 @@ export function MapEngine({ accessToken, center, zoom, layers, layerData, classN
   useEffect(() => {
     if (!containerRef.current) return
 
-    const provider = new MapboxAdapter()
+    const provider = providerFactory()
     const layerManager = layerManagerRef.current
     providerRef.current = provider
 
@@ -77,9 +97,10 @@ export function MapEngine({ accessToken, center, zoom, layers, layerData, classN
     // Mounted once. `center`/`zoom` are only the *initial* view — moving
     // the map afterwards goes through the Camera API, not by tearing down
     // and recreating the whole map on every prop change. `layers`/
-    // `onReady` are read once at mount for the same reason; `layerData`
-    // is intentionally NOT a dependency of this effect (see the effect
-    // below) — data updates must never remount the map.
+    // `providerFactory`/`onReady` are read once at mount for the same
+    // reason; `layerData` is intentionally NOT a dependency of this
+    // effect (see the effect below) — data updates must never remount
+    // the map.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
