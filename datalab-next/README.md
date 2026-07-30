@@ -22,7 +22,7 @@ npm run dev
 The API (`../api/`) must be running separately — see [`../api/README.md`](../api/README.md) — with `GET /venues` and `GET /venues/{id}` reachable and CORS allowing `http://localhost:5173` (already configured in `api/app/main.py`).
 
 - Dev server: http://localhost:5173
-- `npm run build` — type-check (`tsc -b`) and production build
+- `npm run build` — type-check (`tsc -b`) and production build. **Use this to verify changes, not bare `tsc --noEmit`** — the root `tsconfig.json` has `"files": []` plus project references, so a bare `tsc --noEmit` silently compiles nothing and exits 0 regardless of real errors. Only `-b` (which `npm run build` already uses) actually type-checks.
 - `npm run lint` — oxlint
 
 ## Structure
