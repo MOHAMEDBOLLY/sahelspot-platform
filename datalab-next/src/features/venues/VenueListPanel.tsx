@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Store } from 'lucide-react'
-import { useVenues } from './useVenues'
+import { useVenueSearch } from './useVenueSearch'
 import { VenueList } from './VenueList'
 import { BulkActionToolbar } from './BulkActionToolbar'
 import { LoadingState } from '../../components/LoadingState'
 import { ErrorState } from '../../components/ErrorState'
 import { PagePlaceholder } from '../../components/PagePlaceholder'
 import { Pagination } from '../../components/Pagination'
+import { evaluateVenueQuality, type VenueQuality } from '../../lib/venueQuality'
+import { hasQualityFilter } from '../../lib/venueQualityFilter'
 import type { VenueSearchParams } from '../../types/venue'
 
 type VenueListPanelProps = {
@@ -40,10 +42,14 @@ type VenueListPanelProps = {
  * that more existed).
  */
 export function VenueListPanel({ selectedVenueId, onSelectVenue, searchParams, onPageChange }: VenueListPanelProps) {
-  const { data, isPending, isError, error, refetch } = useVenues(searchParams)
+  const { data, isPending, isError, error, refetch } = useVenueSearch(searchParams)
   const [checkedVenueIds, setCheckedVenueIds] = useState<Set<string>>(new Set())
   const hasActiveFilters = Boolean(
-    searchParams.q || searchParams.destinationId || searchParams.category || searchParams.status,
+    searchParams.q ||
+      searchParams.destinationId ||
+      searchParams.category ||
+      searchParams.status ||
+      hasQualityFilter(searchParams.qualityFilter ?? {}),
   )
 
   useEffect(() => {
@@ -53,6 +59,18 @@ export function VenueListPanel({ selectedVenueId, onSelectVenue, searchParams, o
       const pruned = new Set([...current].filter((id) => visibleIds.has(id)))
       return pruned.size === current.size ? current : pruned
     })
+  }, [data])
+
+  /** Evaluated once per venue per fetch, not per render — `data.items`
+   * only changes reference on a new page/filter/refetch, so unrelated
+   * re-renders (e.g. toggling a checkbox) don't re-run the evaluator. */
+  const qualityByVenueId = useMemo(() => {
+    const map = new Map<string, VenueQuality>()
+    if (!data) return map
+    for (const venue of data.items) {
+      map.set(venue.id, evaluateVenueQuality(venue))
+    }
+    return map
   }, [data])
 
   function toggleChecked(id: string) {
@@ -126,6 +144,7 @@ export function VenueListPanel({ selectedVenueId, onSelectVenue, searchParams, o
         onSelectVenue={onSelectVenue}
         checkedVenueIds={checkedVenueIds}
         onToggleChecked={toggleChecked}
+        qualityByVenueId={qualityByVenueId}
       />
       <Pagination page={data.page} pageSize={data.page_size} total={data.total} onPageChange={onPageChange} />
     </div>

@@ -20,6 +20,8 @@ import { ErrorState } from '../../../components/ErrorState'
 import { PagePlaceholder } from '../../../components/PagePlaceholder'
 import { WorkspaceToolbar } from './WorkspaceToolbar'
 import { ValidationSummary } from './ValidationSummary'
+import { VenueMissingDataChips } from '../../../components/VenueMissingDataChips'
+import { evaluateVenueQuality } from '../../../lib/venueQuality'
 import { BasicInfoSection } from './sections/BasicInfoSection'
 import { BeachDetailsSection } from './sections/BeachDetailsSection'
 import { LocationSection } from './sections/LocationSection'
@@ -305,6 +307,7 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
         onSubmitForReview={handleSubmitForReview}
         onApprove={handleApprove}
       />
+      <VenueMissingDataChips quality={evaluateVenueQuality(displayedVenue)} />
       {validationResult && <ValidationSummary result={validationResult} />}
       <BasicInfoSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} errors={fieldErrors} />
       {displayedVenue.category === 'Beach' && (

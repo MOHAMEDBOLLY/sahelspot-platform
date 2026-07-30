@@ -123,7 +123,7 @@ export function ImagesSection({
   const displayedError = localError ?? uploadError
 
   return (
-    <WorkspaceSection title="Images" icon={Images}>
+    <WorkspaceSection id="venue-section-images" title="Images" icon={Images}>
       {displayedError && <p className="mb-3 text-xs font-medium text-red-600">{displayedError}</p>}
       {isUploading && uploadProgress !== null && (
         <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
