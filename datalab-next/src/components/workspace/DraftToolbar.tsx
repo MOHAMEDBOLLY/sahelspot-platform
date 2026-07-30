@@ -49,9 +49,9 @@ export function DraftToolbar({
   extraStatus,
 }: DraftToolbarProps) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="flex min-w-0 items-center gap-2">
-        <h2 className="truncate text-lg font-semibold text-gray-900">{title}</h2>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <h2 className="max-w-full truncate text-lg font-semibold text-gray-900">{title}</h2>
         {mode === 'edit' && isDirty && !isSaving && (
           <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
@@ -65,14 +65,14 @@ export function DraftToolbar({
         )}
         {extraStatus}
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {extraActions}
         {mode === 'view' ? (
           canEdit && (
             <button
               type="button"
               onClick={onEdit}
-              className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+              className="flex min-h-11 items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700 lg:min-h-0"
             >
               <Pencil size={14} />
               Edit
@@ -84,7 +84,7 @@ export function DraftToolbar({
               type="button"
               onClick={onCancel}
               disabled={isSaving}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-11 items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
             >
               <X size={14} />
               Cancel
@@ -94,7 +94,7 @@ export function DraftToolbar({
               onClick={onSave}
               disabled={!isDirty || isSaving || hasFieldErrors}
               title={hasFieldErrors ? 'Fix the highlighted fields before saving.' : undefined}
-              className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-11 items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
             >
               {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               {isSaving ? 'Saving…' : 'Save Draft'}

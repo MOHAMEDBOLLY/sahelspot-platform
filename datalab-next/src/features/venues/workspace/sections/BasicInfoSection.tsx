@@ -20,7 +20,7 @@ type BasicInfoSectionProps = {
 export function BasicInfoSection({ venue, mode, onFieldChange, errors = {} }: BasicInfoSectionProps) {
   return (
     <WorkspaceSection title="Basic Information" icon={Info}>
-      <dl className="grid grid-cols-2 gap-4">
+      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {mode === 'view' ? (
           <WorkspaceField label="Name" value={venue.name} />
         ) : (

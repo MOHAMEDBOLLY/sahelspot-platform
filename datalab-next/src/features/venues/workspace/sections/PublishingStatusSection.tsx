@@ -23,7 +23,7 @@ export function PublishingStatusSection({
 }: PublishingStatusSectionProps) {
   return (
     <WorkspaceSection title="Publishing Status" icon={UploadCloud}>
-      <dl className="grid grid-cols-2 gap-4">
+      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {/* Status is workflow-controlled (see docs/ARCHITECTURE.md#publishing-architecture) —
             it changes via Review/Publish actions, not a free-form field edit. Always read-only. */}
         <WorkspaceField label="Status" value={<StatusBadge status={venue.status} />} />

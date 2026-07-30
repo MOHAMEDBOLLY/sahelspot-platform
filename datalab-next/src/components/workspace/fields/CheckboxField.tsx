@@ -7,7 +7,7 @@ type CheckboxFieldProps = {
 /** Edit-mode control: a single boolean toggle. Purely presentational — no validation, no persistence. */
 export function CheckboxField({ label, checked, onChange }: CheckboxFieldProps) {
   return (
-    <label className="flex items-center gap-2">
+    <label className="flex min-h-11 items-center gap-2 lg:min-h-0">
       <input
         type="checkbox"
         checked={checked}

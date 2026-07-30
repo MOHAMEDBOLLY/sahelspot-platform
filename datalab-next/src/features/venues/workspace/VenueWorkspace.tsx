@@ -251,7 +251,7 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
   const isSaveConflict = saveError instanceof ApiError && saveError.status === 409
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 pb-24 lg:pb-0">
       {isSaveConflict && (
         <div className="flex items-center justify-between gap-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <span>{saveError.message}</span>
@@ -264,49 +264,56 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
           </button>
         </div>
       )}
-      <WorkspaceToolbar
-        venueName={displayedVenue.name}
-        mode={mode}
-        isDirty={isDirty}
-        isSaving={isSaving}
-        saveError={
-          isSaveConflict
-            ? null
-            : saveError instanceof ApiError
-              ? saveError.message
-              : saveError
-                ? 'Failed to save.'
+      {/* Phone/tablet: fixed to the bottom, safe-area aware, so the
+          primary Edit/Save/workflow actions are always one thumb-reach
+          away, "native mobile editor" style (requirement 6). Desktop
+          (`lg:`): `lg:static` restores its original in-flow position at
+          the top, unchanged. */}
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-gray-200 bg-white p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-4px_12px_rgba(0,0,0,0.06)] lg:static lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
+        <WorkspaceToolbar
+          venueName={displayedVenue.name}
+          mode={mode}
+          isDirty={isDirty}
+          isSaving={isSaving}
+          saveError={
+            isSaveConflict
+              ? null
+              : saveError instanceof ApiError
+                ? saveError.message
+                : saveError
+                  ? 'Failed to save.'
+                  : null
+          }
+          hasFieldErrors={hasFieldErrors}
+          canEdit={canEdit}
+          isValidating={isValidating}
+          canSubmitForReview={canSubmitForReview}
+          isSubmittingForReview={isSubmittingForReview}
+          submitForReviewError={
+            submitForReviewError instanceof ApiError
+              ? submitForReviewError.message
+              : submitForReviewError
+                ? 'Failed to submit for review.'
                 : null
-        }
-        hasFieldErrors={hasFieldErrors}
-        canEdit={canEdit}
-        isValidating={isValidating}
-        canSubmitForReview={canSubmitForReview}
-        isSubmittingForReview={isSubmittingForReview}
-        submitForReviewError={
-          submitForReviewError instanceof ApiError
-            ? submitForReviewError.message
-            : submitForReviewError
-              ? 'Failed to submit for review.'
-              : null
-        }
-        canApprove={canApprove}
-        isApproving={isApproving}
-        approveError={
-          approveError instanceof ApiError ? approveError.message : approveError ? 'Failed to approve.' : null
-        }
-        canReject={canApprove}
-        rejectError={
-          rejectError instanceof ApiError ? rejectError.message : rejectError ? 'Failed to reject.' : null
-        }
-        onReject={handleReject}
-        onEdit={startEditing}
-        onCancel={handleCancel}
-        onSave={handleSave}
-        onValidate={handleValidate}
-        onSubmitForReview={handleSubmitForReview}
-        onApprove={handleApprove}
-      />
+          }
+          canApprove={canApprove}
+          isApproving={isApproving}
+          approveError={
+            approveError instanceof ApiError ? approveError.message : approveError ? 'Failed to approve.' : null
+          }
+          canReject={canApprove}
+          rejectError={
+            rejectError instanceof ApiError ? rejectError.message : rejectError ? 'Failed to reject.' : null
+          }
+          onReject={handleReject}
+          onEdit={startEditing}
+          onCancel={handleCancel}
+          onSave={handleSave}
+          onValidate={handleValidate}
+          onSubmitForReview={handleSubmitForReview}
+          onApprove={handleApprove}
+        />
+      </div>
       <VenueMissingDataChips quality={evaluateVenueQuality(displayedVenue)} />
       {validationResult && <ValidationSummary result={validationResult} />}
       <BasicInfoSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} errors={fieldErrors} />

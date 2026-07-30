@@ -29,7 +29,7 @@ export function BeachDetailsSection({ venue, mode, onFieldChange }: BeachDetails
 
   return (
     <WorkspaceSection title="Beach Details" icon={Waves}>
-      <dl className="grid grid-cols-2 gap-4">
+      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {mode === 'view' ? (
           <>
             <WorkspaceField label="Type" value={beachDetails.type ?? null} />

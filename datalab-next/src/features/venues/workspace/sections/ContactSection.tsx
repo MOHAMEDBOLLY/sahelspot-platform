@@ -53,7 +53,7 @@ function FieldValueWithLink({ value, href, icon, label, linkKey }: {
 export function ContactSection({ venue, mode, onFieldChange, errors = {} }: ContactSectionProps) {
   return (
     <WorkspaceSection id="venue-section-contact" title="Contact" icon={Phone}>
-      <dl className="grid grid-cols-2 gap-4">
+      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {mode === 'view' ? (
           <>
             <WorkspaceField

@@ -18,7 +18,7 @@ type LocationSectionProps = {
 export function LocationSection({ venue, mode, onFieldChange, errors = {} }: LocationSectionProps) {
   return (
     <WorkspaceSection id="venue-section-location" title="Location" icon={MapPin}>
-      <dl className="grid grid-cols-2 gap-4">
+      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {mode === 'view' ? (
           <>
             <WorkspaceField label="Latitude" value={venue.latitude} />

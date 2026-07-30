@@ -100,7 +100,7 @@ export function WorkspaceToolbar({
               onClick={onValidate}
               disabled={isValidating || isDirty}
               title={isDirty ? 'Save Draft first — Validate checks the saved state, not unsaved edits.' : undefined}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-11 items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
             >
               {isValidating ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
               {isValidating ? 'Validating…' : 'Validate'}
@@ -111,7 +111,7 @@ export function WorkspaceToolbar({
               type="button"
               onClick={onSubmitForReview}
               disabled={isSubmittingForReview}
-              className="flex items-center gap-1.5 rounded-lg bg-green-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-11 items-center gap-1.5 rounded-lg bg-green-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
             >
               {isSubmittingForReview ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
               {isSubmittingForReview ? 'Submitting…' : 'Submit for Review'}
@@ -122,7 +122,7 @@ export function WorkspaceToolbar({
               type="button"
               onClick={onApprove}
               disabled={isApproving}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-11 items-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
             >
               {isApproving ? <Loader2 size={14} className="animate-spin" /> : <ThumbsUp size={14} />}
               {isApproving ? 'Approving…' : 'Approve'}
