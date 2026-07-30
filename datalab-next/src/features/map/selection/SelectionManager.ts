@@ -1,5 +1,6 @@
 import type { MapProvider } from '../providers/mapProvider'
 import type { LayerManager } from '../layers/LayerManager'
+import { LayerId } from '../constants/LayerId'
 
 interface SelectedFeature {
   sourceId: string
@@ -14,11 +15,12 @@ interface SelectedFeature {
  * a `MapProvider`), so `LayerManager.setFeatureState` stays the single
  * choke point for feature-state writes.
  *
- * Foundation only in this phase: nothing calls `select`/`clear` yet — no
- * click handling exists (Phase 3, "Interaction"). The state key written
- * is `selected`; layers that want to *style* a selected feature
- * differently (e.g. the Boundary Layer's future "Compound Focus Mode")
- * read this same key in their own paint expressions.
+ * `selectVenue`/`clearSelection` (Phase 3) are venue-domain sugar over
+ * the generic `select`/`clear` — V1 only ever selects venues, so
+ * `InteractionController` uses these rather than passing `LayerId
+ * .VENUES_SOURCE` around itself. The state key written is `selected`;
+ * `VenueLayer`'s paint expressions read this same key to render the
+ * highlight — the layer never sets it, only styles it.
  */
 export class SelectionManager {
   private selected: SelectedFeature | null = null
@@ -44,5 +46,16 @@ export class SelectionManager {
 
   getSelected(): SelectedFeature | null {
     return this.selected
+  }
+
+  /** Selecting a new venue automatically clears whatever was selected
+   * before — the same guarantee `select` already provides, just under
+   * the venue-specific name `VENUE CLICK` calls for. */
+  selectVenue(provider: MapProvider, venueId: string): void {
+    this.select(provider, LayerId.VENUES_SOURCE, venueId)
+  }
+
+  clearSelection(provider: MapProvider): void {
+    this.clear(provider)
   }
 }

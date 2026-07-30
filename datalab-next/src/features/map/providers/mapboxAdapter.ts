@@ -139,6 +139,22 @@ export class MapboxAdapter implements MapProvider {
     this.map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none')
   }
 
+  getClusterExpansionZoom(sourceId: string, clusterId: number): Promise<number> {
+    const source = this.map?.getSource(sourceId)
+    if (!source || source.type !== 'geojson') {
+      return Promise.reject(new Error(`No GeoJSON source "${sourceId}" to expand cluster ${clusterId} on`))
+    }
+    return new Promise((resolve, reject) => {
+      ;(source as mapboxgl.GeoJSONSource).getClusterExpansionZoom(clusterId, (error, zoom) => {
+        if (error || zoom === undefined || zoom === null) {
+          reject(error ?? new Error('getClusterExpansionZoom returned no zoom'))
+          return
+        }
+        resolve(zoom)
+      })
+    })
+  }
+
   setFeatureState(sourceId: string, featureId: string | number, state: Record<string, unknown>): void {
     this.map?.setFeatureState({ source: sourceId, id: featureId }, state)
   }

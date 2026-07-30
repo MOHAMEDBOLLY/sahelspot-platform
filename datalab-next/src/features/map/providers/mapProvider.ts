@@ -102,6 +102,12 @@ export interface MapProvider {
   removeLayer(id: string): void
   /** Phase 2 — the Boundary Layer's visibility-toggle requirement. */
   setLayerVisibility(id: string, visible: boolean): void
+  /** Phase 3 — the zoom level at which a given cluster naturally breaks
+   * apart, per the provider's own clustering. This is what "expand
+   * naturally using Mapbox clustering" (no custom expansion logic) means
+   * in practice: ask the provider what native clustering already knows,
+   * rather than guessing a fixed zoom increment. */
+  getClusterExpansionZoom(sourceId: string, clusterId: number): Promise<number>
 
   /** Per-feature ephemeral state (selected/highlighted/faded) — the
    * mechanism every "selection" and "focus mode" interaction must use

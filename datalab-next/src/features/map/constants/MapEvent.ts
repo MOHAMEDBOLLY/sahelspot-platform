@@ -10,6 +10,9 @@ export const MapEvent = {
   MoveEnd: 'moveend',
   Zoom: 'zoom',
   StyleLoaded: 'styledata',
+  /** Phase 3 — fires once panning/zooming/data-loading settles; the
+   * source for the `MapIdle` interaction event. */
+  Idle: 'idle',
 } as const
 
 export type MapEvent = (typeof MapEvent)[keyof typeof MapEvent]

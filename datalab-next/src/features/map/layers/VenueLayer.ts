@@ -15,7 +15,13 @@ const EMPTY_COLLECTION: VenueFeatureCollection = { type: 'FeatureCollection', fe
  *
  * Marker color is data-driven per category (`buildVenueCategoryColorExpression`)
  * — no single marker style, per the architecture decision. Popups and
- * click handling are not part of this layer (later phase).
+ * click handling are not part of this layer.
+ *
+ * Phase 3: paint also reads the `selected` feature-state key to render
+ * the "highlight marker" requirement — this layer only *styles* that
+ * key, it never sets it (`SelectionManager`/`LayerManager` do, via
+ * `InteractionController`). Ownership vs. rendering stays split exactly
+ * as the Selection architecture requires.
  */
 export class VenueLayer implements MapLayer<VenueFeatureCollection> {
   readonly id = LayerId.VENUES_SOURCE
@@ -35,9 +41,9 @@ export class VenueLayer implements MapLayer<VenueFeatureCollection> {
       type: 'circle',
       filter: ['!', ['has', 'point_count']],
       paint: {
-        'circle-radius': 7,
+        'circle-radius': ['case', ['boolean', ['feature-state', 'selected'], false], 10, 7],
         'circle-color': buildVenueCategoryColorExpression(),
-        'circle-stroke-width': 2,
+        'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3, 2],
         'circle-stroke-color': '#ffffff',
       },
     })

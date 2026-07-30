@@ -3,18 +3,25 @@ import { MapboxAdapter } from './providers/mapboxAdapter'
 import { LayerManager } from './layers/LayerManager'
 import { SelectionManager } from './selection/SelectionManager'
 import { CameraController } from './camera/CameraController'
+import { PopupController } from './popup/PopupController'
+import { FocusController } from './focus/FocusController'
+import { InteractionController } from './interaction/InteractionController'
 import type { LngLat, MapProvider } from './providers/mapProvider'
 import type { MapLayer } from './layers/types'
 
 /** What `MapEngine` hands back once the provider has mounted and every
  * layer is registered — the concrete realization of "MapEngine →
- * SelectionManager → LayerManager" and the Camera API, all owned here
- * and handed outward rather than constructed ad hoc by callers. */
+ * SelectionManager → LayerManager", the Camera API, and (Phase 3) Popup/
+ * Focus/Interaction — all owned here and handed outward rather than
+ * constructed ad hoc by callers. */
 export interface MapEngineContext {
   provider: MapProvider
   camera: CameraController
   selection: SelectionManager
   layerManager: LayerManager
+  popup: PopupController
+  focus: FocusController
+  interaction: InteractionController
 }
 
 export type MapEngineProps = {
@@ -76,19 +83,28 @@ export function MapEngine({
 
     provider.init(containerRef.current, { center, zoom, accessToken })
 
+    let interaction: InteractionController | null = null
+
     const unsubscribeLoad = provider.onLoad(() => {
       for (const layer of layers) {
         layerManager.register(layer)
       }
       layerManager.mountAll(provider)
+
       const selection = new SelectionManager(layerManager)
       const camera = new CameraController(provider)
+      const popup = new PopupController()
+      const focus = new FocusController(camera, { center, zoom })
+      interaction = new InteractionController(provider, selection, camera, popup)
+      interaction.attach()
+
       setIsReady(true)
-      onReady?.({ provider, camera, selection, layerManager })
+      onReady?.({ provider, camera, selection, layerManager, popup, focus, interaction })
     })
 
     return () => {
       unsubscribeLoad()
+      interaction?.detach()
       setIsReady(false)
       layerManager.unmountAll(provider)
       provider.destroy()
