@@ -42,8 +42,10 @@ export class VenueLayer implements MapLayer<VenueFeatureCollection> {
       filter: ['!', ['has', 'point_count']],
       paint: {
         'circle-radius': ['case', ['boolean', ['feature-state', 'selected'], false], 10, 7],
+        'circle-radius-transition': { duration: 150 },
         'circle-color': buildVenueCategoryColorExpression(),
         'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3, 2],
+        'circle-stroke-width-transition': { duration: 150 },
         'circle-stroke-color': '#ffffff',
       },
     })

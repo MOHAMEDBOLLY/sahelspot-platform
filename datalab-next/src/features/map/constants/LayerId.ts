@@ -11,6 +11,7 @@ export const LayerId = {
   VENUES_SOURCE: 'venues',
   VENUES_UNCLUSTERED: 'venues-unclustered',
   CLUSTERS: 'clusters',
+  CLUSTER_HALO: 'cluster-halo',
   CLUSTER_COUNT: 'cluster-count',
 
   /** The destination-boundary GeoJSON source, and its two read-only

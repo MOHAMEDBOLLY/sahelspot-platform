@@ -15,17 +15,24 @@ const EMPTY_COLLECTION: BoundaryFeatureCollection = { type: 'FeatureCollection',
  */
 export class BoundaryLayer implements MapLayer<BoundaryFeatureCollection> {
   readonly id = LayerId.DESTINATIONS_SOURCE
+  private unsubscribeHover: (() => void) | null = null
 
   mount(provider: MapProvider): void {
     provider.addSource({ id: LayerId.DESTINATIONS_SOURCE, data: EMPTY_COLLECTION })
 
+    // More restraint at rest (8% vs. the previous 12%) so a resting
+    // compound reads as a quiet outline, not a filled shape competing
+    // with venue markers; the hover state (feature-state, same
+    // mechanism as venue `selected`) is what makes a compound feel
+    // interactive on pointer-over, not a permanently-heavier fill.
     provider.addLayer({
       id: LayerId.BOUNDARIES_FILL,
       sourceId: LayerId.DESTINATIONS_SOURCE,
       type: 'fill',
       paint: {
         'fill-color': '#0EA5E9',
-        'fill-opacity': 0.12,
+        'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.22, 0.08],
+        'fill-opacity-transition': { duration: 150 },
       },
     })
 
@@ -35,12 +42,17 @@ export class BoundaryLayer implements MapLayer<BoundaryFeatureCollection> {
       type: 'line',
       paint: {
         'line-color': '#0EA5E9',
-        'line-width': 1.5,
+        'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 2.5, 1.5],
+        'line-width-transition': { duration: 150 },
       },
     })
+
+    this.unsubscribeHover = provider.onHover(LayerId.BOUNDARIES_FILL, LayerId.DESTINATIONS_SOURCE)
   }
 
   unmount(provider: MapProvider): void {
+    this.unsubscribeHover?.()
+    this.unsubscribeHover = null
     provider.removeLayer(LayerId.BOUNDARIES_LINE)
     provider.removeLayer(LayerId.BOUNDARIES_FILL)
     provider.removeSource(LayerId.DESTINATIONS_SOURCE)
