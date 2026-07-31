@@ -7,6 +7,10 @@
 export const MapEvent = {
   Load: 'load',
   Click: 'click',
+  /** Map UX Polish — drives per-feature `hover` feature-state (see
+   * `MapboxAdapter.onHover`); mirrors `Click`'s layer-delegated form. */
+  MouseMove: 'mousemove',
+  MouseLeave: 'mouseleave',
   MoveEnd: 'moveend',
   Zoom: 'zoom',
   StyleLoaded: 'styledata',

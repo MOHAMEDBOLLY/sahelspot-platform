@@ -1,5 +1,6 @@
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
+import './mapboxControls.css'
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
 import type {
   Bounds,
@@ -33,6 +34,17 @@ export class MapboxAdapter implements MapProvider {
       zoom: options.zoom,
       attributionControl: true,
     })
+
+    // Zoom + geolocate controls — Mapbox ships neither by default. Both
+    // are restyled entirely via mapboxControls.css (imported above) to
+    // match the product's rounded/shadowed button language instead of
+    // Mapbox's default squared-off gray buttons; no visibility/behavior
+    // change, purely a skin over the stock controls.
+    this.map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right')
+    this.map.addControl(
+      new mapboxgl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false }),
+      'bottom-right',
+    )
   }
 
   destroy(): void {
@@ -171,6 +183,39 @@ export class MapboxAdapter implements MapProvider {
 
   removeFeatureState(sourceId: string, featureId?: string | number): void {
     this.map?.removeFeatureState({ source: sourceId, id: featureId })
+  }
+
+  onHover(layerId: string, sourceId: string): () => void {
+    if (!this.map) return () => {}
+    const map = this.map
+    let hoveredId: string | number | undefined
+
+    const clear = () => {
+      if (hoveredId !== undefined) {
+        map.setFeatureState({ source: sourceId, id: hoveredId }, { hover: false })
+        hoveredId = undefined
+      }
+    }
+
+    const onMove = (event: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+      const feature = event.features?.[0]
+      const nextId = feature?.id
+      if (nextId === hoveredId) return
+      clear()
+      if (nextId !== undefined) {
+        map.setFeatureState({ source: sourceId, id: nextId }, { hover: true })
+        hoveredId = nextId
+      }
+    }
+
+    map.on(MapEvent.MouseMove, layerId, onMove)
+    map.on(MapEvent.MouseLeave, layerId, clear)
+
+    return () => {
+      clear()
+      map.off(MapEvent.MouseMove, layerId, onMove)
+      map.off(MapEvent.MouseLeave, layerId, clear)
+    }
   }
 
   onClick(layerId: string, handler: MapClickHandler): () => void {

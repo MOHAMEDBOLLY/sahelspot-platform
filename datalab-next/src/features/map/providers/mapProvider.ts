@@ -117,6 +117,15 @@ export interface MapProvider {
   setFeatureState(sourceId: string, featureId: string | number, state: Record<string, unknown>): void
   removeFeatureState(sourceId: string, featureId?: string | number): void
 
+  /** Drives a `hover` feature-state on whichever feature the pointer is
+   * currently over in `layerId` (cleared automatically on pointer-leave,
+   * exactly one feature hovered at a time) — the same feature-state
+   * mechanism `selected` already uses, so a layer's paint can read
+   * `['feature-state', 'hover']` the same way it reads `selected`. Purely
+   * visual; never fires a domain event and never touches the Selection/
+   * Interaction event taxonomy. */
+  onHover(layerId: string, sourceId: string): () => void
+
   onClick(layerId: string, handler: MapClickHandler): () => void
   /** The complement of `onClick`: fires only when a click hits none of
    * `layerIds`. Needed because a delegated `onClick` listener and a
