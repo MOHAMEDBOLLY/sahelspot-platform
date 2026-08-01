@@ -29,10 +29,33 @@ export class MapboxAdapter implements MapProvider {
     mapboxgl.accessToken = options.accessToken
     this.map = new mapboxgl.Map({
       container,
-      style: 'mapbox://styles/mapbox/light-v11',
+      style: 'mapbox://styles/mapbox/standard',
       center: [options.center.lng, options.center.lat],
       zoom: options.zoom,
       attributionControl: true,
+      // Mapbox Standard's official runtime config API (not a style fork —
+      // these are first-class properties Standard itself defines and
+      // documents). Tuned for a practical editorial tool, not a showcase
+      // map: default theme/day preset for natural, recognizable color;
+      // POI and transit labels off (irrelevant to venue editing, pure
+      // clutter); place and road labels on (both genuinely help orient
+      // while editing); 3D buildings and landmark icons off (North
+      // Coast's low-rise villa resorts have no wayfinding use for
+      // building height, and 3D costs real GPU/mobile performance for
+      // no benefit here — see the flat-buildings decision made earlier
+      // for the classic-style draft, which applies identically here).
+      config: {
+        basemap: {
+          lightPreset: 'day',
+          theme: 'default',
+          showPlaceLabels: true,
+          showRoadLabels: true,
+          showPointOfInterestLabels: false,
+          showTransitLabels: false,
+          show3dObjects: false,
+          showLandmarkIcons: false,
+        },
+      },
     })
 
     // Zoom + geolocate controls — Mapbox ships neither by default. Both
