@@ -33,17 +33,13 @@ export class MapboxAdapter implements MapProvider {
       center: [options.center.lng, options.center.lat],
       zoom: options.zoom,
       attributionControl: true,
-      // Mapbox Standard's official runtime config API (not a style fork —
-      // these are first-class properties Standard itself defines and
-      // documents). Tuned for a practical editorial tool, not a showcase
-      // map: default theme/day preset for natural, recognizable color;
-      // POI and transit labels off (irrelevant to venue editing, pure
-      // clutter); place and road labels on (both genuinely help orient
-      // while editing); 3D buildings and landmark icons off (North
-      // Coast's low-rise villa resorts have no wayfinding use for
-      // building height, and 3D costs real GPU/mobile performance for
-      // no benefit here — see the flat-buildings decision made earlier
-      // for the classic-style draft, which applies identically here).
+      // Mapbox Standard's official runtime config API — tuned for a
+      // practical editorial tool, not a showcase map. POI/transit labels
+      // off (clutter, irrelevant to venue editing); place/road labels on
+      // (both help orient while editing); 3D buildings and landmarks off
+      // — North Coast's low-rise villa resorts get no wayfinding value
+      // from building height, and 3D costs real GPU/mobile performance
+      // for no benefit here.
       config: {
         basemap: {
           lightPreset: 'day',
@@ -54,6 +50,15 @@ export class MapboxAdapter implements MapProvider {
           showTransitLabels: false,
           show3dObjects: false,
           showLandmarkIcons: false,
+          // Road hierarchy — Standard's only lever here. colorMotorways/
+          // colorTrunks are left at their default (full contrast) so the
+          // international coastal road stays dominant; colorRoads is the
+          // one bucket Standard exposes for everything else (primary,
+          // secondary, residential, service — undifferentiated, no
+          // zoom-based fade exists in Standard's config API). Muting it
+          // is a real tradeoff: primary roads mute along with service/
+          // residential roads, not just the minor ones.
+          colorRoads: '#d9d4c9',
         },
       },
     })
