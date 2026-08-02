@@ -265,6 +265,38 @@ per-venue `generateMetadata`.
 
 ---
 
+## Real-data verification (post-Phase 7, pre-Phase 8)
+
+Publish revision 1071 (25 destinations, 401 venues) landed — the first real content this
+project has had. Every screen built so far (4–7) had only ever been verified against `[]`
+or hand-built fixture data. This pass re-verified Home, Map, Venue Details, and Search
+against the real dataset by feeding real captured JSON through the actual mapper and
+components on a temporary route (deleted before commit) — the CORS gap from Phase 3 still
+blocks the *browser's own* fetch, so this was the available way to see real content
+through real code without touching that out-of-scope config.
+
+**One real bug found and fixed:** the category mapper checked the wire `category` string
+against Stitch's five literal names. Real Studio categories are entirely different
+strings (`Restaurant`, `Cafe`, `Beach Club`, etc.) — before the fix, every category except
+`Nightlife` fell back to `general`, including all 206 restaurants and cafes (51% of the
+dataset). Fixed via a translation table — `API_REQUIREMENTS.md` §9.
+
+**One field newly confirmed and implemented:** `opening_hours`'s real shape, from the one
+populated venue. `lib/domain/openingHours.ts` now parses it into `isOpenNow` and an
+"Until HH:MM" info pill — real coverage is 1/401, so don't expect it visible on more than
+a handful of venues yet.
+
+**Confirmed, not assumed:** `cover_image_url`/`gallery_image_urls` are 0/401 — every
+image fallback in the app is live today, not theoretical. `is_featured` is 1/401 — Home's
+Trending Today is correctly sparse given the data. `beach_details` is 0/401 — still
+unresolved whether it's the "Why Visit" source, unconfirmable until a venue has it set.
+
+**Informational, not code changes:** bilingual venue names render via font fallback
+(no defect, a future i18n decision); one apparent duplicate venue name pair spotted in
+Marassi (a Studio content question).
+
+---
+
 ## Critical path
 
 ```

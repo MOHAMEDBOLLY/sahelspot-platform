@@ -190,18 +190,82 @@ integer, for the star row to be correct.
 
 ---
 
-## 7. Structured content — P1
+## 7. Structured content — `opening_hours` ✅ shape confirmed, `beach_details` still open
 
-Two blobs are typed `dict | None` on the wire and need a documented shape before the UI
-can render them reliably:
+**Verified against publish revision 1071** (401 venues, 2026-08-02).
 
-- **`opening_hours`** — drives Venue Details `InfoPill`s and any "Open now" indicator.
-- **`beach_details`** — the likeliest source for the "Why Visit" checklist (4 rows,
-  circular teal check + text). If it is not, "Why Visit" needs its own field:
-  `highlights: list[str] | None`.
+- **`opening_hours`** — shape confirmed from the one populated venue (`v00001`, 0.2% of
+  the dataset): a day-keyed object (`mon`…`sun`, 3-letter lowercase), each day an array of
+  `["HH:MM", "HH:MM"]` 24h ranges — an array, not a single pair, so a split lunch/dinner
+  schedule is representable. Implemented in `lib/domain/openingHours.ts`
+  (`toOpeningHours`, `isOpenAt`, `formatOpenUntil`) and wired into `Venue.isOpenNow`
+  (`VenueCard`'s `StatusBadge`) and Venue Details' hours `InfoPill`. **Real coverage is
+  effectively zero (1/401)** — implemented because the shape is now a fact, not a guess,
+  but don't expect it to render on more than a handful of venues yet.
+- **`beach_details`** — **confirmed 0/401 populated** in this snapshot. Still an open
+  question whether it's the intended source for "Why Visit" highlights or unrelated;
+  cannot be resolved by inspecting real data since no venue has it set. `highlights: list[str]
+  | None` remains the fallback proposal if `beach_details` turns out to serve a different
+  purpose.
 
-The Consumer domain mapper defines `OpeningHours` and `BeachDetails` types; those
-definitions must be agreed against what Studio actually publishes, not inferred.
+Also confirmed in this snapshot: **`cover_image_url` and `gallery_image_urls` are 0/401
+populated** — every card and gallery in the app is currently rendering its no-image
+fallback. This makes §3a (destination imagery) and the venue-level equivalent the most
+visually significant gap in the product today, not a theoretical one.
+
+---
+
+## 9. Category taxonomy mismatch — found verifying against real data, fixed in Consumer
+
+**Not a Studio requirement — a Consumer bug, now fixed**, documented here because it
+was invisible without real content. The original `VenueCategory` mapper checked the wire
+`category` string against Stitch's five literal names (`"beach"`, `"food"`, `"coffee"`,
+`"nightlife"`, `"general"`). Real Studio categories, confirmed against 401 venues, are
+entirely different strings:
+
+| Real category | Count | Mapped to |
+|---|---|---|
+| Restaurant | 156 | `food` |
+| Cafe | 50 | `coffee` |
+| Activity | 39 | `general` |
+| Shopping | 33 | `general` |
+| Spa | 28 | `general` |
+| Hotel | 26 | `general` |
+| Services | 20 | `general` |
+| Resort | 20 | `general` |
+| Beach Club | 19 | `beach` |
+| Nightlife | 8 | `nightlife` (only literal match) |
+| Other | 2 | `general` |
+
+Before the fix, everything except `Nightlife` fell back to `general` — **100% of
+restaurants and cafes** (206 venues, 51% of the dataset) rendered with the wrong map
+marker colour and the wrong mood-grid icon. `lib/domain/mappers/venue.ts`'s
+`CATEGORY_MAP` now translates the real strings.
+
+**Product question, not a bug:** `Activity`/`Shopping`/`Spa`/`Hotel`/`Services`/`Resort`/
+`Other` (168 venues, 42% of the dataset) have no equivalent in Stitch's five-category mood
+grid or map marker set at all — they correctly fall to `general`, but that's Stitch having
+designed for 5 categories against a real taxonomy of 11, not something a mapper fix can
+resolve. Worth a design conversation: does the mood grid need a 6th "More" chip, or a
+dedicated marker colour for these?
+
+---
+
+## 10. Other observations from real data — informational, not blocking
+
+- **Bilingual venue names.** Several real names mix Latin and Arabic in one string
+  (`"Aklet Samak - اكلة سمك"`, `"Al Agha مطعم الاغا"`). These render legibly today via
+  the browser's own font fallback — `--font-sans` (Inter) has no Arabic glyph coverage,
+  and `--font-arabic` (IBM Plex Sans Arabic) is never applied to dynamic content, since
+  Stitch only used it for the Splash tagline, a fixed string in a known language. Not a
+  defect, but worth a deliberate design decision before an Arabic-locale push: detect and
+  apply `font-arabic` to venue-facing text, or accept system fallback as sufficient.
+- **Possible duplicate content.** Two separate ids in the Marassi food search sample were
+  both named "Al Agha" — may be legitimate branches, may be a data entry duplicate. A
+  Studio content question, not a Consumer rendering issue.
+- **`is_featured` is 1/401.** Home's "Trending Today" will show a single card in this
+  snapshot — correct behaviour given the data, not a bug, but worth knowing before judging
+  Home's visual density against the Stitch export.
 
 ---
 
@@ -217,8 +281,9 @@ definitions must be agreed against what Studio actually publishes, not inferred.
 | 4 | Nearby endpoint / distance | P1 | Map, Search, Nearby |
 | 5 | Weather | P2 | Home weather pill — recommend dropping |
 | 6 | Account-dependent UI | — | ✅ Resolved without API work |
-| 7 | `opening_hours` / `beach_details` shape | P1 | Venue Details |
+| 7 | `opening_hours` ✅ shape confirmed &amp; implemented; `beach_details` still unresolved | P1 | Venue Details |
 | 8 | `price_range`, `tags`, `amenities`, `highlights` | P1 | Venue Details |
+| 9 | *(Consumer bug, not Studio)* category taxonomy mismatch | — | ✅ Fixed — see §9 |
 
 **Buildable to full fidelity today:** Saved, More, Splash, Onboarding, Search (minus
 distance), Map (minus stats and viewport query), Venue Details (minus ratings, price,

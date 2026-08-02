@@ -1,3 +1,5 @@
+import type { OpeningHours } from "./openingHours";
+
 /** The UI-facing venue shape — docs/consumer/ARCHITECTURE.md §3.
  *
  * Deliberately not `PublishedVenue`: components never see snake_case, a
@@ -36,8 +38,15 @@ export type Venue = {
   rating: number | null;
   reviewCount: number | null;
 
-  /** API_REQUIREMENTS.md §7/§8 — no source yet. */
+  /** §7 — real shape confirmed against publish revision 1071, though only
+   * 1/401 venues currently have it populated. `null` covers both "absent"
+   * and "present but malformed" (see `toOpeningHours`). */
+  openingHours: OpeningHours | null;
+  /** Derived from `openingHours` at fetch time — see `toVenue`'s comment on
+   * why that's an acceptable simplification here. */
   isOpenNow: boolean | null;
+
+  /** API_REQUIREMENTS.md §8 — no source yet. */
   distanceLabel: string | null;
   priceRange: string | null;
   tags: string[];

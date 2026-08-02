@@ -16,6 +16,7 @@ import { ImageGallery } from "@/components/venue/ImageGallery";
 import { useVenue } from "@/lib/hooks/useVenue";
 import { useSaved } from "@/lib/saved/useSaved";
 import { VENUE_CATEGORY_LABEL } from "@/lib/domain/venueCategoryLabel";
+import { formatOpenUntil } from "@/lib/domain/openingHours";
 
 /** WhatsApp's brand SVG — the one place a brand mark overrides the icon
  * system, confirmed in the Boca Beach export (`#25D366`, not a Material
@@ -80,7 +81,11 @@ export default function VenueDetailsPage() {
     (url): url is string => url !== null,
   );
   const tags = [VENUE_CATEGORY_LABEL[data.category], ...data.tags];
+  const hoursLabel = data.openingHours ? formatOpenUntil(data.openingHours, new Date()) : null;
   const infoPills = [
+    // Only rendered while genuinely open — see formatOpenUntil's own note on
+    // why there's no "closed, opens at X" fallback copy to show instead.
+    hoursLabel ? { icon: "schedule", label: hoursLabel } : null,
     data.priceRange ? { icon: "payments", label: data.priceRange } : null,
     data.distanceLabel ? { icon: "distance", label: data.distanceLabel } : null,
     ...data.amenities.map((amenity) => ({ icon: "check_circle", label: amenity })),
