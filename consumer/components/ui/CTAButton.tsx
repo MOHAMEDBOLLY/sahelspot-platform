@@ -65,8 +65,14 @@ export function CTAButton({
   );
 
   if (href) {
+    const isExternal = href.startsWith("http");
     return (
-      <Link className={classes} href={href}>
+      <Link
+        className={classes}
+        href={href}
+        rel={isExternal ? "noopener noreferrer" : undefined}
+        target={isExternal ? "_blank" : undefined}
+      >
         {content}
       </Link>
     );

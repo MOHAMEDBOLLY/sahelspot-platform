@@ -135,12 +135,39 @@ is isolated to `/map`.
 
 ---
 
-## Phase 6 — Venue Details ✅ unblocked
+## Phase 6 — Venue Details ✅ complete
 
-Reference: `/Users/Nabil/Downloads/stitch_sahelspot 2/`. Fully specified.
+Reference: `/Users/Nabil/Downloads/stitch_sahelspot 2/`.
 
-**Exit:** matches the exported screen; contact actions, gallery, save control, and 404
-all work; no bottom nav; `px-4` padding.
+`useVenue(id)` drives all four states: skeleton hero + lines while loading, an
+error/retry `EmptyState` on failure, Next's `notFound()` (rendering the existing
+`not-found.tsx`) when the API returns `null`, and the full screen on success.
+
+Every optional field either renders correctly or the region it belongs to disappears —
+nothing renders inert:
+- No `rating` → no `RatingStars` row (not a fabricated 0 or hidden "—").
+- No `priceRange`/`distanceLabel`/`amenities` → the whole info-pill row is omitted, not
+  shown empty.
+- No `highlights` → "Why visit?" section omitted entirely.
+- No `mapsUrl`/`phone`/`whatsapp`/`website` → that specific action is omitted; if none
+  exist, the whole action row is omitted rather than rendering empty.
+- Tag pills combine the one real derivable value (`category`, via a new
+  `VENUE_CATEGORY_LABEL` map) with any real `tags` — never a fabricated second tag.
+
+Share uses the real Web Share API with a clipboard-copy fallback and a visible "Link
+copied" confirmation — not a stub. Nearby Places filters the already-fetched venue list
+by the selected venue's real `destinationId`.
+
+Two primitives gained `href` support this phase, since Venue Details is the first screen
+with external links (`tel:`, `wa.me`, a venue's own website, Google Maps) rather than
+internal routes: `IconActionButton` (new `href` prop, `target="_blank"` + `rel` for
+`http(s)`) and `CTAButton` (same external-link handling added to its existing `href`).
+
+**Exit:** verified by assembling the screen against real Boca-Beach-shaped data on a
+temporary route (removed before commit) — hero, header, tags, info pills, action row,
+checklist, and Nearby Places all match the export at 375px. Live population from
+`/public/venues/{id}` is blocked by the same pre-existing CORS gap as every other screen;
+the error state itself was confirmed live. Clean build/lint/typecheck.
 
 ---
 

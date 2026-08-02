@@ -31,13 +31,18 @@ Onboarding "Next"/"Get Started", `EmptyState`.
 Renders `<button>` or, with `href`, a Next `<Link>`.
 
 ### `IconActionButton`
-`icon` · `label` · `tint?`
+`icon` · `label` · `children?` · `href?`
 Outlined circular action — `w-12 h-12 rounded-full border-2 border-outline-variant/20`,
 navy glyph, `active:bg-surface-container`. Distinct from `IconFAB`, which is filled and
 floats over imagery. Venue Details action row (call / WhatsApp / website).
 
 **WhatsApp is an inline brand SVG at `#25D366`**, not a Material Symbol — the one place
 in the product where a brand mark overrides the icon system.
+
+`href` (added in Phase 6) renders a plain `<a>`, not a Next `Link` — every use (`tel:`,
+`wa.me`, a venue's own website) is external, and `http(s)` links get `target="_blank"` +
+`rel="noopener noreferrer"` automatically. `CTAButton`'s existing `href` gained the same
+external-link handling when Venue Details' "Directions" (Google Maps) needed it.
 
 ### `IconFAB`
 `icon` · `label` (required, becomes `aria-label`) · `variant: 'solid' | 'glass'`
