@@ -7,8 +7,11 @@ type CTAButtonVariant = "primary" | "secondary";
 type CTAButtonOwnProps = {
   children: ReactNode;
   variant?: CTAButtonVariant;
-  /** Material Symbols glyph rendered before the label, as on "Directions". */
+  /** Material Symbols glyph. Position varies by instance in the export:
+   * "Directions" and "Open Calendar" lead with the icon, "View Collection"
+   * trails it — both are real, not an inconsistency to normalize. */
   icon?: string;
+  iconPosition?: "leading" | "trailing";
   fullWidth?: boolean;
   /** Renders a Next `<Link>` instead of a `<button>`. */
   href?: string;
@@ -35,6 +38,7 @@ export function CTAButton({
   children,
   variant = "primary",
   icon,
+  iconPosition = "leading",
   fullWidth = false,
   href,
   className = "",
@@ -54,8 +58,9 @@ export function CTAButton({
 
   const content = (
     <>
-      {icon ? <Icon name={icon} /> : null}
+      {icon && iconPosition === "leading" ? <Icon name={icon} /> : null}
       {children}
+      {icon && iconPosition === "trailing" ? <Icon name={icon} /> : null}
     </>
   );
 

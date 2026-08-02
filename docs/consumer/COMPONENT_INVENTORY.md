@@ -18,7 +18,12 @@ enter at Layer 3.
 ## Layer 1 — Primitives
 
 ### `CTAButton`
-`variant: 'primary' | 'secondary'` · `size: 'md' | 'lg'` · `fullWidth` · `icon`
+`variant: 'primary' | 'secondary'` · `size: 'md' | 'lg'` · `fullWidth` · `icon` ·
+`iconPosition: 'leading' | 'trailing'`
+
+Icon position genuinely varies by instance in the export: "Directions" and "Open
+Calendar" lead with the icon, "View Collection" trails it — confirmed from
+`explore_sahelspot/code.html`, not an inconsistency to normalize.
 Primary = filled navy pill, white text, `h-12 rounded-full font-bold shadow-md`.
 Secondary = white pill, navy text.
 Used: Venue Details "Directions", Explore "View Collection" / "Open Calendar",
@@ -103,6 +108,11 @@ Map overlay, Search.
 ### `CategoryChip`
 Square cream tile + icon + label. **Home's square tile is canonical** — Explore's circular
 variant was resolved against it in the audit. Home mood grid, Search popular categories.
+
+### `QuickBrowseChip`
+White `rounded-2xl` square (not circular, not cream) + coloured icon + label below.
+Confirmed a distinct component from `CategoryChip`, not the resolved conflict — Explore's
+own Quick Browse row genuinely uses this shape in the export.
 
 ### `SectionHeader`
 `title` · `size: 'md' | 'lg'` · `actionLabel?` · `actionHref?`

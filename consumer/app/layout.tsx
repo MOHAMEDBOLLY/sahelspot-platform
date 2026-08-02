@@ -47,7 +47,7 @@ export default function RootLayout({
          * the root layout head applies to every route, which is exactly the
          * intent here. */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=block"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap"
           rel="stylesheet"
         />
       </head>
