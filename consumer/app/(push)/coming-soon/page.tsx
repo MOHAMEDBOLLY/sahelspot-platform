@@ -13,6 +13,16 @@ const LABELS: Record<string, { title: string; description: string }> = {
     title: "All destinations",
     description: "A full destinations directory is on its way.",
   },
+  privacy: {
+    title: "Privacy Policy",
+    description:
+      "Our privacy policy is being finalized and will be published here before launch.",
+  },
+  terms: {
+    title: "Terms of Service",
+    description:
+      "Our terms of service are being finalized and will be published here before launch.",
+  },
 };
 
 const DEFAULT_LABEL = {

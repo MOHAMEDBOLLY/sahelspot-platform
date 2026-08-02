@@ -7,6 +7,13 @@ type ListRowItemOwnProps = {
   label: string;
   trailingValue?: string;
   href?: string;
+  /** For a row with a fixed, single value and genuinely nowhere to navigate
+   * (More's Language/Theme — one language, one theme exist in v1). Renders a
+   * plain, non-interactive row: no chevron, not a button or link, out of the
+   * tab order. Distinct from an unimplemented feature (which keeps its
+   * interaction hidden but its visual intact) — this is informational
+   * display with nothing behind it to click. */
+  disabled?: boolean;
 };
 
 type ListRowItemProps = ListRowItemOwnProps &
@@ -20,6 +27,7 @@ export function ListRowItem({
   label,
   trailingValue,
   href,
+  disabled = false,
   className = "",
   ...props
 }: ListRowItemProps) {
@@ -32,9 +40,13 @@ export function ListRowItem({
       {trailingValue ? (
         <span className="text-sm text-on-surface-variant">{trailingValue}</span>
       ) : null}
-      <Icon className="text-on-surface-variant" name="chevron_right" size={20} />
+      {disabled ? null : <Icon className="text-on-surface-variant" name="chevron_right" size={20} />}
     </>
   );
+
+  if (disabled) {
+    return <div className={`${classes} hover:bg-surface-container-low`}>{content}</div>;
+  }
 
   if (href) {
     return (

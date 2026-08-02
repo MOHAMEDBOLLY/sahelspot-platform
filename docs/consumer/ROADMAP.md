@@ -221,17 +221,36 @@ Planner have no content model in Studio. This is a Studio sprint, not a Consumer
 
 ---
 
-## Phase 9 — Saved · More · Splash · Onboarding ✅ unblocked
+## Phase 9 — Saved · More · Splash · Onboarding ✅ complete
 
-- **Saved** — `SavedRepository` + `LocalStorageSavedRepository`, `useSavedVenues()`
-  hook, `TabBar` with Favorites populated and the other two tabs as `EmptyState`
-- **More** — application-level items only (Preferences / About / Support / Share)
-- **Splash · Onboarding** — unblocked except for the logo asset
+- **Saved** — real `useSaved()` + `useVenues()` wiring; only "Favorites" has content,
+  Collections/Want to Go are permanent `EmptyState`s (no multi-list model exists), not
+  scheduled placeholders. Header sort (recent/A-Z) is a genuine toggle over the real
+  list — implemented rather than left as a Phase-4-style inert stand-in, since a real
+  two-way sort cost nothing extra to build honestly.
+- **More** — application-level items only (Account group dropped per the no-accounts
+  decision). Every row is a real destination: Language/Theme are informational-only via
+  `ListRowItem`'s new `disabled` mode (one language, one theme exist — nothing to
+  navigate to, distinct from an unimplemented feature); About is a real page
+  (`/about`, brand copy only); Privacy/Terms route to `/coming-soon` rather than
+  inventing legal text no one at SahelSpot has approved; Contact is a real `mailto:`;
+  Share uses the real Web Share API with clipboard fallback; Rate App is a feedback
+  `mailto:` in the absence of an app-store listing this website doesn't have.
+- **Splash** — implemented as `app/loading.tsx`, Next's global route-loading UI, per the
+  roadmap's own earlier recommendation against a timed gate that delays first paint.
+  Not a dedicated route no one would navigate to.
+- **Onboarding** — the 3-slide sequence, gradient placeholders standing in for imagery
+  neither Stitch export contains (same treatment as Splash's logo mark). Persists its
+  seen-flag via `useOnboardingSeen`. **No auto-redirect wired from Home** — whether first-
+  time visitors should be redirected into onboarding is a product decision for a public
+  website (unlike a native app's "first launch"), not assumed here; flagged in Open
+  decisions below.
 
 Onboarding slide 3 ("Save Your Favorites") is **valid copy** — Saved genuinely ships.
 
-**Exit:** saved state survives reload; no `localStorage` access outside the service;
-Onboarding shows once and persists its flag.
+**Exit:** verified live — Saved's tabs, sort toggle, and error/retry state; More's
+disabled-vs-real row distinction, About page, and Share confirmation; Onboarding's
+3-slide flow confirmed to persist its flag and land on Home. Clean build/lint/typecheck.
 
 ---
 
@@ -358,3 +377,13 @@ is valid, published data throughout. The open question is purely product/UX: doe
 mood grid gain a 6th "More" chip, do markers get more colours, or does `general` stay the
 intentional catch-all? See `API_REQUIREMENTS.md` §9 for the mapping table and the bug this
 was fixed alongside.
+
+### 10. 🟡 Should first-time visitors be redirected into Onboarding?
+Onboarding (Phase 9) is built and reachable at `/onboarding`, but nothing currently sends
+a first-time visitor there automatically. The spec describes it as "first-launch-only,"
+which is a native-app framing; gating a public website's homepage behind a 3-slide
+sequence for new visitors is a real UX/SEO trade-off (bounce risk, an extra step before
+the content search engines actually want to index), not something to assume. Options: (a)
+client-side redirect from `/` to `/onboarding` when `useOnboardingSeen` is false, (b) leave
+it reachable only via a direct link/future "Help" entry point, never auto-shown. No
+redirect is wired today — option (b) by default, pending a decision.

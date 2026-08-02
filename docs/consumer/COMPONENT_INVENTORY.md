@@ -140,8 +140,14 @@ Segmented. Active = bold navy + underline; inactive = grey. Saved only. Full ARI
 semantics.
 
 ### `ListRowItem`
-`icon` · `label` · `trailingValue?` · `href?` · chevron. `surface-container-low`,
-48dp min height. Profile only.
+`icon` · `label` · `trailingValue?` · `href?` · `disabled?` · chevron. `surface-container-low`,
+48dp min height. More only.
+
+`disabled` (added in Phase 9) renders a non-interactive row with no chevron — for
+Language/Theme, which have a fixed single value and genuinely nowhere to navigate (one
+language, one theme in v1). Distinct from an unimplemented feature, which keeps its
+interaction hidden but its visual intact (`DESIGN_SYSTEM.md` §11); this is informational
+display with nothing behind it at all.
 
 ### `EmptyState`
 Cream icon tile + navy headline + grey subtext + optional `CTAButton`.
