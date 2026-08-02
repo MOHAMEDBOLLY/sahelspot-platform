@@ -108,6 +108,31 @@ body {
   font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
 }
 
+/* Map's user-location dot — matches Stitch's own `user-location-pulse`
+ * animation (2s ease loop) on the Interactive Map export. */
+.user-location-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  opacity: 0.3;
+  animation: user-location-pulse 2s ease-out infinite;
+}
+@keyframes user-location-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* Mapbox's own CSS is required alongside this file — imported once in
+ * MapView.tsx, the only place mapbox-gl is ever imported. */
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

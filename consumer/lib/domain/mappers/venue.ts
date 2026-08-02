@@ -45,6 +45,7 @@ export function toVenue(dto: PublishedVenueDTO): Venue {
     id: dto.id,
     slug: dto.slug,
     name: dto.name,
+    destinationId: dto.destination.id,
     destinationName: dto.destination.name,
     district: dto.district,
     category: toVenueCategory(dto.category),

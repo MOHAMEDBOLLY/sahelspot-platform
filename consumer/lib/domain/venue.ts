@@ -15,6 +15,7 @@ export type Venue = {
   id: string;
   slug: string;
   name: string;
+  destinationId: string;
   destinationName: string;
   district: string | null;
   category: VenueCategory;

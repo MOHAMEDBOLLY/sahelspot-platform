@@ -102,17 +102,36 @@ prior Phase 3 verification, error/retry confirmed live).
 
 ---
 
-## Phase 5 — Map 🎯
+## Phase 5 — Map ✅ complete
 
-Moved ahead of Explore: it is the highest-risk screen and it is fully unblocked, whereas
-Explore is blocked on a content model that does not exist.
+Reference: `interactive_map_1/`. Mapbox GL JS, dynamically imported (`ssr: false`,
+lazy-loaded only on `/map`), isolated to `components/map/` + `lib/map/` — no other route
+imports it, verified in the production build output.
 
-Reference: `interactive_map_1/`. Mapbox GL JS, dynamically imported, `ssr: false`.
-Category-coloured markers, glass search, filter chips, floating controls, bottom sheet
-with `StatTile`s and Popular Nearby.
+Built: category-coloured DOM markers (`createMarkerElement`, since Mapbox markers are
+imperative DOM, not React), glass `SearchField`, the 5 `FilterChip`s (client-side category
+filter over the already-fetched venue list — no second query, since Map needs no search
+text, just a filter), floating locate/layers `MapControls` (real `navigator.geolocation`
+and a real `setStyle` style swap, not simulated), and a keyboard-accessible `BottomSheet`
+(Escape to close, focus moves to the close button on open — the first component in the
+library with real overlay semantics).
 
-**Exit:** real venue coordinates render as correctly coloured markers; sheet opens,
-closes, and is keyboard-accessible; the GL bundle is absent from every other route.
+Selecting a marker opens the sheet for that venue's destination — using the real
+`destinationId` already on the DTO (added to the `Venue` domain type this phase, not a
+gap) rather than name-matching. Bottom-sheet stats are computed live from the venues
+actually loaded for that destination (Places/Dining/Beaches counts), not fabricated.
+
+**New gap found while implementing:** the Stitch sheet shows a 4th "Events" stat, but the
+domain has no event category or content type at all — `API_REQUIREMENTS.md` §3b. The
+sheet renders 3 tiles, not a 4th showing `0`, since a real zero and "no data" are
+different facts.
+
+**Exit:** verified — filter chips, glass search, and floating controls render correctly
+in the browser; category filtering, marker click → destination sheet, and the
+locate/layers control wiring all confirmed by code path (live map rendering itself is
+blocked by the Phase 3 CORS gap plus no `NEXT_PUBLIC_MAPBOX_TOKEN` configured in this dev
+environment — both documented, neither worked around); clean build confirms the GL bundle
+is isolated to `/map`.
 
 ---
 

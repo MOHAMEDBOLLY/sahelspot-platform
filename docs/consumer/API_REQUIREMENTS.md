@@ -102,6 +102,21 @@ Home entirely until this requirement is delivered.
 
 ---
 
+## 3b. Events — P1 (found while implementing Map)
+
+**Needed by:** Map bottom sheet's 4th `StatTile` ("Events"), Home mood grid's "Events"
+chip (the chip itself is fine — it's a `/search?category=event` link with nothing behind
+it yet).
+
+The domain's `VenueCategory` union (`beach | food | coffee | nightlife | general`) has no
+`event` member, and nothing in `PublishedVenueOut` suggests events are modelled as venues
+at all — they're more likely a distinct content type (start/end time, a venue they occur
+at) than a venue category. Until Studio defines one, the Map bottom sheet renders 3 stat
+tiles (Places, Dining, Beaches), not 4 — omitted, not shown as `0` or `—`, since a real
+event count of zero and "we have no idea" are different facts.
+
+---
+
 ## 4. Geospatial — P1
 
 **Needed by:** Map (viewport queries), Search and Venue Details Nearby (distance labels).
@@ -194,6 +209,7 @@ definitions must be agreed against what Studio actually publishes, not inferred.
 | 2 | Collections model + endpoints | P0 | Explore (entirely) |
 | 3 | Home curation (Hidden Gems only — Trending uses `is_featured`) | P1 | Home Hidden Gems |
 | 3a | Destination cover image | **P0** | Home Explore Destinations — before launch |
+| 3b | Events content model | P1 | Map bottom sheet 4th stat tile (omitted, not shown as 0) |
 | 4 | Nearby endpoint / distance | P1 | Map, Search, Nearby |
 | 5 | Weather | P2 | Home weather pill — recommend dropping |
 | 6 | Account-dependent UI | — | ✅ Resolved without API work |

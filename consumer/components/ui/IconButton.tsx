@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { Icon } from "./Icon";
 
 type IconButtonVariant = "solid" | "glass" | "outlined" | "plain";
@@ -31,7 +31,11 @@ type IconButtonProps = IconButtonOwnProps &
  *    bug we are fixing, so it must not be expressible.
  *
  * The *visual* circle stays at the Stitch size where it differs; only the hit
- * area is expanded, so nothing looks redesigned. */
+ * area is expanded, so nothing looks redesigned.
+ *
+ * Forwards its ref — `BottomSheet` needs to move focus to its close button
+ * on open. The `href` form can't take a ref forwarded to an `<a>` the same
+ * way, so the ref only ever targets the `<button>` case in practice. */
 const VARIANTS: Record<IconButtonVariant, string> = {
   /** Floating over imagery — hero controls, card save button. */
   solid: "bg-white/90 backdrop-blur-md shadow-lg text-on-surface",
@@ -44,15 +48,10 @@ const VARIANTS: Record<IconButtonVariant, string> = {
   plain: "text-on-surface-variant hover:bg-surface-container",
 };
 
-export function IconButton({
-  icon,
-  label,
-  variant = "plain",
-  filled = false,
-  href,
-  className = "",
-  ...props
-}: IconButtonProps) {
+export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
+  { icon, label, variant = "plain", filled = false, href, className = "", ...props },
+  ref,
+) {
   const classes = [
     "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
     "transition-all active:scale-90",
@@ -74,8 +73,8 @@ export function IconButton({
   }
 
   return (
-    <button aria-label={label} className={classes} type="button" {...props}>
+    <button aria-label={label} className={classes} ref={ref} type="button" {...props}>
       {content}
     </button>
   );
-}
+});
