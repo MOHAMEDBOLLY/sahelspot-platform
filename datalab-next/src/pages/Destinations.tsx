@@ -57,8 +57,8 @@ export function Destinations() {
   }
 
   return (
-    <div className="flex h-full gap-6">
-      <div className="flex w-80 shrink-0 flex-col gap-3 overflow-y-auto">
+    <div className="flex h-full min-h-0 gap-6">
+      <div className="flex min-h-0 w-80 shrink-0 flex-col gap-3 overflow-y-auto">
         <DestinationFilters searchValue={q} onSearchChange={(value) => setParam('q', value)} />
         {canCreate && (
           <DestinationCreateDialog onCreated={(destination) => setSelectedDestinationId(destination.id)} />
@@ -70,7 +70,7 @@ export function Destinations() {
           searchParams={{ q: debouncedQ || undefined }}
         />
       </div>
-      <div className="min-w-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
         <DestinationWorkspace
           destinationId={selectedDestinationId}
           onDirtyChange={setIsWorkspaceDirty}

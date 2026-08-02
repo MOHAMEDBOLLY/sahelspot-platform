@@ -125,7 +125,7 @@ export function VenueListPanel({ selectedVenueId, onSelectVenue, searchParams, o
     <div className="flex flex-col gap-3">
       {checkedVenueIds.size > 0 && (
         <BulkActionToolbar
-          checkedVenueIds={[...checkedVenueIds]}
+          checkedVenues={data.items.filter((venue) => checkedVenueIds.has(venue.id))}
           onClearSelection={() => setCheckedVenueIds(new Set())}
         />
       )}

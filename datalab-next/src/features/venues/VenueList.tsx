@@ -28,7 +28,7 @@ export function VenueList({
   qualityByVenueId,
 }: VenueListProps) {
   return (
-    <ul className="flex flex-col divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <ul className="flex shrink-0 flex-col divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white">
       {venues.map((venue) => {
         const isSelected = venue.id === selectedVenueId
         const isChecked = checkedVenueIds.has(venue.id)

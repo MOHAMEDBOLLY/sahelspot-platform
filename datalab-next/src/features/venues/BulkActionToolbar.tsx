@@ -12,10 +12,10 @@ import {
   useBulkUpdateVenueDestination,
   useBulkValidateVenues,
 } from './useBulkVenueActions'
-import type { BulkOperationResponse } from '../../types/venue'
+import type { BulkOperationResponse, Venue } from '../../types/venue'
 
 type BulkActionToolbarProps = {
-  checkedVenueIds: string[]
+  checkedVenues: Venue[]
   onClearSelection: () => void
 }
 
@@ -40,8 +40,23 @@ function requestErrorMessage(error: unknown): string {
  * permission the backend already requires for it — same
  * `hasPermission(role, permission)` helper `VenueWorkspace` uses, not a
  * second permission check reimplemented here.
+ *
+ * Status-eligibility fix — Submit for Review and Approve are workflow
+ * transitions with a real precondition (`draft -> review`,
+ * `review -> approved`), the same one `require_status()` enforces on the
+ * backend and the single-venue `VenueWorkspace` already gates its own
+ * buttons on (`canSubmitForReview`/`canApprove`). This toolbar used to
+ * send *every* checked id regardless of its actual status, so selecting
+ * a mix (or an already-submitted batch) produced confusing per-item 409s
+ * ("Resource is in 'review' status; only a 'draft' resource can move to
+ * 'review'.") that read like the workflow itself was broken. Both
+ * buttons now only ever send the subset of checked venues actually
+ * eligible for that transition, and are disabled entirely (not just
+ * silently no-op) when none of the selection qualifies — mirroring the
+ * backend's own state machine instead of relying on it to reject a
+ * request the UI could have avoided sending.
  */
-export function BulkActionToolbar({ checkedVenueIds, onClearSelection }: BulkActionToolbarProps) {
+export function BulkActionToolbar({ checkedVenues, onClearSelection }: BulkActionToolbarProps) {
   // Sprint 29: useDestinations() now returns a paginated envelope
   // ({items, total, ...}), not a bare array — .items is the list itself.
   const { data: destinationsData } = useDestinations()
@@ -61,9 +76,13 @@ export function BulkActionToolbar({ checkedVenueIds, onClearSelection }: BulkAct
 
   const isProcessing = isValidating || isSubmitting || isApproving || isUpdatingCategory || isUpdatingDestination
 
+  const checkedVenueIds = checkedVenues.map((v) => v.id)
+  const draftVenueIds = checkedVenues.filter((v) => v.status === 'draft').map((v) => v.id)
+  const reviewVenueIds = checkedVenues.filter((v) => v.status === 'review').map((v) => v.id)
+
   const canValidate = hasPermission(role, 'content_edit')
-  const canSubmitForReview = hasPermission(role, 'content_submit_review')
-  const canApprove = hasPermission(role, 'content_approve')
+  const canSubmitForReview = hasPermission(role, 'content_submit_review') && draftVenueIds.length > 0
+  const canApprove = hasPermission(role, 'content_approve') && reviewVenueIds.length > 0
   const canEdit = hasPermission(role, 'content_edit')
 
   function beginAction() {
@@ -77,18 +96,22 @@ export function BulkActionToolbar({ checkedVenueIds, onClearSelection }: BulkAct
   }
 
   function handleSubmitForReview() {
-    if (!window.confirm(`Submit ${checkedVenueIds.length} venue(s) for review?`)) return
+    const skipped = checkedVenueIds.length - draftVenueIds.length
+    const skippedNote = skipped > 0 ? ` (${skipped} other selected venue${skipped === 1 ? '' : 's'} already past draft — skipped)` : ''
+    if (!window.confirm(`Submit ${draftVenueIds.length} venue(s) for review?${skippedNote}`)) return
     beginAction()
-    bulkSubmitForReview(checkedVenueIds, {
+    bulkSubmitForReview(draftVenueIds, {
       onSuccess: setLastResult,
       onError: (error) => setRequestError(requestErrorMessage(error)),
     })
   }
 
   function handleApprove() {
-    if (!window.confirm(`Approve ${checkedVenueIds.length} venue(s)?`)) return
+    const skipped = checkedVenueIds.length - reviewVenueIds.length
+    const skippedNote = skipped > 0 ? ` (${skipped} other selected venue${skipped === 1 ? '' : 's'} not in review — skipped)` : ''
+    if (!window.confirm(`Approve ${reviewVenueIds.length} venue(s)?${skippedNote}`)) return
     beginAction()
-    bulkApprove(checkedVenueIds, {
+    bulkApprove(reviewVenueIds, {
       onSuccess: setLastResult,
       onError: (error) => setRequestError(requestErrorMessage(error)),
     })
@@ -156,7 +179,7 @@ export function BulkActionToolbar({ checkedVenueIds, onClearSelection }: BulkAct
               className="flex items-center gap-1 rounded-lg bg-green-700 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSubmitting ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
-              Submit for Review
+              Submit for Review ({draftVenueIds.length})
             </button>
           )}
           {canApprove && (
@@ -167,7 +190,7 @@ export function BulkActionToolbar({ checkedVenueIds, onClearSelection }: BulkAct
               className="flex items-center gap-1 rounded-lg bg-blue-700 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isApproving ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} />}
-              Approve
+              Approve ({reviewVenueIds.length})
             </button>
           )}
         </div>

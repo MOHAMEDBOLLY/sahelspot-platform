@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { MapPinOff, Trash2 } from 'lucide-react'
+import { Loader2, MapPinOff, Send, ThumbsUp, Trash2 } from 'lucide-react'
 import { useDestination } from '../useDestination'
 import { useUpdateDestination } from '../useUpdateDestination'
 import { useDeleteDestination } from '../useDeleteDestination'
 import { useRejectDestination } from '../useRejectDestination'
+import { useSubmitDestinationForReview } from '../useSubmitDestinationForReview'
+import { useApproveDestination } from '../useApproveDestination'
 import { useUploadDestinationCover } from '../useUploadDestinationCover'
 import { toDestinationPatch } from '../api'
 import { validateDestinationDraft } from '../destinationValidation'
@@ -33,14 +35,23 @@ type DestinationWorkspaceProps = {
  * The Destination Workspace — Sprint 21's proof that the editorial
  * architecture Sprints 9–12 built for Venues (Edit Mode, `useDraft`,
  * Save Draft, frontend UX validation) generalizes to a second entity
- * without forking it. Deliberately simpler than `VenueWorkspace`: no
- * Validate/Submit for Review/Approve, since no Editorial Readiness or
- * workflow endpoints exist for destinations yet (out of scope) — so this
- * uses `DraftToolbar` directly, with no entity-specific wrapper toolbar
- * the way Venue's `WorkspaceToolbar` needs one. Sprint 29 adds Delete
- * (via `DraftToolbar`'s existing `extraActions` slot — the same
- * extension point Venue's toolbar already uses, not a new one) and a
- * cover image section.
+ * without forking it. Sprint 29 adds Delete (via `DraftToolbar`'s
+ * existing `extraActions` slot — the same extension point Venue's
+ * toolbar already uses, not a new one) and a cover image section.
+ *
+ * Submit for Review / Approve — the backend has supported this full
+ * `draft -> review -> approved` state machine for destinations since
+ * Phase 2 (`POST .../submit-for-review`, `POST .../approve`, same shape
+ * as venues'), but nothing in Studio ever called either endpoint: every
+ * destination was structurally stuck in `draft` forever. Unlike venues,
+ * there's no separate Validate step or `ValidationSummary` for
+ * destinations — the backend's own readiness gate (`name`/`region`
+ * non-blank, PLATFORM_SPEC_v1.0_FROZEN.md §4.4) is checked inline by
+ * `submit-for-review` itself, not as a precondition the UI has to run
+ * first, so Submit for Review is enabled purely on `status === 'draft'`
+ * (+ permission, + not mid-edit) — same gating shape as venues'
+ * `canSubmitForReview`, just without the `validationResult` dependency
+ * venues have because destinations have nothing equivalent to gate on.
  */
 export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }: DestinationWorkspaceProps) {
   const { data: destination, isPending, isError, error, refetch } = useDestination(destinationId)
@@ -58,6 +69,12 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
   const { mutate: deleteDestination, isPending: isDeleting, error: deleteError } = useDeleteDestination()
   const { mutateAsync: rejectDestination, error: rejectError } = useRejectDestination()
   const {
+    mutate: submitForReview,
+    isPending: isSubmittingForReview,
+    error: submitForReviewError,
+  } = useSubmitDestinationForReview()
+  const { mutate: approve, isPending: isApproving, error: approveError } = useApproveDestination()
+  const {
     mutate: uploadCover,
     isPending: isUploadingCover,
     error: uploadCoverError,
@@ -68,7 +85,10 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const { role } = useAuth()
   const canEdit = hasPermission(role, 'content_edit')
-  const canReject = !isDirty && displayedDestination?.status === 'review' && hasPermission(role, 'content_approve')
+  const canSubmitForReview =
+    !isDirty && displayedDestination?.status === 'draft' && hasPermission(role, 'content_submit_review')
+  const canApprove = !isDirty && displayedDestination?.status === 'review' && hasPermission(role, 'content_approve')
+  const canReject = canApprove
 
   const fieldErrors =
     mode === 'edit' && displayedDestination ? validateDestinationDraft(displayedDestination) : {}
@@ -117,6 +137,16 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
     if (!destinationId) return
     const updatedDestination = await rejectDestination({ id: destinationId, reason })
     commitSave(updatedDestination)
+  }
+
+  function handleSubmitForReview() {
+    if (!destinationId) return
+    submitForReview(destinationId, { onSuccess: commitSave })
+  }
+
+  function handleApprove() {
+    if (!destinationId) return
+    approve(destinationId, { onSuccess: commitSave })
   }
 
   function handleUploadCover(file: File) {
@@ -217,6 +247,28 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
                 {isDeleting ? 'Deleting…' : 'Delete'}
               </button>
             )}
+            {canSubmitForReview && (
+              <button
+                type="button"
+                onClick={handleSubmitForReview}
+                disabled={isSubmittingForReview}
+                className="flex items-center gap-1.5 rounded-lg bg-green-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSubmittingForReview ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                {isSubmittingForReview ? 'Submitting…' : 'Submit for Review'}
+              </button>
+            )}
+            {canApprove && (
+              <button
+                type="button"
+                onClick={handleApprove}
+                disabled={isApproving}
+                className="flex items-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isApproving ? <Loader2 size={14} className="animate-spin" /> : <ThumbsUp size={14} />}
+                {isApproving ? 'Approving…' : 'Approve'}
+              </button>
+            )}
             {canReject && <RejectDialog onReject={handleReject} />}
           </>
         }
@@ -228,6 +280,22 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
                 title={deleteError instanceof ApiError ? deleteError.message : 'Failed to delete.'}
               >
                 {deleteError instanceof ApiError ? deleteError.message : 'Failed to delete.'}
+              </span>
+            )}
+            {submitForReviewError && (
+              <span
+                className="truncate text-xs font-medium text-red-600"
+                title={submitForReviewError instanceof ApiError ? submitForReviewError.message : 'Failed to submit for review.'}
+              >
+                {submitForReviewError instanceof ApiError ? submitForReviewError.message : 'Failed to submit for review.'}
+              </span>
+            )}
+            {approveError && (
+              <span
+                className="truncate text-xs font-medium text-red-600"
+                title={approveError instanceof ApiError ? approveError.message : 'Failed to approve.'}
+              >
+                {approveError instanceof ApiError ? approveError.message : 'Failed to approve.'}
               </span>
             )}
             {rejectError && (

@@ -15,7 +15,7 @@ type DestinationListProps = {
  * docs/ROADMAP.md's Sprint 21 entry for the reasoning). */
 export function DestinationList({ destinations, selectedDestinationId, onSelectDestination }: DestinationListProps) {
   return (
-    <ul className="flex flex-col divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <ul className="flex shrink-0 flex-col divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white">
       {destinations.map((destination) => {
         const isSelected = destination.id === selectedDestinationId
         return (

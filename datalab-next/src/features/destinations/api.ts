@@ -1,4 +1,4 @@
-import { apiDelete, apiDownload, apiGet, apiPatch, apiPostJson, apiUpload } from '../../lib/apiClient'
+import { apiDelete, apiDownload, apiGet, apiPatch, apiPost, apiPostJson, apiUpload } from '../../lib/apiClient'
 import type { Destination, DestinationListResponse, DestinationSearchParams } from '../../types/destination'
 
 /** Sprint 29 — same search + pagination shape venues' `fetchVenues` already
@@ -28,9 +28,10 @@ export function fetchAllDestinations(): Promise<Destination[]> {
 
 /** Exactly the fields Edit Mode exposes as editable — same reasoning as
  * `features/venues/api.ts`'s `VenuePatch`. `id`, `status` (workflow-
- * controlled — no Review/Approval exists for destinations yet, but `status`
- * still isn't a generic text field), `boundary` (a geometry blob with no
- * editor built), and timestamps aren't part of this write path.
+ * controlled via `submitDestinationForReview`/`approveDestination`/
+ * `rejectDestination` below, not a generic text field), `boundary` (a
+ * geometry blob with no editor built), and timestamps aren't part of
+ * this write path.
  * `cover_image_url` (Sprint 29) is here only so clearing the cover can go
  * through this same patch — same reasoning venues' `VenuePatch` already
  * gives for its own `cover_image_url`. */
@@ -93,6 +94,18 @@ export function uploadDestinationCover(
   const formData = new FormData()
   formData.append('file', file)
   return apiUpload<Destination>(`/editor/destinations/${encodeURIComponent(id)}/media`, formData, onProgress)
+}
+
+/** Destination workflow parity (Phase 2, EP9) — the same `draft -> review
+ * -> approved` state machine venues have always had, via the same-shaped
+ * endpoints. Never wired into Studio's UI until now; the backend has
+ * supported it since Phase 2. */
+export function submitDestinationForReview(id: string): Promise<Destination> {
+  return apiPost<Destination>(`/editor/destinations/${encodeURIComponent(id)}/submit-for-review`)
+}
+
+export function approveDestination(id: string): Promise<Destination> {
+  return apiPost<Destination>(`/editor/destinations/${encodeURIComponent(id)}/approve`)
 }
 
 /** EP21 — Reject (`review` -> `draft`), same shape/reasoning as venues'
