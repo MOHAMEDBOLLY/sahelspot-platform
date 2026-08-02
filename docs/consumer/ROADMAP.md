@@ -264,23 +264,31 @@ scroll-shadow header, sheet transitions, marker-location pulse. All gated on
 
 ---
 
-## Phase 11 — Desktop
+## Phase 11 — Accessibility, performance, and QA
 
-Mobile is complete and frozen first. Desktop adapts the same design language per
-`DESIGN_SYSTEM.md` §3 — bottom nav → top nav, carousels → grids, sheet → side panel. No
-new visual vocabulary, no changed type scale, no desktop-only component variants.
-
-**Exit:** every screen correct at 768 / 1024 / 1440px with no horizontal scroll.
-
----
-
-## Phase 12 — Accessibility and performance
+**Reordered ahead of Desktop on explicit instruction** — the mobile experience must be
+feature-complete and stable before desktop work begins at all; there is no immediate
+business need for desktop.
 
 Keyboard traversal of every screen; screen-reader pass; the colour-contrast audit on
 `on-surface-variant/60` and 10px labels; Lighthouse; `sitemap.ts`, `robots.ts`, JSON-LD,
-per-venue `generateMetadata`.
+per-venue `generateMetadata`; a full functional QA pass across every implemented screen
+against real data (revision 1071).
 
-**Exit:** contrast audit passes; no critical a11y findings; Core Web Vitals green.
+**Exit:** contrast audit passes; no critical a11y findings; Core Web Vitals green; no
+known functional defects on mobile.
+
+---
+
+## Phase 12 — Desktop (final phase)
+
+Begins only once Phase 11 is complete and the mobile experience is considered stable —
+not on a fixed schedule. Mobile stays frozen throughout; desktop adapts the same design
+language per `DESIGN_SYSTEM.md` §3 — bottom nav → top nav, carousels → grids, sheet →
+side panel. No new visual vocabulary, no changed type scale, no desktop-only component
+variants.
+
+**Exit:** every screen correct at 768 / 1024 / 1440px with no horizontal scroll.
 
 ---
 
