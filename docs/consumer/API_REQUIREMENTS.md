@@ -64,6 +64,22 @@ models. This is a new editorial entity in Studio with its own workflow and publi
 
 ---
 
+## 3a. Destination imagery — P1 (found while implementing Home)
+
+**Needed by:** `DestinationCard` on Home's Explore Destinations grid.
+
+`PublishedDestinationDTO` has no image field at all — `id`, `name`, `region`, `aliases`,
+`boundary` only. `DestinationCard` degrades to a solid `primary-container` fill when
+`imageUrl` is `null`, which is what Home renders today; every destination card in the
+export has a photograph.
+
+```
+PublishedDestinationOut:
+  cover_image_url: str | None
+```
+
+---
+
 ## 3. Home curation — P1
 
 **Needed by:** Home — Trending Today, Hidden Gems.
@@ -74,6 +90,11 @@ come from a single boolean.
 Preferred: reuse the §2 collection model with `kind: "trending" | "hidden_gem"`, so Home
 and Explore share one mechanism.
 Minimal alternative: `home_section: str | None` on the venue.
+
+**Implemented in Phase 4:** Trending Today uses the one real signal available —
+`is_featured` — rather than waiting on this requirement; still a real field, not a mock.
+Hidden Gems has no fallback of any kind (no second boolean to reuse) and is omitted from
+Home entirely until this requirement is delivered.
 
 ---
 
@@ -167,7 +188,8 @@ definitions must be agreed against what Studio actually publishes, not inferred.
 |---|---|---|---|
 | 1 | `rating`, `review_count` | P0 | 6 screens (degraded) |
 | 2 | Collections model + endpoints | P0 | Explore (entirely) |
-| 3 | Home curation | P1 | Home Trending / Hidden Gems |
+| 3 | Home curation (Hidden Gems only — Trending uses `is_featured`) | P1 | Home Hidden Gems |
+| 3a | Destination cover image | P1 | Home Explore Destinations |
 | 4 | Nearby endpoint / distance | P1 | Map, Search, Nearby |
 | 5 | Weather | P2 | Home weather pill — recommend dropping |
 | 6 | Account-dependent UI | — | ✅ Resolved without API work |

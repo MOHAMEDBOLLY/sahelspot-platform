@@ -66,14 +66,37 @@ dev environment config.
 
 ---
 
-## Phase 4 — Home 🎯
+## Phase 4 — Home ✅ complete
 
-The first complete screen and the validation of everything above. Reference:
-`sahelspot_home/code.html`.
+Reference: `sahelspot_home/code.html`.
 
-**Exit:** pixel-comparable to `sahelspot_home/screen.png` at 390px, using only real
-`/public/*` data. Sections with unmet API requirements render their empty state rather
-than fabricated content.
+Every data-backed section (Trending Today, Explore Destinations) carries its own
+loading / error / empty / success states independently via its own query, rather than
+gating the whole page behind one spinner. Verified live: the CORS gap from Phase 3 means
+both sections currently render their real error state in the browser, with a working
+Retry that re-fires the request — confirmed via network inspection, not assumed.
+
+Two content gaps resolved without mocking:
+- **Trending Today** uses `is_featured` (a real field) rather than waiting on the
+  Hidden-Gems-style curation model in `API_REQUIREMENTS.md` §3.
+- **Hidden Gems** has no fallback field of any kind and is **omitted from Home
+  entirely** until that requirement is delivered — no placeholder section, no mock data.
+
+New requirement found while implementing: `PublishedDestinationDTO` has no image field
+at all — `API_REQUIREMENTS.md` §3a. `DestinationCard` degrades to a solid fill.
+
+The weather pill is omitted per §5's standing recommendation, since unlike the avatar/
+greeting/bell it is live data with no source — showing invented numbers would be the
+mocking the architecture forbids, not a disabled interaction.
+
+Three "See All" actions (mood grid, Trending, Explore Destinations) have no listing
+screen anywhere in the 9-screen inventory to send them to, so `SectionHeader` gained a
+`disabled` variant: the label stays visible, per the standing rule, but isn't a link to
+nowhere.
+
+**Exit:** matches `sahelspot_home/screen.png` structurally at 375px; clean build/lint/
+typecheck; all four data states verified (loading/success reasoned from code path and
+prior Phase 3 verification, error/retry confirmed live).
 
 ---
 
