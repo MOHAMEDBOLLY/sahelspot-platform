@@ -69,7 +69,7 @@ export function MapClient() {
   }
 
   return (
-    <div className="relative h-dvh overflow-hidden pb-24">
+    <div className="relative h-dvh overflow-hidden pb-[max(6rem,calc(5rem+env(safe-area-inset-bottom)))]">
       <div className="absolute inset-0 z-0">
         {venues.isLoading ? (
           <div className="h-full w-full bg-surface-container-low" />

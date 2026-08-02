@@ -104,10 +104,10 @@ export function HomeClient() {
         <section>
           <SectionHeader actionHref="/coming-soon?feature=trending" actionLabel="See All" title="Trending Today" />
           {venues.isLoading ? (
-            <div className="flex gap-4 overflow-hidden">
-              <Skeleton className="h-64 w-[80%] min-w-[280px] shrink-0" />
-              <Skeleton className="h-64 w-[80%] min-w-[280px] shrink-0" />
-            </div>
+            <CardCarousel>
+              <Skeleton className="h-72 w-[80%] min-w-[280px] shrink-0" />
+              <Skeleton className="h-72 w-[80%] min-w-[280px] shrink-0" />
+            </CardCarousel>
           ) : venues.isError ? (
             <EmptyState
               action={<CTAButton onClick={() => venues.refetch()} variant="secondary">Retry</CTAButton>}
@@ -138,10 +138,11 @@ export function HomeClient() {
         <section>
           <SectionHeader actionHref="/coming-soon?feature=destinations" actionLabel="See All" title="Explore Destinations" />
           {destinations.isLoading ? (
-            <div className="grid grid-cols-2 gap-4">
-              <Skeleton className="h-64" />
-              <Skeleton className="h-64" />
-            </div>
+            <CardCarousel>
+              <Skeleton className="h-64 w-[43%] min-w-[160px] shrink-0" />
+              <Skeleton className="h-64 w-[43%] min-w-[160px] shrink-0" />
+              <Skeleton className="h-64 w-[43%] min-w-[160px] shrink-0" />
+            </CardCarousel>
           ) : destinations.isError ? (
             <EmptyState
               action={
@@ -160,17 +161,18 @@ export function HomeClient() {
               title="No destinations yet"
             />
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <CardCarousel>
               {destinations.data?.map((destination) => (
-                <DestinationCard
-                  href={`/search?destination=${destination.id}`}
-                  imageUrl={null}
-                  key={destination.id}
-                  name={destination.name}
-                  placeCount={destination.venueCount}
-                />
+                <div className="w-[43%] min-w-[160px] shrink-0 snap-start" key={destination.id}>
+                  <DestinationCard
+                    href={`/search?destination=${destination.id}`}
+                    imageUrl={null}
+                    name={destination.name}
+                    placeCount={destination.venueCount}
+                  />
+                </div>
               ))}
-            </div>
+            </CardCarousel>
           )}
         </section>
       </main>

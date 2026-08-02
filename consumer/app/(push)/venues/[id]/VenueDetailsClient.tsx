@@ -51,8 +51,24 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
       <div className="mx-auto max-w-md space-y-6 pb-12">
         <Skeleton className="h-80 w-full rounded-none" />
         <div className="space-y-6 px-4">
-          <Skeleton className="h-8 w-2/3" />
-          <Skeleton className="h-24 w-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-2/3" />
+            <Skeleton className="h-5 w-1/3" />
+            <div className="flex gap-2 pt-1">
+              <Skeleton className="h-7 w-20 rounded-full" />
+              <Skeleton className="h-7 w-24 rounded-full" />
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Skeleton className="h-9 w-24 rounded-full" />
+            <Skeleton className="h-9 w-24 rounded-full" />
+          </div>
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-12 flex-grow rounded-full" />
+            <Skeleton className="h-12 w-12 rounded-full" />
+            <Skeleton className="h-12 w-12 rounded-full" />
+          </div>
+          <Skeleton className="h-40 w-full" />
         </div>
       </div>
     );
@@ -174,7 +190,7 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
         </header>
 
         {infoPills.length > 0 ? (
-          <div className="flex gap-3 overflow-x-auto pb-2">
+          <div className="hide-scrollbar flex gap-3 overflow-x-auto pb-2">
             {infoPills.map((pill) => (
               <InfoPill icon={pill.icon} key={pill.label} label={pill.label} />
             ))}

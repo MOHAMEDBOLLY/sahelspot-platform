@@ -35,9 +35,26 @@ export function toValidPhone(raw: string | null): string | null {
 
 /** `wa.me` links take digits only, no leading `+` — a separate return shape
  * from `toValidPhone`, not just reused, since a WhatsApp number and a phone
- * number happen to share a validation rule but not a wire format. */
+ * number happen to share a validation rule but not a wire format.
+ *
+ * This platform is Egypt-only, and Studio editors overwhelmingly enter
+ * local mobile numbers (`01XXXXXXXXX`, 11 digits, no country code) — the
+ * format Egyptian phone numbers are normally written in locally. `wa.me`
+ * requires the country code with the leading `0` dropped; passed through
+ * unchanged, a stored local number produces a link WhatsApp reports as an
+ * invalid phone number rather than opening a chat (confirmed live against
+ * a real published venue, `v00001`). The one unambiguous case — an
+ * 11-digit number starting with a single leading `0` — is converted to
+ * `20` + the remaining 10 digits; every other shape (already has a `+`,
+ * or doesn't match this pattern at all) passes through as before, so this
+ * doesn't narrow acceptance for any number this function previously
+ * accepted. */
 export function toValidWhatsapp(raw: string | null): string | null {
   if (!raw) return null;
   const { digits } = digitsOf(raw);
-  return digits.length >= 7 && digits.length <= 15 ? digits : null;
+  if (digits.length < 7 || digits.length > 15) return null;
+  if (digits.length === 11 && digits.startsWith("0")) {
+    return `20${digits.slice(1)}`;
+  }
+  return digits;
 }

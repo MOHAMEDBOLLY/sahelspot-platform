@@ -40,7 +40,7 @@ export function VenueCard({
   if (variant === "horizontal-row") {
     return (
       <Link
-        className="flex items-center gap-4 rounded-2xl border border-outline-variant/10 bg-surface-container-low p-3 shadow-sm transition-colors hover:bg-surface-container"
+        className="flex items-center gap-4 rounded-2xl border border-outline-variant/10 bg-surface-container-low p-3 shadow-sm transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
         href={href}
       >
         <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-cream">
@@ -77,7 +77,7 @@ export function VenueCard({
 
   return (
     <Link
-      className={`shrink-0 snap-start overflow-hidden rounded-3xl border border-outline-variant/10 bg-surface-container-lowest shadow-md transition-transform active:scale-[0.98] ${
+      className={`shrink-0 snap-start overflow-hidden rounded-3xl border border-outline-variant/10 bg-surface-container-lowest shadow-md transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 ${
         isCompact ? "w-56" : "w-[80%] min-w-[280px]"
       }`}
       href={href}

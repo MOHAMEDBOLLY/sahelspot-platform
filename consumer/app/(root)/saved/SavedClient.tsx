@@ -74,8 +74,8 @@ export function SavedClient() {
           />
         ) : venues.isLoading ? (
           <div className="space-y-4">
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-72 w-full" />
+            <Skeleton className="h-72 w-full" />
           </div>
         ) : venues.isError ? (
           <EmptyState

@@ -23,12 +23,37 @@ const ibmPlexArabic = IBM_Plex_Sans_Arabic({
  * globals.css is dropped before it reaches the browser. The <link> is the one
  * mechanism that actually delivers the @font-face. */
 
+const SITE_DESCRIPTION = "Discover the North Coast — beaches, restaurants, and hidden gems.";
+
 export const metadata: Metadata = {
+  // Required for Next to resolve `openGraph.images`/`twitter.images` (or any
+  // relative asset) into an absolute URL in the rendered <meta> tags —
+  // without it, a relative image path silently fails to become a valid
+  // og:image. Matches the production domain used throughout docs/ and
+  // robots.txt/sitemap.xml.
+  metadataBase: new URL("https://sahelspot.com"),
   title: {
     default: "SahelSpot",
     template: "%s · SahelSpot",
   },
-  description: "Discover the North Coast — beaches, restaurants, and hidden gems.",
+  description: SITE_DESCRIPTION,
+  // Next does not auto-populate openGraph/twitter from the plain
+  // title/description fields above — omitting this block is exactly why
+  // venue pages were rendering with zero og:* tags despite having a
+  // correct <title>/<meta name="description">. Site-wide defaults here;
+  // `venues/[id]/page.tsx` overrides with venue-specific values.
+  openGraph: {
+    title: "SahelSpot",
+    description: SITE_DESCRIPTION,
+    siteName: "SahelSpot",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SahelSpot",
+    description: SITE_DESCRIPTION,
+  },
 };
 
 /** Root layout holds fonts and providers only. Screen chrome (header, bottom

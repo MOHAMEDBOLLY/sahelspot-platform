@@ -59,6 +59,34 @@ class TestSearchByCategory:
         assert response.json() == []
 
 
+class TestSearchByDestination:
+    def test_matches_exact_destination_id(self, client, make_destination, make_venue, preserve_seed_state):
+        tag = _unique_tag()
+        dest_a = make_destination(name=f"Dest A {tag}")
+        dest_b = make_destination(name=f"Dest B {tag}")
+        venue_in_a = make_venue(status="approved", name=f"In A {tag}", destination=dest_a)
+        make_venue(status="approved", name=f"In B {tag}", destination=dest_b)
+
+        client.post("/editor/publish")
+
+        response = client.get(f"/public/search/venues?destination={dest_a.id}")
+
+        names = {v["name"] for v in response.json()}
+        assert venue_in_a.name in names
+        assert f"In B {tag}" not in names
+
+    def test_unknown_destination_returns_empty_list_not_an_error(
+        self, client, make_venue, preserve_seed_state
+    ):
+        make_venue(status="approved")
+        client.post("/editor/publish")
+
+        response = client.get(f"/public/search/venues?destination=not-a-real-destination-{_unique_tag()}")
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+
 class TestSearchCombinesFiltersWithAnd:
     def test_q_and_category_both_must_match(self, client, make_venue, preserve_seed_state):
         tag = _unique_tag()
@@ -75,6 +103,28 @@ class TestSearchCombinesFiltersWithAnd:
 
         names = {v["name"] for v in response.json()}
         assert names == {both_match.name}
+
+    def test_destination_combines_with_q_and_category(
+        self, client, make_destination, make_venue, preserve_seed_state
+    ):
+        tag = _unique_tag()
+        dest = make_destination(name=f"Combo Dest {tag}")
+        other_dest = make_destination(name=f"Combo Other Dest {tag}")
+        # Matches destination + category, wrong name.
+        make_venue(status="approved", name="Unrelated", category="Cafe", destination=dest)
+        # Matches destination + name, wrong category.
+        make_venue(status="approved", name=f"Combo {tag}", category="Restaurant", destination=dest)
+        # Matches name + category, wrong destination.
+        make_venue(status="approved", name=f"Combo {tag}", category="Cafe", destination=other_dest)
+        # Matches all three.
+        all_match = make_venue(status="approved", name=f"Combo {tag}", category="Cafe", destination=dest)
+
+        client.post("/editor/publish")
+
+        response = client.get(f"/public/search/venues?q={tag}&category=Cafe&destination={dest.id}")
+
+        ids = {v["id"] for v in response.json()}
+        assert ids == {all_match.id}
 
 
 class TestSearchWithNoParams:

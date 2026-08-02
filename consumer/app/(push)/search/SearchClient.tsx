@@ -42,13 +42,18 @@ function SearchPageContent() {
   const [category, setCategory] = useState<VenueCategory | "all">(
     (searchParams.get("category") as VenueCategory | null) ?? "all",
   );
+  // Arrives only from Home's Explore Destinations cards
+  // (`/search?destination={id}`) — no in-page control changes it, so it
+  // doesn't need its own setter, unlike `query`/`category`.
+  const destination = searchParams.get("destination") ?? undefined;
 
   const results = useSearchVenues({
     q: query,
     category: category === "all" ? undefined : category,
+    destination,
   });
 
-  const hasQuery = Boolean(query.trim() || category !== "all");
+  const hasQuery = Boolean(query.trim() || category !== "all" || destination);
 
   useEffect(() => {
     if (query.trim()) addRecentSearch(query.trim());
@@ -142,9 +147,9 @@ function SearchPageContent() {
               />
               {results.isLoading ? (
                 <div className="space-y-3">
-                  <Skeleton className="h-24 w-full" />
-                  <Skeleton className="h-24 w-full" />
-                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-28 w-full" />
+                  <Skeleton className="h-28 w-full" />
+                  <Skeleton className="h-28 w-full" />
                 </div>
               ) : results.isError ? (
                 <EmptyState
@@ -164,6 +169,11 @@ function SearchPageContent() {
                       onClick={() => {
                         setQuery("");
                         setCategory("all");
+                        // `destination` isn't local state — it's read live
+                        // from the URL each render (see its declaration
+                        // above) — so clearing it means dropping the query
+                        // string, not just resetting component state.
+                        if (destination) router.replace("/search");
                       }}
                       variant="secondary"
                     >

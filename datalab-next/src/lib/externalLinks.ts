@@ -30,11 +30,22 @@ export function buildInstagramHref(handle: string | null | undefined): string | 
   return `https://instagram.com/${clean}`
 }
 
+/** Egypt-only platform — editors overwhelmingly enter local mobile numbers
+ * (`01XXXXXXXXX`, 11 digits, no country code), but `wa.me` requires the
+ * country code with the leading `0` dropped. Passed through unchanged, a
+ * stored local number produces a link WhatsApp reports as invalid rather
+ * than opening a chat (confirmed against real published venue data — see
+ * the identical fix in `consumer/lib/domain/validators.ts`'s
+ * `toValidWhatsapp`, which this mirrors since the two frontends don't
+ * share code). Only the one unambiguous case — 11 digits with a single
+ * leading `0` — is converted to `20` + the remaining 10 digits; anything
+ * else passes through as before. */
 export function buildWhatsappHref(whatsapp: string | null | undefined): string | null {
   if (!whatsapp?.trim()) return null
   const digits = whatsapp.replace(/[^\d]/g, '')
   if (!digits) return null
-  return `https://wa.me/${digits}`
+  const normalized = digits.length === 11 && digits.startsWith('0') ? `20${digits.slice(1)}` : digits
+  return `https://wa.me/${normalized}`
 }
 
 export function buildPhoneHref(phone: string | null | undefined): string | null {

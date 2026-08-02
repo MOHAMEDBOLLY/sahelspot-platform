@@ -12,6 +12,7 @@ export function fetchVenue(venueId: string): Promise<PublishedVenueDTO | null> {
 export type VenueSearchParams = {
   q?: string;
   category?: string;
+  destination?: string;
 };
 
 /** Calls the dedicated `/public/search/venues` endpoint — never
@@ -20,6 +21,7 @@ export function searchVenues(params: VenueSearchParams): Promise<PublishedVenueD
   const query = new URLSearchParams();
   if (params.q) query.set("q", params.q);
   if (params.category) query.set("category", params.category);
+  if (params.destination) query.set("destination", params.destination);
   const suffix = query.toString();
 
   return apiGetList<PublishedVenueDTO>(`/public/search/venues${suffix ? `?${suffix}` : ""}`);

@@ -14,7 +14,10 @@ type DestinationCardProps = {
  * read directly from the Home export. */
 export function DestinationCard({ href, name, imageUrl, placeCount }: DestinationCardProps) {
   return (
-    <Link className="group relative block h-64 overflow-hidden rounded-3xl" href={href}>
+    <Link
+      className="group relative block h-64 overflow-hidden rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+      href={href}
+    >
       {imageUrl ? (
         <Image
           alt={name}

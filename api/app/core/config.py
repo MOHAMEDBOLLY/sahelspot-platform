@@ -21,10 +21,13 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str = Field(min_length=1)
     # Sprint 30 — comma-separated list of origins allowed to call this API
     # from a browser (CORSMiddleware's allow_origins). Defaults to the
-    # Studio dev server so local dev keeps working unconfigured; production
-    # deployments must set this explicitly. No wildcard support — every
-    # deployed frontend origin must be listed.
-    allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    # Studio and Consumer dev servers so local dev keeps working
+    # unconfigured; production deployments must set this explicitly. No
+    # wildcard support — every deployed frontend origin must be listed.
+    allowed_origins: str = (
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:3000,http://127.0.0.1:3000"
+    )
     # Sprint 24 — the Supabase user id (sub claim) that gets bootstrapped as
     # `admin` on first login instead of the default `viewer`. Deliberately
     # not baked into the migration (see 0003_app_users.py) since it varies

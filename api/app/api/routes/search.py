@@ -20,6 +20,7 @@ router = APIRouter(prefix="/search", tags=["search"])
 def search_published_venues(
     q: str | None = Query(default=None, description="Case-insensitive substring match on venue name"),
     category: str | None = Query(default=None, description="Exact category match"),
+    destination: str | None = Query(default=None, description="Exact destination id match"),
     db: Session = Depends(get_db),
 ):
     """Reads *only* the current publish revision's frozen snapshot — same
@@ -29,9 +30,12 @@ def search_published_venues(
     `revision.snapshot["venues"]`, not as a SQL query — a real
     implementation difference from `/editor/venues`'s `ILIKE`/DB-level
     search (Sprint 27), even though the filtering *intent* (case-
-    insensitive name substring + exact category, AND-combined) is the
-    same. Reuses `resolve_published_venue` (app/api/routes/public.py) for
-    the destination-merge step rather than re-deriving it.
+    insensitive name substring + exact category + exact destination,
+    AND-combined) is the same. Reuses `resolve_published_venue`
+    (app/api/routes/public.py) for the destination-merge step rather than
+    re-deriving it. `destination` matches `venue["destination_id"]`
+    directly (the raw snapshot field, not the resolved `DestinationRef`)
+    — same id Home's Explore Destinations cards already link with.
     """
     revision = get_current_revision(db)
     if revision is None:
@@ -43,6 +47,8 @@ def search_published_venues(
         if q and q.lower() not in venue["name"].lower():
             continue
         if category and venue["category"] != category:
+            continue
+        if destination and venue["destination_id"] != destination:
             continue
         resolved = resolve_published_venue(venue, destinations_by_id)
         if resolved is not None:

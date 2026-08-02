@@ -13,7 +13,10 @@ type CollectionCardProps = {
  * model, docs/consumer/API_REQUIREMENTS.md §2. */
 export function CollectionCard({ href, label, imageUrl }: CollectionCardProps) {
   return (
-    <Link className="relative block h-40 overflow-hidden rounded-3xl" href={href}>
+    <Link
+      className="relative block h-40 overflow-hidden rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+      href={href}
+    >
       {imageUrl ? (
         <Image alt={label} className="object-cover" fill sizes="50vw" src={imageUrl} />
       ) : (
