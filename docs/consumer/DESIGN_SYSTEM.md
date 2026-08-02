@@ -179,7 +179,32 @@ them. This is what makes the gaps in `API_REQUIREMENTS.md` non-blocking for comp
 
 ---
 
-## 11. Known deviations from Stitch
+## 11. Unimplemented features stay visible
+
+**A visual element present in Stitch is never removed because its functionality is not
+built yet.** Disable the interaction; keep the element.
+
+This applies to the avatar, the greeting, and the notification bell — all of which need
+accounts or a notification system that v1 does not have. They render exactly as designed;
+they simply do nothing.
+
+| Element | v1 treatment |
+|---|---|
+| Avatar | Rendered at full size and styling, with a neutral placeholder in place of a user photo |
+| Greeting ("Good Morning 👋") | Rendered verbatim, static — no time-of-day logic is inferred |
+| Notification bell | Rendered in position, `disabled` + `aria-disabled`, no hover/active affordance |
+
+Disabled controls keep their Stitch appearance rather than taking the dimmed
+`disabled:opacity-50` treatment used for genuinely disabled actions — the goal is visual
+fidelity, so they must not *look* broken. They are removed from the tab order and named
+for screen readers as unavailable.
+
+The alternative — deleting them — would silently redesign the header and make the
+implementation impossible to diff against the export.
+
+---
+
+## 12. Known deviations from Stitch
 
 Deliberate, approved, and recorded so they are never mistaken for drift:
 

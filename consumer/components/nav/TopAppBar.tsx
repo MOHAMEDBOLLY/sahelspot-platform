@@ -1,25 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Avatar } from "@/components/ui/Avatar";
+import { Icon } from "@/components/ui/Icon";
 
 type TopAppBarProps = {
-  /** Screen title. Home shows the "SahelSpot" wordmark; other tabs show their
-   * own name ("Explore", "Saved", "More"). */
+  /** `greeting` is Home's: greeting line above the SahelSpot wordmark.
+   *  `title` is every other root tab's: the screen name alone. */
+  variant?: "greeting" | "title";
+  /** Wordmark on Home, screen name elsewhere. */
   title: string;
-  /** `lg` is Home's wordmark treatment; `md` is the plain screen title. */
-  size?: "md" | "lg";
+  /** Home only. Static by design — Stitch shows "Good Morning 👋" and defines
+   * no time-of-day behaviour, so none is inferred. */
+  greeting?: string;
 };
 
-/** Sticky header for root-tab screens.
+/** Sticky header for root-tab screens, matching the export exactly.
  *
- * The avatar and notification bell present in the Stitch export are omitted:
- * v1 has no user accounts and no notifications, so both are controls with
- * nothing behind them. Everything else — sticky positioning, the blur+shadow
- * that fades in past 10px of scroll — matches the export.
+ * The avatar and notification bell have no functionality in v1 — there are no
+ * accounts and no notifications — but both are kept at full visual fidelity
+ * with their interactions disabled. The bell deliberately does *not* take the
+ * dimmed disabled styling used for genuinely disabled actions: the intent is
+ * to look identical to Stitch, not to look broken.
  *
- * The scroll listener is passive and only flips a boolean, so it does no work
- * per frame beyond the class toggle. */
-export function TopAppBar({ title, size = "md" }: TopAppBarProps) {
+ * The two variants differ in more than text: Home's bell is navy and its
+ * avatar sits on `primary-container`, while Explore's bell is grey and its
+ * avatar carries a hairline ring. Both are reproduced. */
+export function TopAppBar({ variant = "title", title, greeting }: TopAppBarProps) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -29,6 +36,8 @@ export function TopAppBar({ title, size = "md" }: TopAppBarProps) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const isGreeting = variant === "greeting";
+
   return (
     <header
       className={`sticky top-0 z-40 transition-shadow duration-300 ${
@@ -36,13 +45,32 @@ export function TopAppBar({ title, size = "md" }: TopAppBarProps) {
       }`}
     >
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3">
-        <h1
-          className={`font-bold tracking-tight text-primary ${
-            size === "lg" ? "text-xl" : "text-2xl font-black"
+        <div className="flex items-center gap-3">
+          <Avatar bordered={!isGreeting} />
+          {isGreeting ? (
+            <div>
+              <p className="text-xs font-medium text-on-surface-variant">{greeting}</p>
+              <h1 className="text-xl font-bold tracking-tight text-primary">{title}</h1>
+            </div>
+          ) : (
+            <h1 className="text-2xl font-black tracking-tight text-primary">{title}</h1>
+          )}
+        </div>
+
+        {/* Notifications don't exist in v1. The control keeps its designed
+          * position and appearance, but is inert and out of the tab order. */}
+        <button
+          aria-disabled="true"
+          aria-label="Notifications (not available yet)"
+          className={`flex h-10 w-10 items-center justify-center rounded-full ${
+            isGreeting ? "text-primary" : "text-on-surface-variant"
           }`}
+          disabled
+          tabIndex={-1}
+          type="button"
         >
-          {title}
-        </h1>
+          <Icon name="notifications" />
+        </button>
       </div>
     </header>
   );

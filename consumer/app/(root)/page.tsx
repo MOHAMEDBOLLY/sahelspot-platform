@@ -4,7 +4,7 @@ import { PhasePlaceholder } from "@/components/ui/PhasePlaceholder";
 export default function HomePage() {
   return (
     <>
-      <TopAppBar size="lg" title="SahelSpot" />
+      <TopAppBar greeting="Good Morning 👋" title="SahelSpot" variant="greeting" />
       <PhasePlaceholder phase="Phase 4" screen="Home" />
     </>
   );
