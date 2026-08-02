@@ -115,7 +115,7 @@ the product that would introduce a second data source, and decision 3 forbids ex
 
 | Element | Resolution |
 |---|---|
-| Save / heart control | ✅ Device-local `localStorage` behind `SavedVenuesService` |
+| Save / heart control | ✅ Device-local `localStorage` behind `SavedRepository` |
 | Saved tab content | ✅ Same service; ids only, content re-fetched from `/public/venues` |
 | Account group on More | ✅ Removed — More is application-level items only |
 | Avatar + "Good Morning 👋" greeting | ⚠️ No user to greet. Recommend a static wordmark header |

@@ -104,7 +104,7 @@ replaces it without touching the UI layer:
 
 ```ts
 // lib/saved/types.ts
-interface SavedVenuesService {
+interface SavedRepository {
   list(): Promise<string[]>;
   has(venueId: string): Promise<boolean>;
   add(venueId: string): Promise<void>;
@@ -113,7 +113,7 @@ interface SavedVenuesService {
 }
 ```
 
-`LocalStorageSavedVenuesService` is the only v1 implementation. Components consume a
+`LocalStorageSavedRepository` is the only v1 implementation. Components consume a
 `useSavedVenues()` hook and never touch `localStorage` directly. The stored value is a
 list of venue ids; venue content is always re-fetched from `/public/venues`, so the
 Studio API remains the single source of truth for content.

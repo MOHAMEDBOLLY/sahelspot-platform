@@ -9,7 +9,7 @@ export default function SavedPage() {
     <>
       <TopAppBar title="Saved" />
       <PhasePlaceholder
-        note="Device-local only, behind SavedVenuesService. No account, no sync."
+        note="Device-local only, behind SavedRepository. No account, no sync."
         phase="Phase 9"
         screen="Saved"
       />

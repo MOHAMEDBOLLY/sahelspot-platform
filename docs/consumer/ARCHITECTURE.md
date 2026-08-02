@@ -62,12 +62,20 @@ consumer/
     map/                          Layer 4 — isolated
   lib/
     api/
-      client.ts                   fetch, ApiError, base URL
-      venues.ts  destinations.ts  search.ts
+      client.ts                   apiGetList / apiGetOrNull, ApiError, base URL
+      dto.ts                      PublishedVenueDTO / PublishedDestinationDTO
+      venues.ts  destinations.ts  fetchVenues, fetchVenue, searchVenues, fetchDestinations
     domain/
-      venue.ts  destination.ts    domain models + mappers
-    hooks/                        TanStack Query hooks
-    saved/                        SavedVenuesService interface + localStorage impl
+      venue.ts  destination.ts    Venue / Destination — the UI-facing shapes
+      mappers/
+        venue.ts  destination.ts  DTO -> Domain, one function per resource
+    hooks/
+      useVenues.ts  useVenue.ts  useDestinations.ts  useSearchVenues.ts
+    saved/
+      types.ts                   SavedRepository interface
+      localStorageSavedRepository.ts
+      repository.ts               the one wiring point — swap the impl here only
+      useSaved.ts                 the hook every component actually uses
     map/                          Mapbox config, marker colours, bounds
     utils/
   styles/globals.css              @theme tokens
@@ -79,41 +87,70 @@ renders it itself.
 
 ---
 
-## 3. Domain models
+## 3. Data flow
 
-The API shape and the UI shape are deliberately different types. `PublishedVenue` mirrors
-the API exactly; `Venue` is what components consume.
+```
+SahelSpot Studio → Public API → API Client → DTO → Mapper → Domain Model
+                                                              → View Model → UI
+```
+
+Each arrow is a real seam in the code, not a conceptual one:
+
+| Stage | Lives in | Example |
+|---|---|---|
+| API Client | `lib/api/client.ts` | `apiGetList`, `apiGetOrNull` — the only functions that call `fetch` |
+| DTO | `lib/api/dto.ts` | `PublishedVenueDTO` — mirrors `PublishedVenueOut` exactly, snake_case included |
+| Mapper | `lib/domain/mappers/venue.ts` | `toVenue(dto): Venue` — the only place a DTO field becomes a domain field |
+| Domain Model | `lib/domain/venue.ts` | `Venue` — camelCase, parsed coordinates, closed category union |
+| View Model | per-screen, from Phase 4 on | e.g. Home composes `Venue[]` + curation into what its sections actually render |
+| UI Components | `components/**` | Consume `Venue`/`Destination` (or a screen's view model), never a DTO |
+
+For Phase 3, hooks (`lib/hooks/`) return the Domain Model directly — for a plain list
+screen the domain model *is* the view model, so no extra layer is invented where nothing
+needs shaping yet. A screen-specific view model appears the moment a screen actually
+composes multiple things (Home's curated rows, Map's bottom-sheet stats); it is built
+alongside that screen in its own phase, not speculatively here.
+
+`PublishedVenueDTO` and `Venue` are deliberately different types:
 
 ```ts
-// lib/api/types.ts — mirrors PublishedVenueOut exactly. Never used in components.
-interface PublishedVenue { /* … as today … */ }
+// lib/api/dto.ts — mirrors PublishedVenueOut exactly. Never imported by a component.
+interface PublishedVenueDTO { /* … snake_case, as the wire sends it … */ }
 
-// lib/domain/venue.ts — what the UI consumes.
+// lib/domain/venue.ts — what hooks return and components consume.
 interface Venue {
   id: string;
-  name: string;
   slug: string;
-  destination: { id: string; name: string };
+  name: string;
+  destinationName: string;
   district: string | null;
   category: VenueCategory;
   isFeatured: boolean;
   isVerified: boolean;
-  coordinates: { lat: number; lng: number } | null;  // parsed from string
-  contact: { phone; whatsapp; website; mapsUrl; instagram; facebook; tiktok };
-  description: string | null;
+  coordinates: { lat: number; lng: number } | null;  // parsed from string, or null if unparseable
   coverImageUrl: string | null;
-  galleryImageUrls: string[];
-  openingHours: OpeningHours | null;
-  beachDetails: BeachDetails | null;
-  rating: Rating | null;        // ← API gap; null until delivered
+  galleryImageUrls: string[];                        // null -> []
+  shortDescription: string | null;
+  contact: { phone; whatsapp; website; mapsUrl };
+  rating: number | null;          // API_REQUIREMENTS.md §1 — no source yet
+  reviewCount: number | null;
+  isOpenNow: boolean | null;      // §7 — opening_hours shape not agreed with Studio yet
+  distanceLabel: string | null;   // §4
+  priceRange: string | null;      // §8
+  tags: string[];
+  amenities: string[];
+  highlights: string[];
 }
 ```
 
-The mapper is the single place that:
-- parses `latitude`/`longitude` from `string | null` into a real `{lat, lng}` or `null`
+`lib/domain/mappers/venue.ts`'s `toVenue` is the single place that:
+- parses `latitude`/`longitude` from `string | null` into `{lat, lng} | null`, treating an
+  unparseable value the same as absent rather than plotting it at `0,0`
 - normalises `gallery_image_urls: string[] | null` to `[]`
-- narrows `category: string` to a `VenueCategory` union (needed for marker colours)
-- gives structure to the untyped `opening_hours` / `beach_details` JSON blobs
+- narrows `category: string` to the closed `VenueCategory` union, falling an unrecognized
+  value back to `"general"` rather than throwing — a marker in the wrong colour is a much
+  smaller failure than a venue vanishing from the whole app
+- sets every field with an open `API_REQUIREMENTS.md` gap to `null` / `[]`
 
 Components never see snake_case, never see a stringified coordinate, and never
 null-check a list. When a gap in `API_REQUIREMENTS.md` is filled, only the mapper changes.
@@ -136,11 +173,11 @@ not user data** — they need no backend and do not contradict the no-accounts d
 
 ### Saved venues
 
-Isolated behind `SavedVenuesService` (`lib/saved/`) so a future authenticated
+Isolated behind `SavedRepository` (`lib/saved/`) so a future authenticated
 implementation replaces it without touching the UI layer:
 
 ```ts
-interface SavedVenuesService {
+interface SavedRepository {
   list(): Promise<string[]>;
   has(venueId: string): Promise<boolean>;
   add(venueId: string): Promise<void>;
@@ -149,11 +186,18 @@ interface SavedVenuesService {
 }
 ```
 
-`LocalStorageSavedVenuesService` is the only v1 implementation. The async signature is
-deliberate — it costs nothing now and means a network-backed implementation later is a
-substitution rather than a rewrite. Components use `useSavedVenues()`; **no component
-touches `localStorage` directly.** Only venue *ids* are stored; venue content is always
-re-fetched from `/public/venues`, so the Studio API remains the single source of truth.
+`LocalStorageSavedRepository` is the only v1 implementation, wired in one place —
+`lib/saved/repository.ts` exports the single `savedRepository` instance, and nothing
+outside that file imports the localStorage class directly. The async signature on every
+method is deliberate: it costs nothing now and means a network-backed implementation
+later is a substitution at that one wiring point, not a rewrite of the interface or its
+callers.
+
+Components use `useSaved()` (`lib/saved/useSaved.ts`); **no component touches
+`localStorage` or the repository directly.** Only venue *ids* are stored; venue content
+is always re-fetched from `/public/venues` through the same Domain Model pipeline as
+everywhere else, so Studio remains the single content source — the repository is a list
+of references into it, not a second one.
 
 Query defaults: `staleTime: 5min`, `gcTime: 30min`, no refetch on window focus. Published
 content changes only on publish, so aggressive caching is correct.

@@ -43,13 +43,26 @@ Map module excluded.
 
 ---
 
-## Phase 3 — Data layer
+## Phase 3 — Data layer ✅ complete
 
-- `lib/api/` split; `lib/domain/` models and mappers; TanStack Query hooks and provider
-- Loading / empty / error primitives wired
+- `lib/api/` — `client.ts` (`apiGetList`/`apiGetOrNull`), `dto.ts`, per-resource fetchers
+- `lib/domain/` — `Venue`/`Destination` models, `mappers/` (DTO → Domain)
+- `lib/hooks/` — `useVenues`, `useVenue`, `useDestinations`, `useSearchVenues`
+- `lib/saved/` — `SavedRepository` interface, `LocalStorageSavedRepository`, the single
+  `repository.ts` wiring point, and `useSaved()`
 
-**Exit:** typed domain objects flow from `/public/*` into components. No component
-touches a snake_case API shape.
+**Exit:** typed domain objects flow from `/public/*` into components through the full
+Client → DTO → Mapper → Domain chain. No component touches a snake_case API shape.
+Verified against the live API: schema cross-checked field-for-field against
+`PublishedVenueOut`, both list endpoints correctly return `[]` (no publish revision yet —
+handled as the empty state, not an error), and `/public/venues/{id}` 404s correctly for an
+unknown id.
+
+⚠️ **Known local-dev gap, not a Consumer defect:** the API's CORS allowlist
+(`ALLOWED_ORIGINS` in `api/.env`) permits `:5173` (the Vite Studio app) but not `:3000`
+(this app), so browser-side fetches fail locally with `net::ERR_FAILED` until that's
+added. Out of scope for this Consumer-only session; flagged for whoever owns the API's
+dev environment config.
 
 ---
 
@@ -106,7 +119,7 @@ Planner have no content model in Studio. This is a Studio sprint, not a Consumer
 
 ## Phase 9 — Saved · More · Splash · Onboarding ✅ unblocked
 
-- **Saved** — `SavedVenuesService` + `LocalStorageSavedVenuesService`, `useSavedVenues()`
+- **Saved** — `SavedRepository` + `LocalStorageSavedRepository`, `useSavedVenues()`
   hook, `TabBar` with Favorites populated and the other two tabs as `EmptyState`
 - **More** — application-level items only (Preferences / About / Support / Share)
 - **Splash · Onboarding** — unblocked except for the logo asset
@@ -177,10 +190,11 @@ substantial piece of work and Home ships without rating UI until it lands.
 The approved item list includes "Theme", but Stitch defines one light theme and no dark
 mode. Omit the row, or show it disabled? Does not block Phase 0.
 
-### 4. 🟡 Avatar, greeting, and notification bell
-No user and no notifications exist in v1. Recommend a static wordmark header and no bell.
-Affects Phase 1's `TopAppBar` — a small, reversible call; proceeding with the
-greeting-less variant unless told otherwise.
+### 4. ✅ Resolved — avatar, greeting, and notification bell stay visible
+All three are kept at full Stitch visual fidelity in `TopAppBar`; only their
+interaction is disabled (no photo behind the avatar, the bell is inert). An
+unimplemented feature loses its interaction, not its visual presence — see
+`DESIGN_SYSTEM.md` §11.
 
 ### 5. 🟡 Weather pill
 Recommend dropping from v1 — it is one decorative pill and the only element that would
