@@ -23,6 +23,15 @@ export function CategoryChip({
 }: CategoryChipProps) {
   return (
     <button
+      // Explicit aria-label rather than relying on name-from-content: the
+      // icon's glyph ligature text ("restaurant", "coffee", ...) sits right
+      // next to the visible label inside the same button, and accessible-
+      // name computation across browsers/assistive tech is inconsistent
+      // about excluding aria-hidden siblings cleanly in that shape. Every
+      // other icon-bearing control in this app takes an explicit label for
+      // the same reason (see IconButton); this one relied on implicit
+      // text-content naming and is the exception, not the pattern.
+      aria-label={label}
       className={`group flex flex-col items-center gap-2 focus-visible:outline-none ${className}`}
       type="button"
       {...props}

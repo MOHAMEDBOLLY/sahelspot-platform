@@ -95,7 +95,11 @@ export function VenueCard({
         <span className="absolute top-3 right-3">
           <IconButton
             aria-pressed={saved}
-            className={saved ? "text-tertiary" : "text-on-surface-variant/40"}
+            // Solid on-surface-variant, not the export's /40: computed
+            // contrast at 40% against this icon's white circle backdrop is
+            // 1.84:1, well under WCAG's 3:1 minimum for UI components. Full
+            // opacity measures 6.4:1.
+            className={saved ? "text-tertiary" : "text-on-surface-variant"}
             icon="favorite"
             filled={saved}
             label={saved ? "Remove from saved" : "Save this place"}

@@ -29,6 +29,11 @@ export function BottomNav() {
         return (
           <Link
             aria-current={active ? "page" : undefined}
+            // Explicit aria-label, not name-from-content — same reasoning as
+            // CategoryChip: the icon glyph's ligature text sits right next
+            // to the visible label, and that shape is unreliable across
+            // accessible-name implementations.
+            aria-label={tab.label}
             className={`flex h-12 min-w-12 flex-col items-center justify-center gap-1 rounded-lg px-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 ${
               active
                 ? "text-primary"

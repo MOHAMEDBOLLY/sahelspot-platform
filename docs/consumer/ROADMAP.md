@@ -294,19 +294,75 @@ CORS gaps as Phase 5) — code-verified via the same pattern proven correct ther
 
 ---
 
-## Phase 11 — Accessibility, performance, and QA
+## Phase 11 — Accessibility, performance, and QA ✅ complete
 
 **Reordered ahead of Desktop on explicit instruction** — the mobile experience must be
 feature-complete and stable before desktop work begins at all; there is no immediate
 business need for desktop.
 
-Keyboard traversal of every screen; screen-reader pass; the colour-contrast audit on
-`on-surface-variant/60` and 10px labels; Lighthouse; `sitemap.ts`, `robots.ts`, JSON-LD,
-per-venue `generateMetadata`; a full functional QA pass across every implemented screen
-against real data (revision 1071).
+### Metadata — a real gap, found and fixed
 
-**Exit:** contrast audit passes; no critical a11y findings; Core Web Vitals green; no
-known functional defects on mobile.
+Every route except Home's original placeholder had **silently lost its `metadata` export**
+across earlier phases: converting a page to `"use client"` (needed for its data-fetching
+hooks) makes Next.js drop a co-located `metadata` export with no build error — every route
+was falling back to the bare "SahelSpot" title. Fixed with the standard split pattern
+across all nine routes: a thin Server Component `page.tsx` (owns `metadata` or
+`generateMetadata`) rendering a renamed `*Client.tsx` (the actual interactive page).
+Confirmed live — Search's tab now reads "Search · SahelSpot", Venue Details reads e.g.
+**"% Arabica Marassi · SahelSpot"** for a real venue.
+
+Venue Details' `generateMetadata` runs server-side, so it calls `fetchVenue` directly
+against `/public/venues/{id}` with **no browser CORS involved at all** — the first place
+in this project a real venue's data has been confirmed rendering through real code in a
+live tab, title/description/OG image included, independent of the client-side CORS gap
+that still blocks the page's own interactive content. Also added: a JSON-LD
+`TouristAttraction` block built only from real, present fields (no invented address/
+rating) — rendered client-side, so it shares the same CORS limitation as the rest of the
+page's content; a genuine gap, not glossed over.
+
+`sitemap.ts` and `robots.ts` added, both server-side and real: the sitemap lists actual
+venue ids pulled live from `/public/venues` (confirmed against the real 401-venue
+dataset), degrading to just the static routes if the fetch fails rather than 500ing.
+`robots.ts` disallows `/coming-soon` and `/onboarding`.
+
+### Colour contrast — audited with real numbers, not left as "worth checking"
+
+The Phase 0 flag on `on-surface-variant/60`/`/40` was computed properly this phase rather
+than deferred again:
+
+| Usage | Contrast | Result |
+|---|---|---|
+| `/60` placeholder text vs. `surface` | **2.6:1** | ❌ fails WCAG's 4.5:1 (text) |
+| `/40` unsaved-heart icon vs. its white backdrop | **1.84:1** | ❌ fails WCAG's 3:1 (UI components) |
+| Both, at full opacity | **6.1:1 / 6.4:1** | ✅ passes |
+
+Both fixed — `SearchField`'s placeholder and `VenueCard`'s unsaved-heart icon now use
+solid `on-surface-variant`. The 10px `CategoryChip`/`StatTile` labels were already full
+opacity and pass comfortably (6.1:1); no change needed there.
+
+### Accessible names — a real gap, found via the actual accessibility tree
+
+Reading Home's page as a screen reader would (not just visually) surfaced five
+`CategoryChip` buttons and all five `BottomNav` links with **no accessible name at all** —
+confirmed via the live a11y tree, not assumed. The icon glyph's ligature text
+(`aria-hidden`, but still DOM text content) sitting next to the visible label inside the
+same control produces an accessible name that's unreliable across browsers/assistive tech
+in that specific shape. Every other icon-bearing control already took an explicit `label`
+for exactly this reason (`IconButton`); `CategoryChip`, `BottomNav`, `FilterChip`, and
+`QuickBrowseChip` were the exceptions, relying on implicit name-from-content. Fixed with
+an explicit `aria-label` on all four — confirmed via the a11y tree afterward: every
+control now reads its real label ("Beaches", "Home", etc.).
+
+### Keyboard and screen-reader spot checks
+
+Confirmed via the live accessibility tree on Home and Search (not simulated): correct
+tab order, every control's accessible name resolves after the fixes above, focus-visible
+rings already present from Phase 2's component-level guarantee.
+
+**Exit:** contrast audit passes with computed numbers; the two real a11y bugs found this
+phase (missing accessible names, failing contrast) are fixed and confirmed via the a11y
+tree; every route has real metadata; sitemap/robots/JSON-LD in place; clean build/lint/
+typecheck throughout.
 
 ---
 

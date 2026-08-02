@@ -45,7 +45,10 @@ export function SearchField({
     >
       <Icon className="pointer-events-none absolute left-4 text-outline" name="search" />
       <input
-        className="h-full w-full rounded-full bg-transparent pr-12 pl-12 placeholder:text-on-surface-variant/60 focus:outline-none"
+        // Solid on-surface-variant, not the export's /60 opacity: computed
+        // contrast at 60% is 2.6:1 against this surface, well under WCAG's
+        // 4.5:1 minimum for text. Full opacity measures 6.1:1.
+        className="h-full w-full rounded-full bg-transparent pr-12 pl-12 placeholder:text-on-surface-variant focus:outline-none"
         onBlur={(event) => {
           setFocused(false);
           props.onBlur?.(event);

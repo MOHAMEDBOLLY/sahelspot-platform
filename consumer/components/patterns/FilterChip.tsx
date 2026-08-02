@@ -22,6 +22,7 @@ export function FilterChip({
 }: FilterChipProps) {
   return (
     <button
+      aria-label={label}
       aria-pressed={active}
       className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 ${
         active

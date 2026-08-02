@@ -14,7 +14,7 @@ type QuickBrowseChipProps = {
  * is a different component for a different row, confirmed in the export. */
 export function QuickBrowseChip({ href, label, icon }: QuickBrowseChipProps) {
   return (
-    <Link className="flex shrink-0 flex-col items-center gap-2" href={href}>
+    <Link aria-label={label} className="flex shrink-0 flex-col items-center gap-2" href={href}>
       <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm">
         <Icon className="text-primary" name={icon} size={28} />
       </span>
