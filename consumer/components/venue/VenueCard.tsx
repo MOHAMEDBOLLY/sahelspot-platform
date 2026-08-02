@@ -77,7 +77,7 @@ export function VenueCard({
 
   return (
     <Link
-      className={`shrink-0 snap-start overflow-hidden rounded-3xl border border-outline-variant/10 bg-surface-container-lowest shadow-md ${
+      className={`shrink-0 snap-start overflow-hidden rounded-3xl border border-outline-variant/10 bg-surface-container-lowest shadow-md transition-transform active:scale-[0.98] ${
         isCompact ? "w-56" : "w-[80%] min-w-[280px]"
       }`}
       href={href}

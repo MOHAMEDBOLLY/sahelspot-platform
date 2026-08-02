@@ -254,13 +254,43 @@ disabled-vs-real row distinction, About page, and Share confirmation; Onboarding
 
 ---
 
-## Phase 10 — Motion
+## Phase 10 — Motion ✅ complete
 
-Framer Motion added only now, per approved guidance. `tap-scale`, `hover-scale`,
-scroll-shadow header, sheet transitions, marker-location pulse. All gated on
-`prefers-reduced-motion`.
+Framer Motion added only now, per approved guidance — but audited first, rather than
+applied uniformly: most of the tokens in `DESIGN_TOKENS.md` §6 were already implemented as
+plain CSS transitions in earlier phases, matching Stitch's own technique exactly (the
+export itself uses vanilla CSS transitions + `addEventListener`, never an animation
+library). Reimplementing those in Framer Motion would have been motion for its own sake.
 
-**Exit:** no motion regressions; reduced-motion path verified.
+- **`tap-scale`** — already present via Tailwind `active:scale-*` on every button
+  primitive since Phase 2. One real gap found and fixed: `VenueCard`'s `vertical-lg`/
+  `vertical-compact` card itself had no touch feedback at all (Stitch's own
+  `touchstart`/`touchend` → `scale-[0.98]` micro-interaction on Home's Trending cards was
+  never carried over) — added as `active:scale-[0.98]`, CSS, no Framer Motion needed.
+- **`hover-scale`** — already correct: `DestinationCard`'s `group-hover:scale-110
+  duration-700` was implemented directly from the export in Phase 4.
+- **Scroll-shadow header** — already correct: `TopAppBar`'s scroll listener + CSS
+  transition, Phase 1.
+- **Marker-location pulse** — already correct: a CSS `@keyframes` animation in
+  `globals.css`, Phase 5, matching Stitch's own `user-location-pulse` class name and
+  approach.
+- **Sheet transitions** — the one place Framer Motion earns its dependency. `BottomSheet`
+  now slides up on open / down on close via `AnimatePresence` + `motion.div`, which plain
+  CSS can't do cleanly for a conditionally-rendered element's *exit*. Its contract changed
+  from parent-conditional-rendering to an `open` prop, always mounted — the Map page now
+  keeps `selectedDestinationId` set through the close animation (only clearing `sheetOpen`)
+  so the sheet has real content to slide away with instead of going blank first.
+
+All of the above — the pre-existing CSS and the new Framer Motion — sit under the global
+`prefers-reduced-motion` blanket override in `globals.css`; `BottomSheet` additionally uses
+Framer's own `useReducedMotion` to drop its transition to `{ duration: 0 }` directly,
+rather than relying only on the CSS override to neutralize a spring physics animation.
+
+**Exit:** verified — no console errors introduced, clean build/lint/typecheck, `VenueCard`'s
+new tap-scale and `BottomSheet`'s `open`-prop refactor confirmed structurally in the
+browser. The sheet's own slide animation couldn't be triggered end-to-end in this
+environment (needs a real Mapbox marker click, blocked by the same pre-existing token +
+CORS gaps as Phase 5) — code-verified via the same pattern proven correct there.
 
 ---
 

@@ -36,6 +36,7 @@ export default function MapPage() {
 
   const [category, setCategory] = useState<VenueCategory | "all">("all");
   const [selectedDestinationId, setSelectedDestinationId] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const allVenues = useMemo(() => venues.data ?? [], [venues.data]);
   const mappableVenues = useMemo(
@@ -61,7 +62,10 @@ export default function MapPage() {
 
   function handleSelectVenue(venueId: string) {
     const venue = allVenues.find((v) => v.id === venueId);
-    if (venue) setSelectedDestinationId(venue.destinationId);
+    if (venue) {
+      setSelectedDestinationId(venue.destinationId);
+      setSheetOpen(true);
+    }
   }
 
   return (
@@ -112,50 +116,52 @@ export default function MapPage() {
         onToggleLayers={() => mapRef.current?.toggleStyle()}
       />
 
-      {selectedDestinationId ? (
-        <BottomSheet onClose={() => setSelectedDestinationId(null)} title={selectedDestinationName}>
-          {/* Stats are real, computed from the venues actually loaded for this
-            * destination — Places/Dining/Beaches counts, not fabricated
-            * numbers. There is no "Events" stat: the domain has no event
-            * category or content type at all (VenueCategory has no "event"
-            * member), so a 4th tile would have nothing real to show — see
-            * docs/consumer/API_REQUIREMENTS.md. */}
-          <div className="grid grid-cols-3 gap-2">
-            <StatTile accent="primary" label="Places" value={destinationVenues.length} />
-            <StatTile
-              accent="secondary"
-              label="Dining"
-              value={destinationVenues.filter((v) => v.category === "food").length}
-            />
-            <StatTile
-              accent="info"
-              label="Beaches"
-              value={destinationVenues.filter((v) => v.category === "beach").length}
-            />
-          </div>
+      {/* Always mounted, controlled by `open` — not conditionally rendered on
+        * `selectedDestinationId`, which stays set through the close
+        * animation so the sheet has real content to slide away with instead
+        * of going blank first. */}
+      <BottomSheet onClose={() => setSheetOpen(false)} open={sheetOpen} title={selectedDestinationName}>
+        {/* Stats are real, computed from the venues actually loaded for this
+          * destination — Places/Dining/Beaches counts, not fabricated
+          * numbers. There is no "Events" stat: the domain has no event
+          * category or content type at all (VenueCategory has no "event"
+          * member), so a 4th tile would have nothing real to show — see
+          * docs/consumer/API_REQUIREMENTS.md. */}
+        <div className="grid grid-cols-3 gap-2">
+          <StatTile accent="primary" label="Places" value={destinationVenues.length} />
+          <StatTile
+            accent="secondary"
+            label="Dining"
+            value={destinationVenues.filter((v) => v.category === "food").length}
+          />
+          <StatTile
+            accent="info"
+            label="Beaches"
+            value={destinationVenues.filter((v) => v.category === "beach").length}
+          />
+        </div>
 
-          <SectionHeader title="Popular Nearby" />
-          {destinationVenues.length === 0 ? (
-            <EmptyState
-              description="No published places here yet."
-              icon="location_off"
-              title="Nothing here yet"
-            />
-          ) : (
-            <CardCarousel>
-              {destinationVenues.slice(0, 6).map((venue) => (
-                <VenueCard
-                  key={venue.id}
-                  onToggleSaved={toggle}
-                  saved={isSaved(venue.id)}
-                  variant="vertical-compact"
-                  venue={venue}
-                />
-              ))}
-            </CardCarousel>
-          )}
-        </BottomSheet>
-      ) : null}
+        <SectionHeader title="Popular Nearby" />
+        {destinationVenues.length === 0 ? (
+          <EmptyState
+            description="No published places here yet."
+            icon="location_off"
+            title="Nothing here yet"
+          />
+        ) : (
+          <CardCarousel>
+            {destinationVenues.slice(0, 6).map((venue) => (
+              <VenueCard
+                key={venue.id}
+                onToggleSaved={toggle}
+                saved={isSaved(venue.id)}
+                variant="vertical-compact"
+                venue={venue}
+              />
+            ))}
+          </CardCarousel>
+        )}
+      </BottomSheet>
     </div>
   );
 }
