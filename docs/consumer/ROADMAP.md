@@ -182,11 +182,33 @@ the error state itself was confirmed live. Clean build/lint/typecheck.
 
 ---
 
-## Phase 7 — Search ✅ unblocked
+## Phase 7 — Search ✅ complete
 
-`VenueCard/horizontal-row` is now fully specified, which was the only gap.
+Search has no Stitch export in either delivery — it's specified only in
+`SahelSpot_Remaining_Screens_Spec.md`, as `SCREEN_ANALYSIS.md` §7 already flagged. Built
+faithfully to that written spec, reusing `VenueCard/horizontal-row` (confirmed in Phase 6)
+and `CATEGORY_FILTERS` (shared with Map — plain data, no Mapbox import, so reusing it here
+doesn't cross the Map module's isolation boundary).
 
-**Exit:** all four states correct against `/public/search/venues`.
+Two states, driven directly by `useSearchVenues`'s own TanStack state rather than
+screen-local booleans: **default** (no query/category — Recent Searches + Popular
+Categories) and **active** (category chips + Results, itself loading/error/empty/success).
+`useSearchVenues`'s `enabled: false` when nothing's queried is what keeps the default
+state from firing a request at all.
+
+Recent Searches (`lib/search/useRecentSearches.ts`) is device-local, same "preference, not
+user data" category as Saved — deliberately simpler than `SavedRepository`, with no
+interface/implementation split, since search history has no plausible future sync target
+the way saved venues do.
+
+**Bug caught in browser verification:** the Results count read `Results — 0` during an
+error, implying zero results were found rather than that the request failed. Fixed by
+gating the count on `results.isSuccess`, not just `!isLoading`.
+
+**Exit:** verified live — default state (Popular Categories, no Recent Searches yet),
+category-chip switching, Recent Searches persisting across navigation with a working
+"Clear All", and the corrected error-state count all confirmed in the browser. Clean
+build/lint/typecheck.
 
 ---
 
