@@ -1,26 +1,119 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Design tokens — docs/consumer/DESIGN_TOKENS.md.
+ *
+ * Literal hex only. Every Stitch screen ships its own inline `tailwind.config`
+ * and no two agree: `primary` resolves to #3b618e on Map and Venue Details,
+ * `tertiary` to #904e00 on Home and Map, and `surface` differs between Home
+ * and Explore. Those screens are frozen upstream and were not corrected, so a
+ * Stitch colour *alias* is never a safe source. The values below are the
+ * canonical ones, cross-checked against the design system's DESIGN.md. */
+@theme {
+  /* Brand */
+  --color-primary: #0d3b66;
+  --color-secondary: #2aa198;
+  --color-tertiary: #f28705;
+  --color-cream: #f5e6c8;
+
+  /* Surface — the page is *not* white. Cards are white on a slightly tinted
+   * page; collapsing both to #FFFFFF flattens every card in the product. */
+  --color-surface: #f9f9fe;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f2f3fa;
+  --color-surface-container: #eceef5;
+  --color-surface-container-high: #e5e8f0;
+
+  --color-primary-container: #9ec3f6;
+  --color-secondary-container: #89f5ea;
+  --color-on-secondary-container: #005c56;
+
+  /* Content */
+  --color-on-surface: #2e333a;
+  --color-on-surface-variant: #5b5f67;
+  --color-outline: #767b83;
+  --color-outline-variant: #aeb2bb;
+  --color-error: #a83836;
+
+  /* Map marker categories — data encodings, not brand colours. Nightlife and
+   * coffee have no brand token; they exist only as marker colours. */
+  --color-pin-nightlife: #3730a3;
+  --color-pin-coffee: #7f4400;
+
+  /* WhatsApp brand green — the one place a brand mark overrides the icon
+   * system (Venue Details action row). */
+  --color-whatsapp: #25d366;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-arabic: var(--font-ibm-plex-arabic), sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --shadow-nav: 0 -4px 12px rgb(0 0 0 / 0.05);
+  --shadow-sheet: 0 -10px 40px -15px rgb(0 0 0 / 0.15);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* No dark mode. Stitch defines a single light theme — every screen is
+ * `<html class="light">`, and the `dark:` variants scattered through the
+ * export are never exercised. */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+}
+
+/* Carousels bleed past the screen's px-4 and hide their scrollbar. Used by
+ * CardCarousel and every horizontally scrolling row. */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Venue Details hero. Darkens only the top and bottom edges, so the floating
+ * controls and the page counter stay legible without dimming the photo. */
+.hero-gradient {
+  background: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 0.3) 0%,
+    rgb(0 0 0 / 0) 20%,
+    rgb(0 0 0 / 0) 80%,
+    rgb(0 0 0 / 0.4) 100%
+  );
+}
+
+/* Material Symbols ships one variable font; FILL 1 is the "active" state
+ * (selected nav tab, saved heart, rating stars). */
+/* font-family is declared here rather than relying on the class rule inside
+ * Google's stylesheet: both rules have the same specificity, and ours wins on
+ * order, which would otherwise leave every glyph rendering as its literal
+ * ligature text ("home", "construction"). */
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  user-select: none;
+}
+.material-symbols-outlined[data-filled="true"] {
+  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
