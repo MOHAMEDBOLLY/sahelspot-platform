@@ -9,12 +9,17 @@
     "lint": "oxlint"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.4",
+    "framer-motion": "^12.43.0",
+    "lucide-react": "^1.28.0",
+    "mapbox-gl": "^3.27.0",
     "next": "16.2.12",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/mapbox-gl": "^3.4.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
