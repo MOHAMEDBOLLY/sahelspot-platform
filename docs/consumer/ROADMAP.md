@@ -90,9 +90,11 @@ greeting/bell it is live data with no source — showing invented numbers would 
 mocking the architecture forbids, not a disabled interaction.
 
 Three "See All" actions (mood grid, Trending, Explore Destinations) have no listing
-screen anywhere in the 9-screen inventory to send them to, so `SectionHeader` gained a
-`disabled` variant: the label stays visible, per the standing rule, but isn't a link to
-nowhere.
+screen anywhere in the 9-screen inventory. Corrected on review: disabled CTAs are not
+acceptable production UI even when the destination is unbuilt. Mood grid's "See All" now
+routes to `/search` (a real, existing screen); Trending and Explore Destinations route to
+a new `/coming-soon` page instead — a genuine destination that tells the visitor what's
+missing, not a link to nowhere and not an inert label.
 
 **Exit:** matches `sahelspot_home/screen.png` structurally at 375px; clean build/lint/
 typecheck; all four data states verified (loading/success reasoned from code path and

@@ -64,7 +64,7 @@ models. This is a new editorial entity in Studio with its own workflow and publi
 
 ---
 
-## 3a. Destination imagery — P1 (found while implementing Home)
+## 3a. Destination imagery — P0 (found while implementing Home)
 
 **Needed by:** `DestinationCard` on Home's Explore Destinations grid.
 
@@ -77,6 +77,10 @@ export has a photograph.
 PublishedDestinationOut:
   cover_image_url: str | None
 ```
+
+**Raised to P0 on review**: destination imagery is core to the visual experience, not a
+cosmetic gap — this should land in the Public API before launch, not be treated as a
+degrade-gracefully case long-term.
 
 ---
 
@@ -189,7 +193,7 @@ definitions must be agreed against what Studio actually publishes, not inferred.
 | 1 | `rating`, `review_count` | P0 | 6 screens (degraded) |
 | 2 | Collections model + endpoints | P0 | Explore (entirely) |
 | 3 | Home curation (Hidden Gems only — Trending uses `is_featured`) | P1 | Home Hidden Gems |
-| 3a | Destination cover image | P1 | Home Explore Destinations |
+| 3a | Destination cover image | **P0** | Home Explore Destinations — before launch |
 | 4 | Nearby endpoint / distance | P1 | Map, Search, Nearby |
 | 5 | Weather | P2 | Home weather pill — recommend dropping |
 | 6 | Account-dependent UI | — | ✅ Resolved without API work |

@@ -88,7 +88,7 @@ export default function HomePage() {
         </section>
 
         <section>
-          <SectionHeader actionLabel="See All" disabled title="What are you in the mood for?" />
+          <SectionHeader actionHref="/search" actionLabel="See All" title="What are you in the mood for?" />
           <div className="grid grid-cols-5 gap-3">
             {MOOD_CATEGORIES.map((mood) => (
               <CategoryChip
@@ -102,7 +102,7 @@ export default function HomePage() {
         </section>
 
         <section>
-          <SectionHeader actionLabel="See All" disabled title="Trending Today" />
+          <SectionHeader actionHref="/coming-soon?feature=trending" actionLabel="See All" title="Trending Today" />
           {venues.isLoading ? (
             <div className="flex gap-4 overflow-hidden">
               <Skeleton className="h-64 w-[80%] min-w-[280px] shrink-0" />
@@ -136,7 +136,7 @@ export default function HomePage() {
         </section>
 
         <section>
-          <SectionHeader actionLabel="See All" disabled title="Explore Destinations" />
+          <SectionHeader actionHref="/coming-soon?feature=destinations" actionLabel="See All" title="Explore Destinations" />
           {destinations.isLoading ? (
             <div className="grid grid-cols-2 gap-4">
               <Skeleton className="h-64" />

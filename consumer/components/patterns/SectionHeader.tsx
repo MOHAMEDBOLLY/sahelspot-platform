@@ -9,24 +9,20 @@ type SectionHeaderProps = {
   actionLabel?: string;
   actionHref?: string;
   onActionClick?: () => void;
-  /** Renders the "See All" text without a working link — for sections whose
-   * Stitch export shows one but that have no listing screen in the 9-screen
-   * inventory to send it to (Home's Trending Today, Explore Destinations,
-   * mood grid). Per the standing rule (DESIGN_SYSTEM.md §11), an
-   * unimplemented feature loses its interaction, not its visual presence —
-   * so the label stays, it just isn't clickable. */
-  disabled?: boolean;
 };
 
 /** Title + optional "See All" action. Omitting the action renders the title
- * alone, as Explore's Quick Browse section does. */
+ * alone, as Explore's Quick Browse section does.
+ *
+ * No disabled variant: a "See All" with nowhere to go still routes somewhere
+ * real — either an existing screen or `/coming-soon` — rather than shipping
+ * as an inert label. Stitch itself never shows a disabled action. */
 export function SectionHeader({
   title,
   size = "md",
   actionLabel,
   actionHref,
   onActionClick,
-  disabled = false,
 }: SectionHeaderProps) {
   return (
     <div className="mb-4 flex items-center justify-between">
@@ -36,11 +32,7 @@ export function SectionHeader({
         {title}
       </h2>
       {actionLabel ? (
-        disabled ? (
-          <span aria-disabled="true" className="text-sm font-semibold text-secondary/50">
-            {actionLabel}
-          </span>
-        ) : actionHref ? (
+        actionHref ? (
           <Link
             className="text-sm font-semibold text-secondary hover:underline"
             href={actionHref}
