@@ -13,9 +13,7 @@ import { RatingStars } from "@/components/ui/RatingStars";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { GalleryThumbnails } from "@/components/venue/GalleryThumbnails";
 import { ImageGallery } from "@/components/venue/ImageGallery";
-import { VenueCard } from "@/components/venue/VenueCard";
 import { useVenue } from "@/lib/hooks/useVenue";
-import { useVenues } from "@/lib/hooks/useVenues";
 import { useSaved } from "@/lib/saved/useSaved";
 import { VENUE_CATEGORY_LABEL } from "@/lib/domain/venueCategoryLabel";
 
@@ -41,7 +39,6 @@ export default function VenueDetailsPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const venue = useVenue(params.id);
-  const allVenues = useVenues();
   const { isSaved, toggle } = useSaved();
   const [shareState, setShareState] = useState<"idle" | "copied">("idle");
 
@@ -88,10 +85,6 @@ export default function VenueDetailsPage() {
     data.distanceLabel ? { icon: "distance", label: data.distanceLabel } : null,
     ...data.amenities.map((amenity) => ({ icon: "check_circle", label: amenity })),
   ].filter((pill): pill is { icon: string; label: string } => pill !== null);
-
-  const nearby = (allVenues.data ?? []).filter(
-    (v) => v.destinationId === data.destinationId && v.id !== data.id,
-  );
 
   async function handleShare() {
     const shareData = { title: data.name, url: window.location.href };
@@ -207,14 +200,11 @@ export default function VenueDetailsPage() {
           </section>
         ) : null}
 
-        <section className="space-y-4">
-          <SectionHeader size="lg" title="Nearby Places" />
-          {nearby.length === 0 ? (
-            <EmptyState description="No other published places here yet." icon="place" title="Nothing nearby yet" />
-          ) : (
-            <VenueCard variant="horizontal-row" venue={nearby[0]} />
-          )}
-        </section>
+        {/* "Nearby Places" is omitted entirely — the Public API has no real
+          * nearby-venue endpoint yet (API_REQUIREMENTS.md §4). Filtering the
+          * already-fetched venue list by shared destination was an
+          * approximation computed in the UI layer, not real nearby data, so
+          * it's removed rather than kept as a stand-in. */}
       </div>
     </div>
   );

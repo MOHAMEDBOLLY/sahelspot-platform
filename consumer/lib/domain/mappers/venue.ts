@@ -1,5 +1,6 @@
 import type { PublishedVenueDTO } from "@/lib/api/dto";
 import type { Venue, VenueCategory } from "@/lib/domain/venue";
+import { toValidPhone, toValidUrl, toValidWhatsapp } from "@/lib/domain/validators";
 
 const KNOWN_CATEGORIES: readonly VenueCategory[] = [
   "beach",
@@ -55,11 +56,15 @@ export function toVenue(dto: PublishedVenueDTO): Venue {
     coverImageUrl: dto.cover_image_url,
     galleryImageUrls: dto.gallery_image_urls ?? [],
     shortDescription: dto.short_description,
+    // Validated here, not at render time: a malformed phone/URL becomes
+    // null exactly like an absent one, so IconActionButton/CTAButton's
+    // existing "omit if null" behaviour is what keeps a garbage value off
+    // the screen, without every component re-implementing validation.
     contact: {
-      phone: dto.phone,
-      whatsapp: dto.whatsapp,
-      website: dto.website,
-      mapsUrl: dto.maps_url,
+      phone: toValidPhone(dto.phone),
+      whatsapp: toValidWhatsapp(dto.whatsapp),
+      website: toValidUrl(dto.website),
+      mapsUrl: toValidUrl(dto.maps_url),
     },
 
     // API_REQUIREMENTS.md §1 — ratings have no source yet.

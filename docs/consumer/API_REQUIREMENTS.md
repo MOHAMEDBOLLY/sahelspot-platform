@@ -133,8 +133,12 @@ from browser geolocation. Client-side is acceptable and needs no API work, but r
 location permission prompt; the design shows distances without any visible permission
 flow. **Decision needed.**
 
-Venue Details "Nearby Places" can be served in the interim by filtering
-`/public/venues` to the same destination — correct, cheap, no API change.
+**Venue Details "Nearby Places" is omitted entirely until `/public/venues/nearby` (or
+equivalent) exists.** An earlier interim approach — filtering `/public/venues` to the same
+destination client-side — was implemented in Phase 6 and removed on review: it is UI-layer
+approximation of "nearby," not real nearby data, and the architecture's rule against
+computing or fabricating content in the UI layer applies to it exactly as it does to
+ratings or highlights. The section returns once this endpoint is delivered.
 
 ---
 

@@ -151,6 +151,10 @@ interface Venue {
   value back to `"general"` rather than throwing — a marker in the wrong colour is a much
   smaller failure than a venue vanishing from the whole app
 - sets every field with an open `API_REQUIREMENTS.md` gap to `null` / `[]`
+- validates every external-action field (`phone`, `whatsapp`, `website`, `mapsUrl`) via
+  `lib/domain/validators.ts`, turning a malformed value into `null` — the same value a
+  missing one would have. A component never renders `tel:garbage` or a `javascript:` URL,
+  because it never sees the unvalidated string to begin with.
 
 Components never see snake_case, never see a stringified coordinate, and never
 null-check a list. When a gap in `API_REQUIREMENTS.md` is filled, only the mapper changes.

@@ -151,6 +151,17 @@ nothing renders inert:
 - No `highlights` → "Why visit?" section omitted entirely.
 - No `mapsUrl`/`phone`/`whatsapp`/`website` → that specific action is omitted; if none
   exist, the whole action row is omitted rather than rendering empty.
+
+**Corrected on review** (two changes, both applied at the mapper, not the page):
+- **Nearby Places removed entirely.** The original implementation filtered the
+  already-fetched venue list by shared `destinationId` and called that "nearby" — a UI-
+  layer approximation, not real nearby data. The section returns only once
+  `/public/venues/nearby` (or equivalent) exists — `API_REQUIREMENTS.md` §4.
+- **External actions are now validated, not just checked for truthiness.** New
+  `lib/domain/validators.ts` (`toValidUrl`, `toValidPhone`, `toValidWhatsapp`) runs inside
+  `toVenue`, so a malformed phone number or a non-`http(s)` URL becomes `null` — same as
+  absent — before it ever reaches `IconActionButton`/`CTAButton`. No component re-checks
+  this; the mapper is the one place it happens.
 - Tag pills combine the one real derivable value (`category`, via a new
   `VENUE_CATEGORY_LABEL` map) with any real `tags` — never a fabricated second tag.
 
