@@ -218,10 +218,11 @@ visually significant gap in the product today, not a theoretical one.
 ## 9. Category taxonomy mismatch — found verifying against real data, fixed in Consumer
 
 **Not a Studio requirement — a Consumer bug, now fixed**, documented here because it
-was invisible without real content. The original `VenueCategory` mapper checked the wire
-`category` string against Stitch's five literal names (`"beach"`, `"food"`, `"coffee"`,
-`"nightlife"`, `"general"`). Real Studio categories, confirmed against 401 venues, are
-entirely different strings:
+was invisible without real content. The API was never at fault: `category` is a valid,
+correctly-published free-text field the whole time. The original `VenueCategory` mapper
+checked that string against Stitch's five literal names (`"beach"`, `"food"`, `"coffee"`,
+`"nightlife"`, `"general"`) instead of the real Studio taxonomy. Real categories, confirmed
+against 401 venues, are entirely different strings:
 
 | Real category | Count | Mapped to |
 |---|---|---|
@@ -240,14 +241,13 @@ entirely different strings:
 Before the fix, everything except `Nightlife` fell back to `general` — **100% of
 restaurants and cafes** (206 venues, 51% of the dataset) rendered with the wrong map
 marker colour and the wrong mood-grid icon. `lib/domain/mappers/venue.ts`'s
-`CATEGORY_MAP` now translates the real strings.
+`CATEGORY_MAP` now translates the real strings. This item is closed — no Studio-side
+action needed.
 
-**Product question, not a bug:** `Activity`/`Shopping`/`Spa`/`Hotel`/`Services`/`Resort`/
-`Other` (168 venues, 42% of the dataset) have no equivalent in Stitch's five-category mood
-grid or map marker set at all — they correctly fall to `general`, but that's Stitch having
-designed for 5 categories against a real taxonomy of 11, not something a mapper fix can
-resolve. Worth a design conversation: does the mood grid need a 6th "More" chip, or a
-dedicated marker colour for these?
+> Whether Stitch's five-category mood grid/marker set should grow to cover the other 7
+> real categories (`Activity`/`Shopping`/`Spa`/`Hotel`/`Services`/`Resort`/`Other` —
+> currently 42% of venues, correctly shown as `general`) is a product/UX decision, not an
+> API gap — see `ROADMAP.md` §Open decisions.
 
 ---
 
@@ -283,7 +283,7 @@ dedicated marker colour for these?
 | 6 | Account-dependent UI | — | ✅ Resolved without API work |
 | 7 | `opening_hours` ✅ shape confirmed &amp; implemented; `beach_details` still unresolved | P1 | Venue Details |
 | 8 | `price_range`, `tags`, `amenities`, `highlights` | P1 | Venue Details |
-| 9 | *(Consumer bug, not Studio)* category taxonomy mismatch | — | ✅ Fixed — see §9 |
+| 9 | *(Consumer-side bug, not a Studio requirement)* category taxonomy mismatch | — | ✅ Fixed — see §9. Whether the mood grid/marker set covers more categories is a product decision — `ROADMAP.md` §Open decisions |
 
 **Buildable to full fidelity today:** Saved, More, Splash, Onboarding, Search (minus
 distance), Map (minus stats and viewport query), Venue Details (minus ratings, price,

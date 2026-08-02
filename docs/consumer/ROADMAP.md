@@ -336,15 +336,25 @@ unimplemented feature loses its interaction, not its visual presence — see
 Recommend dropping from v1 — it is one decorative pill and the only element that would
 introduce a second data source, which decision 3 forbids.
 
-### 5. 🟡 Splash screen
+### 6. 🟡 Splash screen
 A timed splash is a native pattern that delays first paint and harms SEO on the most
 important route. Recommend a brand loading state during initial fetch rather than a timed
 gate.
 
-### 6. 🟡 Commit the Stitch export
+### 7. 🟡 Commit the Stitch export
 It currently lives in `~/Downloads`, outside version control. The visual source of truth
 should be versioned alongside the code.
 
-### 7. 🟢 Confirm the canonical Map
+### 8. 🟢 Confirm the canonical Map
 `interactive_map_1` is canonical on evidence, though its title disagrees with the audit
 (`STITCH_SOURCE.md`). Confirm before Phase 5.
+
+### 9. 🟡 Category coverage beyond Stitch's five — a product/UX decision, not an API gap
+Real Studio data (publish revision 1071) confirmed 11 real venue categories against
+Stitch's mood grid and map markers, designed for 5. `Activity`/`Shopping`/`Spa`/`Hotel`/
+`Services`/`Resort`/`Other` — 168 venues, 42% of the dataset — have no Stitch-designed
+chip or marker colour and correctly render as `general`. The API is not at fault; `category`
+is valid, published data throughout. The open question is purely product/UX: does the
+mood grid gain a 6th "More" chip, do markers get more colours, or does `general` stay the
+intentional catch-all? See `API_REQUIREMENTS.md` §9 for the mapping table and the bug this
+was fixed alongside.
