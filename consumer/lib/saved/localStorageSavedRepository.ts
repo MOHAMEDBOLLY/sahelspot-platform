@@ -54,7 +54,9 @@ export class LocalStorageSavedRepository implements SavedRepository {
   async add(venueId: string): Promise<void> {
     const ids = readIds();
     if (!ids.includes(venueId)) {
-      writeIds([...ids, venueId]);
+      // Prepended, not appended — `useSaved`/`SavedClient` treat this list
+      // as most-recently-saved-first for the "recent" sort.
+      writeIds([venueId, ...ids]);
       this.notify();
     }
   }
