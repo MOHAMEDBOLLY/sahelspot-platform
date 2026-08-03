@@ -60,20 +60,24 @@ def list_venues(
     destination_id: str | None = Query(default=None),
     category: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    brand: str | None = Query(default=None, description="Exact match — Brand Asset Propagation's sibling lookup"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(require_permission(Permission.CONTENT_VIEW)),
 ):
-    """Sprint 27 — Search & Filter Foundation. All four query params are
-    optional and combine with AND semantics (e.g. `q` + `category` narrows
-    to both at once, not either). Deliberately plain `ILIKE` for `q`, not a
-    `tsvector`/GIN index — docs/DATABASE.md already named that as deferred
-    until AI Search is actually scoped, and nothing about this sprint
-    changes that trigger; at this data volume a sequential scan is fine.
-    An unrecognized `category`/`status` value isn't rejected — it just
-    matches no rows, the same as any other filter value nothing has —
+    """Sprint 27 — Search & Filter Foundation. Every query param is
+    optional and they combine with AND semantics (e.g. `q` + `category`
+    narrows to both at once, not either). Deliberately plain `ILIKE` for
+    `q`, not a `tsvector`/GIN index — docs/DATABASE.md already named that
+    as deferred until AI Search is actually scoped, and nothing about this
+    sprint changes that trigger; at this data volume a sequential scan is
+    fine. An unrecognized `category`/`status` value isn't rejected — it
+    just matches no rows, the same as any other filter value nothing has —
     rather than duplicating the `CHECK` constraint's own validation here.
+    `brand` is exact-match (Brand Asset Propagation's own reasoning — see
+    `app/db/models.py`'s `Venue.brand` docstring for why this is deliberately
+    not fuzzy).
 
     Response is paginated (`VenueListOut`, not a bare list) so the caller
     always knows `total`, keeping room for real pagination controls later
@@ -92,6 +96,8 @@ def list_venues(
         query = query.filter(Venue.category == category)
     if status:
         query = query.filter(Venue.status == status)
+    if brand:
+        query = query.filter(Venue.brand == brand)
 
     total = query.count()
     items = query.order_by(Venue.name).offset((page - 1) * page_size).limit(page_size).all()
@@ -603,6 +609,15 @@ async def upload_venue_media(
     venue_id: str,
     slot: Literal["cover", "gallery"] = Form(...),
     file: UploadFile = File(...),
+    apply_to_brand: bool = Form(
+        default=False,
+        description=(
+            "Brand Asset Propagation — cover uploads only (see slot). When true and this "
+            "venue has a brand set, every other venue sharing that brand also gets this "
+            "same cover_image_url. Ignored for slot='gallery'; a brand's venues don't share "
+            "a gallery, only a cover."
+        ),
+    ),
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
 ):
@@ -620,6 +635,15 @@ async def upload_venue_media(
     an oversized upload is rejected without buffering it first. Kept
     after the 404 check, preserving the existing precedence (a
     nonexistent venue already 404s before any file handling, unchanged).
+
+    Brand Asset Propagation — `apply_to_brand` only ever touches
+    `cover_image_url` on sibling venues (same `brand`, excluding this one).
+    Nothing else about a sibling changes: not its location, category,
+    contacts, gallery, status, or anything else — same "set exactly the
+    one field, nothing more" discipline `set_cover_from_gallery` already
+    follows. Each touched sibling's `version` still increments (a real
+    write happened to it, same as any other field change), so a concurrent
+    editor on that sibling still gets a real `409` on their next save.
     """
     venue = db.get(Venue, venue_id)
     if venue is None:
@@ -637,6 +661,15 @@ async def upload_venue_media(
 
     if slot == "cover":
         venue.cover_image_url = url
+        if apply_to_brand and venue.brand:
+            siblings = (
+                db.query(Venue)
+                .filter(Venue.brand == venue.brand, Venue.id != venue.id)
+                .all()
+            )
+            for sibling in siblings:
+                sibling.cover_image_url = url
+                sibling.version += 1
     else:
         # Reassigned, not appended in place — SQLAlchemy only detects a
         # change to an ARRAY column on assignment, not on in-place mutation

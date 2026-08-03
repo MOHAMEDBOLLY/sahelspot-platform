@@ -128,6 +128,7 @@ class Venue(Base):
         Index("ix_venues_category", "category"),
         Index("ix_venues_status", "status"),
         Index("ix_venues_destination_id_status", "destination_id", "status"),
+        Index("ix_venues_brand", "brand"),
     )
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
@@ -169,6 +170,12 @@ class Venue(Base):
     beach_details: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
     internal_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Brand Asset Propagation — free text, not a CHECK-constrained
+    # vocabulary or a lookup table (see 0011_venue_brand.py's docstring for
+    # why). Never inferred from `name`; only ever set explicitly by an
+    # editor. Two venues are "the same brand" purely by this value
+    # matching exactly (case-sensitive) — no fuzzy/normalized matching.
+    brand: Mapped[str | None] = mapped_column(Text, nullable=True)
     # PLATFORM_SPEC_v1.0_FROZEN.md §5.1 — see Destination.translations above.
     translations: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # PLATFORM_SPEC_v1_FINAL.md §2.2 (Venue, Legacy-only) — preserves the

@@ -31,6 +31,7 @@ function makeVenue(overrides: Partial<Venue> = {}): Venue {
     beach_details: null,
     internal_notes: null,
     source: null,
+    brand: null,
     last_published_at: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',

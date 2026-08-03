@@ -3,11 +3,18 @@ import { ImageOff, Images, ImageUp, Loader2, Upload, X } from 'lucide-react'
 import type { Venue } from '../../../../types/venue'
 import { WorkspaceSection } from '../../../../components/workspace/WorkspaceSection'
 import type { WorkspaceMode } from '../../../../components/workspace/types'
+import { CoverApplyScopeDialog } from '../../../../components/CoverApplyScopeDialog'
 
 type ImagesSectionProps = {
   venue: Venue
   mode: WorkspaceMode
-  onUploadCover: (file: File) => void
+  /** Brand Asset Propagation — how many venues (including this one) share
+   * `venue.brand`. `undefined`/`<= 1` means either no brand is set or this
+   * is the only venue in it — the propagation prompt is hidden entirely
+   * in both cases (task spec), and `onUploadCover` is called exactly as
+   * it always was. */
+  brandVenueCount?: number
+  onUploadCover: (file: File, applyToBrand: boolean) => void
   onUploadGalleryImage: (file: File) => void
   onRemoveCover: () => void
   onRemoveGalleryImage: (url: string) => void
@@ -48,6 +55,7 @@ function ImagePlaceholder({ label }: { label: string }) {
 export function ImagesSection({
   venue,
   mode,
+  brandVenueCount,
   onUploadCover,
   onUploadGalleryImage,
   onRemoveCover,
@@ -63,6 +71,12 @@ export function ImagesSection({
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const [localError, setLocalError] = useState<string | null>(null)
   const [draggedUrl, setDraggedUrl] = useState<string | null>(null)
+  // Brand Asset Propagation — a cover file staged for upload, waiting on
+  // the "This venue only" vs. "All venues in this brand" choice. Only
+  // ever set when brandVenueCount > 1 (see handleCoverFileSelected); the
+  // no-brand / single-venue-in-brand case never touches this state at
+  // all, so it behaves exactly as before this feature existed.
+  const [pendingCoverFile, setPendingCoverFile] = useState<File | null>(null)
 
   function validateFile(file: File): boolean {
     if (!file.type.startsWith('image/')) {
@@ -80,9 +94,18 @@ export function ImagesSection({
   function handleCoverFileSelected(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (file && validateFile(file)) {
-      onUploadCover(file)
+    if (!file || !validateFile(file)) return
+
+    if (brandVenueCount && brandVenueCount > 1) {
+      setPendingCoverFile(file)
+    } else {
+      onUploadCover(file, false)
     }
+  }
+
+  function handleConfirmCoverScope(applyToBrand: boolean) {
+    if (pendingCoverFile) onUploadCover(pendingCoverFile, applyToBrand)
+    setPendingCoverFile(null)
   }
 
   function handleGalleryFileSelected(event: ChangeEvent<HTMLInputElement>) {
@@ -124,6 +147,13 @@ export function ImagesSection({
 
   return (
     <WorkspaceSection id="venue-section-images" title="Images" icon={Images}>
+      {pendingCoverFile && brandVenueCount && (
+        <CoverApplyScopeDialog
+          venueCount={brandVenueCount}
+          onCancel={() => setPendingCoverFile(null)}
+          onConfirm={handleConfirmCoverScope}
+        />
+      )}
       {displayedError && <p className="mb-3 text-xs font-medium text-red-600">{displayedError}</p>}
       {isUploading && uploadProgress !== null && (
         <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">

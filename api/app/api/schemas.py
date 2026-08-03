@@ -130,6 +130,7 @@ class VenueOut(BaseModel):
     beach_details: dict | None = None
     internal_notes: str | None = None
     source: str | None = None
+    brand: str | None = None
     translations: dict | None = None
     version: int
     last_published_at: datetime | None = None
@@ -187,6 +188,9 @@ class VenueUpdate(BaseModel):
     facebook_handle: str | None = None
     tiktok_handle: str | None = None
     internal_notes: str | None = Field(default=None, max_length=2000)
+    # Brand Asset Propagation — plain free text, never inferred from
+    # `name`/anything else; only ever set by an explicit editor choice.
+    brand: str | None = Field(default=None, max_length=200)
     cover_image_url: str | None = None
     gallery_image_urls: list[str] | None = None
     # PLATFORM_SPEC_v1.0_FROZEN.md §5 — same `translations` write-path gap

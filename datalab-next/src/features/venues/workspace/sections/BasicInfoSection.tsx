@@ -73,6 +73,18 @@ export function BasicInfoSection({ venue, mode, onFieldChange, errors = {} }: Ba
           />
         )}
 
+        {/* Brand Asset Propagation — free text, never inferred from Name.
+            Two venues share a brand purely by this value matching exactly. */}
+        {mode === 'view' ? (
+          <WorkspaceField label="Brand" value={venue.brand} />
+        ) : (
+          <TextField
+            label="Brand"
+            value={venue.brand ?? ''}
+            onChange={(v) => onFieldChange('brand', v)}
+          />
+        )}
+
         {mode === 'view' ? (
           <>
             <WorkspaceField label="Featured" value={venue.is_featured ? 'Yes' : 'No'} />

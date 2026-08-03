@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MousePointerClick } from 'lucide-react'
 import { useVenue } from '../useVenue'
+import { useVenues } from '../useVenues'
 import { useUpdateVenue } from '../useUpdateVenue'
 import { useValidateVenue } from '../useValidateVenue'
 import { useSubmitForReview } from '../useSubmitForReview'
@@ -122,6 +123,18 @@ export function VenueWorkspace({ venueId, onDirtyChange, onDeleted }: VenueWorks
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const { role } = useAuth()
+
+  // Brand Asset Propagation — total venues sharing this venue's brand
+  // (including itself), for the cover-upload scope prompt. Only queried
+  // when a brand is actually set — a brand-less venue never needs this
+  // and never shows the prompt (ImagesSection hides it when the count is
+  // <= 1 anyway, but skipping the query entirely for the common no-brand
+  // case avoids a pointless request on every venue).
+  const { data: brandVenues } = useVenues(
+    { brand: displayedVenue?.brand ?? undefined, pageSize: 1 },
+    { enabled: Boolean(displayedVenue?.brand) },
+  )
+  const brandVenueCount = brandVenues?.total
 
   // A stale validation result belongs to whatever the venue looked like when
   // it ran — never carry it across venues, or across a fresh edit session.
@@ -253,11 +266,11 @@ export function VenueWorkspace({ venueId, onDirtyChange, onDeleted }: VenueWorks
     onDeleted?.()
   }
 
-  function handleUpload(file: File, slot: MediaSlot) {
+  function handleUpload(file: File, slot: MediaSlot, applyToBrand = false) {
     if (!venueId) return
     setUploadProgress(0)
     uploadMedia(
-      { id: venueId, file, slot, onProgress: setUploadProgress },
+      { id: venueId, file, slot, onProgress: setUploadProgress, applyToBrand },
       { onSuccess: commitSave, onSettled: () => setUploadProgress(null) },
     )
   }
@@ -418,7 +431,8 @@ export function VenueWorkspace({ venueId, onDirtyChange, onDeleted }: VenueWorks
       <ImagesSection
         venue={displayedVenue}
         mode={mode}
-        onUploadCover={(file) => handleUpload(file, 'cover')}
+        brandVenueCount={brandVenueCount}
+        onUploadCover={(file, applyToBrand) => handleUpload(file, 'cover', applyToBrand)}
         onUploadGalleryImage={(file) => handleUpload(file, 'gallery')}
         onRemoveCover={handleRemoveCover}
         onRemoveGalleryImage={handleRemoveGalleryImage}

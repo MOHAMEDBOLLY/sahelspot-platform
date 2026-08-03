@@ -52,6 +52,11 @@ export interface Venue {
   beach_details: Record<string, unknown> | null
   internal_notes: string | null
   source: string | null
+  /** Brand Asset Propagation — free text, never inferred from `name`.
+   * Two venues are "the same brand" purely by this value matching
+   * exactly (case-sensitive), same reasoning as the backend column
+   * (app/db/models.py's `Venue.brand`). */
+  brand: string | null
   last_published_at: string | null
   created_at: string
   updated_at: string
@@ -80,6 +85,7 @@ export interface VenueSearchParams {
   destinationId?: string
   category?: string
   status?: string
+  brand?: string
   page?: number
   pageSize?: number
   qualityFilter?: QualityFilterParams

@@ -17,12 +17,14 @@ export function useUploadVenueMedia() {
       file,
       slot,
       onProgress,
+      applyToBrand,
     }: {
       id: string
       file: File
       slot: MediaSlot
       onProgress?: (percent: number) => void
-    }) => uploadVenueMedia(id, file, slot, onProgress),
+      applyToBrand?: boolean
+    }) => uploadVenueMedia(id, file, slot, onProgress, applyToBrand),
     onSuccess: (updatedVenue) => {
       queryClient.setQueryData(['venue', updatedVenue.id], updatedVenue)
       queryClient.invalidateQueries({ queryKey: ['venues'] })

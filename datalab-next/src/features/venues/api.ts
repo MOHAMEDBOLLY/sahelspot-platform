@@ -23,6 +23,7 @@ export function fetchVenues(params: VenueSearchParams = {}): Promise<VenueListRe
   if (params.destinationId) searchParams.set('destination_id', params.destinationId)
   if (params.category) searchParams.set('category', params.category)
   if (params.status) searchParams.set('status', params.status)
+  if (params.brand) searchParams.set('brand', params.brand)
   searchParams.set('page', String(params.page ?? 1))
   searchParams.set('page_size', String(params.pageSize ?? 50))
 
@@ -53,6 +54,7 @@ export type VenuePatch = Pick<
   | 'name'
   | 'category'
   | 'district'
+  | 'brand'
   | 'is_featured'
   | 'is_verified'
   | 'short_description'
@@ -83,6 +85,7 @@ export function toVenuePatch(venue: Venue): VenuePatch {
     name: venue.name,
     category: venue.category,
     district: emptyToNull(venue.district),
+    brand: emptyToNull(venue.brand),
     is_featured: venue.is_featured,
     is_verified: venue.is_verified,
     short_description: emptyToNull(venue.short_description),
@@ -147,10 +150,15 @@ export function uploadVenueMedia(
   file: File,
   slot: MediaSlot,
   onProgress?: (percent: number) => void,
+  /** Brand Asset Propagation — cover uploads only; the backend ignores
+   * this for slot='gallery'. Omitted (not just `false`) for every
+   * existing call site, so nothing about them changes. */
+  applyToBrand?: boolean,
 ): Promise<Venue> {
   const formData = new FormData()
   formData.append('slot', slot)
   formData.append('file', file)
+  if (applyToBrand) formData.append('apply_to_brand', 'true')
   return apiUpload<Venue>(`/editor/venues/${encodeURIComponent(id)}/media`, formData, onProgress)
 }
 
