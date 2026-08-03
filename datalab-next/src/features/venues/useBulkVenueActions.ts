@@ -1,6 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   bulkApproveVenues,
+  bulkArchiveVenues,
+  bulkDeleteVenues,
+  bulkMoveVenuesToDraft,
+  bulkRestoreVenues,
   bulkSubmitVenuesForReview,
   bulkUpdateVenueCategory,
   bulkUpdateVenueDestination,
@@ -36,6 +40,38 @@ export function useBulkApproveVenues() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (venueIds: string[]) => bulkApproveVenues(venueIds),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['venues'] }),
+  })
+}
+
+export function useBulkMoveVenuesToDraft() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (venueIds: string[]) => bulkMoveVenuesToDraft(venueIds),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['venues'] }),
+  })
+}
+
+export function useBulkArchiveVenues() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (venueIds: string[]) => bulkArchiveVenues(venueIds),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['venues'] }),
+  })
+}
+
+export function useBulkRestoreVenues() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (venueIds: string[]) => bulkRestoreVenues(venueIds),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['venues'] }),
+  })
+}
+
+export function useBulkDeleteVenues() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (venueIds: string[]) => bulkDeleteVenues(venueIds),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['venues'] }),
   })
 }

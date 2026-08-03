@@ -277,7 +277,11 @@ export function Venues() {
             Back to venues
           </button>
         )}
-        <VenueWorkspace venueId={selectedVenueId} onDirtyChange={setIsWorkspaceDirty} />
+        <VenueWorkspace
+          venueId={selectedVenueId}
+          onDirtyChange={setIsWorkspaceDirty}
+          onDeleted={() => setSelectedVenueId(null)}
+        />
       </div>
     </div>
   )

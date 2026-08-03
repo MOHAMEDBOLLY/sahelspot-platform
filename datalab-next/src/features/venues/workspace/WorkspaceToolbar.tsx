@@ -1,6 +1,7 @@
-import { CheckCheck, Loader2, Send, ThumbsUp } from 'lucide-react'
+import { Archive, ArchiveRestore, CheckCheck, Loader2, RotateCcw, Send, ThumbsUp } from 'lucide-react'
 import { DraftToolbar } from '../../../components/workspace/DraftToolbar'
 import { RejectDialog } from '../../../components/RejectDialog'
+import { DeleteConfirmDialog } from '../../../components/DeleteConfirmDialog'
 import type { WorkspaceMode } from '../../../components/workspace/types'
 
 type WorkspaceToolbarProps = {
@@ -23,6 +24,23 @@ type WorkspaceToolbarProps = {
   approveError: string | null
   canReject: boolean
   rejectError: string | null
+  /** Venue Lifecycle Management — approved -> draft, approved -> archived,
+   * archived -> approved (restore). Same "only offer the transition the
+   * backend would currently accept" gating as canSubmitForReview/
+   * canApprove above, keyed off the venue's persisted status
+   * (see VenueWorkspace's canMoveToDraft/canArchive/canRestore). */
+  canMoveToDraft: boolean
+  isMovingToDraft: boolean
+  moveToDraftError: string | null
+  canArchive: boolean
+  isArchiving: boolean
+  archiveError: string | null
+  canRestore: boolean
+  isRestoring: boolean
+  restoreError: string | null
+  /** Always available regardless of status (task spec) — no
+   * status-eligibility gate like the others above, only permission. */
+  canDelete: boolean
   onEdit: () => void
   onCancel: () => void
   onSave: () => void
@@ -30,6 +48,10 @@ type WorkspaceToolbarProps = {
   onSubmitForReview: () => void
   onApprove: () => void
   onReject: (reason: string) => Promise<void>
+  onMoveToDraft: () => void
+  onArchive: () => void
+  onRestore: () => void
+  onDelete: () => Promise<void>
 }
 
 /** The Venue Workspace's toolbar — the generic Edit/Cancel/Save Draft shell
@@ -53,6 +75,16 @@ export function WorkspaceToolbar({
   approveError,
   canReject,
   rejectError,
+  canMoveToDraft,
+  isMovingToDraft,
+  moveToDraftError,
+  canArchive,
+  isArchiving,
+  archiveError,
+  canRestore,
+  isRestoring,
+  restoreError,
+  canDelete,
   onEdit,
   onCancel,
   onSave,
@@ -60,6 +92,10 @@ export function WorkspaceToolbar({
   onSubmitForReview,
   onApprove,
   onReject,
+  onMoveToDraft,
+  onArchive,
+  onRestore,
+  onDelete,
 }: WorkspaceToolbarProps) {
   return (
     <DraftToolbar
@@ -88,6 +124,21 @@ export function WorkspaceToolbar({
           {rejectError && (
             <span className="truncate text-xs font-medium text-red-600" title={rejectError}>
               {rejectError}
+            </span>
+          )}
+          {moveToDraftError && (
+            <span className="truncate text-xs font-medium text-red-600" title={moveToDraftError}>
+              {moveToDraftError}
+            </span>
+          )}
+          {archiveError && (
+            <span className="truncate text-xs font-medium text-red-600" title={archiveError}>
+              {archiveError}
+            </span>
+          )}
+          {restoreError && (
+            <span className="truncate text-xs font-medium text-red-600" title={restoreError}>
+              {restoreError}
             </span>
           )}
         </>
@@ -129,6 +180,40 @@ export function WorkspaceToolbar({
             </button>
           )}
           {canReject && <RejectDialog onReject={onReject} />}
+          {canMoveToDraft && (
+            <button
+              type="button"
+              onClick={onMoveToDraft}
+              disabled={isMovingToDraft}
+              className="flex min-h-11 items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+            >
+              {isMovingToDraft ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+              {isMovingToDraft ? 'Moving to Draft…' : 'Move to Draft'}
+            </button>
+          )}
+          {canArchive && (
+            <button
+              type="button"
+              onClick={onArchive}
+              disabled={isArchiving}
+              className="flex min-h-11 items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+            >
+              {isArchiving ? <Loader2 size={14} className="animate-spin" /> : <Archive size={14} />}
+              {isArchiving ? 'Archiving…' : 'Archive'}
+            </button>
+          )}
+          {canRestore && (
+            <button
+              type="button"
+              onClick={onRestore}
+              disabled={isRestoring}
+              className="flex min-h-11 items-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+            >
+              {isRestoring ? <Loader2 size={14} className="animate-spin" /> : <ArchiveRestore size={14} />}
+              {isRestoring ? 'Restoring…' : 'Restore'}
+            </button>
+          )}
+          {canDelete && <DeleteConfirmDialog onConfirm={onDelete} />}
         </>
       }
     />

@@ -6,6 +6,10 @@ import { useValidateVenue } from '../useValidateVenue'
 import { useSubmitForReview } from '../useSubmitForReview'
 import { useApproveVenue } from '../useApproveVenue'
 import { useRejectVenue } from '../useRejectVenue'
+import { useMoveVenueToDraft } from '../useMoveVenueToDraft'
+import { useArchiveVenue } from '../useArchiveVenue'
+import { useRestoreVenue } from '../useRestoreVenue'
+import { useDeleteVenue } from '../useDeleteVenue'
 import { useUploadVenueMedia } from '../useUploadVenueMedia'
 import { useSetCoverFromGallery } from '../useSetCoverFromGallery'
 import { useDeleteVenueCoverImage, useDeleteVenueGalleryImage } from '../useDeleteVenueMedia'
@@ -35,9 +39,15 @@ import type { ValidationResult } from '../../../types/validation'
 type VenueWorkspaceProps = {
   venueId: string | null
   onDirtyChange?: (isDirty: boolean) => void
+  /** Venue Lifecycle Management — Delete removes the row entirely, so
+   * unlike every other transition there's no updated venue to keep
+   * displaying afterward. The parent (`pages/Venues.tsx`) owns
+   * `selectedVenueId` and clears it here, the same way it already does
+   * for "back to list." */
+  onDeleted?: () => void
 }
 
-export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) {
+export function VenueWorkspace({ venueId, onDirtyChange, onDeleted }: VenueWorkspaceProps) {
   const { data: venue, isPending, isError, error, refetch } = useVenue(venueId)
   const {
     mode,
@@ -63,6 +73,25 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
     reset: resetApproveError,
   } = useApproveVenue()
   const { mutateAsync: rejectVenue, error: rejectError } = useRejectVenue()
+  const {
+    mutate: moveToDraft,
+    isPending: isMovingToDraft,
+    error: moveToDraftError,
+    reset: resetMoveToDraftError,
+  } = useMoveVenueToDraft()
+  const {
+    mutate: archive,
+    isPending: isArchiving,
+    error: archiveError,
+    reset: resetArchiveError,
+  } = useArchiveVenue()
+  const {
+    mutate: restore,
+    isPending: isRestoring,
+    error: restoreError,
+    reset: resetRestoreError,
+  } = useRestoreVenue()
+  const { mutateAsync: deleteVenueMutation } = useDeleteVenue()
   const {
     mutate: uploadMedia,
     isPending: isUploadingMedia,
@@ -128,6 +157,19 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
   // might not match it.
   const canApprove = !isDirty && displayedVenue?.status === 'review' && hasPermission(role, 'content_approve')
 
+  // Venue Lifecycle Management — same "only offer what the backend would
+  // currently accept, gated on !isDirty since these act on the persisted
+  // row" reasoning as canSubmitForReview/canApprove above.
+  const canMoveToDraft =
+    !isDirty && displayedVenue?.status === 'approved' && hasPermission(role, 'content_approve')
+  const canArchive =
+    !isDirty && displayedVenue?.status === 'approved' && hasPermission(role, 'content_approve')
+  const canRestore =
+    !isDirty && displayedVenue?.status === 'archived' && hasPermission(role, 'content_approve')
+  // Delete is always available regardless of status (task spec) — the
+  // only gate is permission, same tier as delete_destination.
+  const canDelete = hasPermission(role, 'content_edit')
+
   useEffect(() => {
     onDirtyChange?.(isDirty)
   }, [isDirty, onDirtyChange])
@@ -137,6 +179,9 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
     resetSubmitForReviewError()
     resetApproveError()
     resetUploadMediaError()
+    resetMoveToDraftError()
+    resetArchiveError()
+    resetRestoreError()
     cancelEditing()
   }
 
@@ -183,6 +228,29 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
     if (!venueId) return
     const updatedVenue = await rejectVenue({ id: venueId, reason })
     commitSave(updatedVenue)
+  }
+
+  function handleMoveToDraft() {
+    if (!venueId) return
+    if (!window.confirm('Move this venue back to Draft? It will no longer be visible on the Consumer Website.')) return
+    moveToDraft(venueId, { onSuccess: commitSave })
+  }
+
+  function handleArchive() {
+    if (!venueId) return
+    if (!window.confirm('Archive this venue? It will no longer be visible on the Consumer Website, but stays editable here.')) return
+    archive(venueId, { onSuccess: commitSave })
+  }
+
+  function handleRestore() {
+    if (!venueId) return
+    restore(venueId, { onSuccess: commitSave })
+  }
+
+  async function handleDelete() {
+    if (!venueId) return
+    await deleteVenueMutation(venueId)
+    onDeleted?.()
   }
 
   function handleUpload(file: File, slot: MediaSlot) {
@@ -305,6 +373,26 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
           rejectError={
             rejectError instanceof ApiError ? rejectError.message : rejectError ? 'Failed to reject.' : null
           }
+          canMoveToDraft={canMoveToDraft}
+          isMovingToDraft={isMovingToDraft}
+          moveToDraftError={
+            moveToDraftError instanceof ApiError
+              ? moveToDraftError.message
+              : moveToDraftError
+                ? 'Failed to move to draft.'
+                : null
+          }
+          canArchive={canArchive}
+          isArchiving={isArchiving}
+          archiveError={
+            archiveError instanceof ApiError ? archiveError.message : archiveError ? 'Failed to archive.' : null
+          }
+          canRestore={canRestore}
+          isRestoring={isRestoring}
+          restoreError={
+            restoreError instanceof ApiError ? restoreError.message : restoreError ? 'Failed to restore.' : null
+          }
+          canDelete={canDelete}
           onReject={handleReject}
           onEdit={startEditing}
           onCancel={handleCancel}
@@ -312,6 +400,10 @@ export function VenueWorkspace({ venueId, onDirtyChange }: VenueWorkspaceProps) 
           onValidate={handleValidate}
           onSubmitForReview={handleSubmitForReview}
           onApprove={handleApprove}
+          onMoveToDraft={handleMoveToDraft}
+          onArchive={handleArchive}
+          onRestore={handleRestore}
+          onDelete={handleDelete}
         />
       </div>
       <VenueMissingDataChips quality={evaluateVenueQuality(displayedVenue)} />

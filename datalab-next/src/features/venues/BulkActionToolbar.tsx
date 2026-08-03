@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCheck, Loader2, Send, ThumbsUp, X } from 'lucide-react'
+import { Archive, ArchiveRestore, CheckCheck, Loader2, RotateCcw, Send, ThumbsUp, Trash2, X } from 'lucide-react'
 import { useDestinations } from '../destinations/useDestinations'
 import { useAuth } from '../auth/useAuth'
 import { hasPermission } from '../auth/permissions'
@@ -7,6 +7,10 @@ import { ApiError } from '../../lib/apiClient'
 import { VENUE_CATEGORIES } from './venueCategories'
 import {
   useBulkApproveVenues,
+  useBulkArchiveVenues,
+  useBulkDeleteVenues,
+  useBulkMoveVenuesToDraft,
+  useBulkRestoreVenues,
   useBulkSubmitVenuesForReview,
   useBulkUpdateVenueCategory,
   useBulkUpdateVenueDestination,
@@ -70,19 +74,43 @@ export function BulkActionToolbar({ checkedVenues, onClearSelection }: BulkActio
   const { mutate: bulkValidate, isPending: isValidating } = useBulkValidateVenues()
   const { mutate: bulkSubmitForReview, isPending: isSubmitting } = useBulkSubmitVenuesForReview()
   const { mutate: bulkApprove, isPending: isApproving } = useBulkApproveVenues()
+  const { mutate: bulkMoveToDraft, isPending: isMovingToDraft } = useBulkMoveVenuesToDraft()
+  const { mutate: bulkArchive, isPending: isArchiving } = useBulkArchiveVenues()
+  const { mutate: bulkRestore, isPending: isRestoring } = useBulkRestoreVenues()
+  const { mutate: bulkDelete, isPending: isDeleting } = useBulkDeleteVenues()
   const { mutate: bulkUpdateCategory, isPending: isUpdatingCategory } = useBulkUpdateVenueCategory()
   const { mutate: bulkUpdateDestination, isPending: isUpdatingDestination } =
     useBulkUpdateVenueDestination()
 
-  const isProcessing = isValidating || isSubmitting || isApproving || isUpdatingCategory || isUpdatingDestination
+  const isProcessing =
+    isValidating ||
+    isSubmitting ||
+    isApproving ||
+    isMovingToDraft ||
+    isArchiving ||
+    isRestoring ||
+    isDeleting ||
+    isUpdatingCategory ||
+    isUpdatingDestination
 
   const checkedVenueIds = checkedVenues.map((v) => v.id)
   const draftVenueIds = checkedVenues.filter((v) => v.status === 'draft').map((v) => v.id)
   const reviewVenueIds = checkedVenues.filter((v) => v.status === 'review').map((v) => v.id)
+  const approvedVenueIds = checkedVenues.filter((v) => v.status === 'approved').map((v) => v.id)
+  const archivedVenueIds = checkedVenues.filter((v) => v.status === 'archived').map((v) => v.id)
 
   const canValidate = hasPermission(role, 'content_edit')
   const canSubmitForReview = hasPermission(role, 'content_submit_review') && draftVenueIds.length > 0
   const canApprove = hasPermission(role, 'content_approve') && reviewVenueIds.length > 0
+  // Venue Lifecycle Management — same "only send the subset actually
+  // eligible for this transition" gating as canSubmitForReview/canApprove
+  // above, extended to the three new status transitions.
+  const canMoveToDraft = hasPermission(role, 'content_approve') && approvedVenueIds.length > 0
+  const canArchive = hasPermission(role, 'content_approve') && approvedVenueIds.length > 0
+  const canRestore = hasPermission(role, 'content_approve') && archivedVenueIds.length > 0
+  // Delete has no status precondition (task spec) — every checked venue
+  // is eligible, so it's just the permission check.
+  const canDelete = hasPermission(role, 'content_edit') && checkedVenueIds.length > 0
   const canEdit = hasPermission(role, 'content_edit')
 
   function beginAction() {
@@ -113,6 +141,51 @@ export function BulkActionToolbar({ checkedVenues, onClearSelection }: BulkActio
     beginAction()
     bulkApprove(reviewVenueIds, {
       onSuccess: setLastResult,
+      onError: (error) => setRequestError(requestErrorMessage(error)),
+    })
+  }
+
+  function handleMoveToDraft() {
+    const skipped = checkedVenueIds.length - approvedVenueIds.length
+    const skippedNote = skipped > 0 ? ` (${skipped} other selected venue${skipped === 1 ? '' : 's'} not approved — skipped)` : ''
+    if (!window.confirm(`Move ${approvedVenueIds.length} venue(s) back to Draft?${skippedNote}`)) return
+    beginAction()
+    bulkMoveToDraft(approvedVenueIds, {
+      onSuccess: setLastResult,
+      onError: (error) => setRequestError(requestErrorMessage(error)),
+    })
+  }
+
+  function handleArchive() {
+    const skipped = checkedVenueIds.length - approvedVenueIds.length
+    const skippedNote = skipped > 0 ? ` (${skipped} other selected venue${skipped === 1 ? '' : 's'} not approved — skipped)` : ''
+    if (!window.confirm(`Archive ${approvedVenueIds.length} venue(s)?${skippedNote}`)) return
+    beginAction()
+    bulkArchive(approvedVenueIds, {
+      onSuccess: setLastResult,
+      onError: (error) => setRequestError(requestErrorMessage(error)),
+    })
+  }
+
+  function handleRestore() {
+    const skipped = checkedVenueIds.length - archivedVenueIds.length
+    const skippedNote = skipped > 0 ? ` (${skipped} other selected venue${skipped === 1 ? '' : 's'} not archived — skipped)` : ''
+    if (!window.confirm(`Restore ${archivedVenueIds.length} venue(s)?${skippedNote}`)) return
+    beginAction()
+    bulkRestore(archivedVenueIds, {
+      onSuccess: setLastResult,
+      onError: (error) => setRequestError(requestErrorMessage(error)),
+    })
+  }
+
+  function handleDelete() {
+    if (!window.confirm(`Delete Venue?\n\nThis action cannot be undone. ${checkedVenueIds.length} venue(s) will be permanently deleted.`)) return
+    beginAction()
+    bulkDelete(checkedVenueIds, {
+      onSuccess: (result) => {
+        setLastResult(result)
+        onClearSelection()
+      },
       onError: (error) => setRequestError(requestErrorMessage(error)),
     })
   }
@@ -158,7 +231,7 @@ export function BulkActionToolbar({ checkedVenues, onClearSelection }: BulkActio
         </button>
       </div>
 
-      {(canValidate || canSubmitForReview || canApprove) && (
+      {(canValidate || canSubmitForReview || canApprove || canMoveToDraft || canArchive || canRestore || canDelete) && (
         <div className="flex flex-wrap gap-1.5">
           {canValidate && (
             <button
@@ -191,6 +264,50 @@ export function BulkActionToolbar({ checkedVenues, onClearSelection }: BulkActio
             >
               {isApproving ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} />}
               Approve ({reviewVenueIds.length})
+            </button>
+          )}
+          {canMoveToDraft && (
+            <button
+              type="button"
+              onClick={handleMoveToDraft}
+              disabled={isProcessing}
+              className="flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isMovingToDraft ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+              Move to Draft ({approvedVenueIds.length})
+            </button>
+          )}
+          {canArchive && (
+            <button
+              type="button"
+              onClick={handleArchive}
+              disabled={isProcessing}
+              className="flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isArchiving ? <Loader2 size={12} className="animate-spin" /> : <Archive size={12} />}
+              Archive ({approvedVenueIds.length})
+            </button>
+          )}
+          {canRestore && (
+            <button
+              type="button"
+              onClick={handleRestore}
+              disabled={isProcessing}
+              className="flex items-center gap-1 rounded-lg bg-blue-700 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isRestoring ? <Loader2 size={12} className="animate-spin" /> : <ArchiveRestore size={12} />}
+              Restore ({archivedVenueIds.length})
+            </button>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={isProcessing}
+              className="flex items-center gap-1 rounded-lg border border-red-300 px-2 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+              Delete ({checkedVenueIds.length})
             </button>
           )}
         </div>

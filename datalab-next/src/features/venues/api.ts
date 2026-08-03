@@ -1,4 +1,13 @@
-import { apiDeleteJson, apiDownload, apiGet, apiPatch, apiPost, apiPostJson, apiUpload } from '../../lib/apiClient'
+import {
+  apiDelete,
+  apiDeleteJson,
+  apiDownload,
+  apiGet,
+  apiPatch,
+  apiPost,
+  apiPostJson,
+  apiUpload,
+} from '../../lib/apiClient'
 import type { BulkOperationResponse, Venue, VenueListResponse, VenueSearchParams } from '../../types/venue'
 import type { ValidationResult } from '../../types/validation'
 
@@ -194,6 +203,30 @@ export function rejectVenue(id: string, reason: string): Promise<Venue> {
   return apiPostJson<Venue>(`/editor/venues/${encodeURIComponent(id)}/reject`, { reason })
 }
 
+/** Venue Lifecycle Management — the transitions the draft/review/approved
+ * workflow above never covered: an `approved` venue could never go back to
+ * `draft`, be retired (`archived`) without deleting it, or be restored.
+ * Same shape as Approve/Reject above: a structured 409 if the venue isn't
+ * currently in the expected status. */
+export function moveVenueToDraft(id: string): Promise<Venue> {
+  return apiPost<Venue>(`/editor/venues/${encodeURIComponent(id)}/move-to-draft`)
+}
+
+export function archiveVenue(id: string): Promise<Venue> {
+  return apiPost<Venue>(`/editor/venues/${encodeURIComponent(id)}/archive`)
+}
+
+export function restoreVenue(id: string): Promise<Venue> {
+  return apiPost<Venue>(`/editor/venues/${encodeURIComponent(id)}/restore`)
+}
+
+/** Permanent delete, any status — distinct from Archive (which only hides
+ * a venue from the Consumer Website while keeping it editable in Studio).
+ * No soft-delete: this really removes the row. */
+export function deleteVenue(id: string): Promise<void> {
+  return apiDelete(`/editor/venues/${encodeURIComponent(id)}`)
+}
+
 /** Sprint 28 — Bulk Operations. Every bulk endpoint returns the same
  * `BulkOperationResponse` shape (one result row per id) regardless of
  * whether it's a read-only check or a mutation — partial failure is
@@ -211,6 +244,22 @@ export function bulkSubmitVenuesForReview(venueIds: string[]): Promise<BulkOpera
 
 export function bulkApproveVenues(venueIds: string[]): Promise<BulkOperationResponse> {
   return apiPostJson<BulkOperationResponse>('/editor/venues/bulk/approve', { venue_ids: venueIds })
+}
+
+export function bulkMoveVenuesToDraft(venueIds: string[]): Promise<BulkOperationResponse> {
+  return apiPostJson<BulkOperationResponse>('/editor/venues/bulk/move-to-draft', { venue_ids: venueIds })
+}
+
+export function bulkArchiveVenues(venueIds: string[]): Promise<BulkOperationResponse> {
+  return apiPostJson<BulkOperationResponse>('/editor/venues/bulk/archive', { venue_ids: venueIds })
+}
+
+export function bulkRestoreVenues(venueIds: string[]): Promise<BulkOperationResponse> {
+  return apiPostJson<BulkOperationResponse>('/editor/venues/bulk/restore', { venue_ids: venueIds })
+}
+
+export function bulkDeleteVenues(venueIds: string[]): Promise<BulkOperationResponse> {
+  return apiPostJson<BulkOperationResponse>('/editor/venues/bulk/delete', { venue_ids: venueIds })
 }
 
 /** EP15 unified `PATCH /editor/venues/bulk` — replaces the two

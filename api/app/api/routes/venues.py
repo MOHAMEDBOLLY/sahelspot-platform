@@ -313,6 +313,122 @@ def bulk_approve_venues(
     return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
 
 
+@router.post("/bulk/move-to-draft", response_model=BulkOperationResponse)
+def bulk_move_venues_to_draft(
+    payload: BulkVenueIdsRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    """Calls `_move_to_draft_or_raise()` — the same function
+    `POST /venues/{id}/move-to-draft` calls — once per id. Same
+    partial-failure handling as the other bulk-* endpoints above.
+    """
+    results: list[BulkResultItem] = []
+    for venue_id in payload.venue_ids:
+        venue = db.get(Venue, venue_id)
+        if venue is None:
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error="Venue not found"))
+            continue
+        try:
+            _move_to_draft_or_raise(db, venue, user.id)
+            db.commit()
+        except HTTPException as exc:
+            db.rollback()
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error=_error_message(exc)))
+            continue
+        venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
+
+    succeeded = sum(1 for result in results if result.success)
+    return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
+
+
+@router.post("/bulk/archive", response_model=BulkOperationResponse)
+def bulk_archive_venues(
+    payload: BulkVenueIdsRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    """Calls `_archive_or_raise()` — the same function
+    `POST /venues/{id}/archive` calls — once per id."""
+    results: list[BulkResultItem] = []
+    for venue_id in payload.venue_ids:
+        venue = db.get(Venue, venue_id)
+        if venue is None:
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error="Venue not found"))
+            continue
+        try:
+            _archive_or_raise(db, venue, user.id)
+            db.commit()
+        except HTTPException as exc:
+            db.rollback()
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error=_error_message(exc)))
+            continue
+        venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
+
+    succeeded = sum(1 for result in results if result.success)
+    return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
+
+
+@router.post("/bulk/restore", response_model=BulkOperationResponse)
+def bulk_restore_venues(
+    payload: BulkVenueIdsRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    """Calls `_restore_or_raise()` — the same function
+    `POST /venues/{id}/restore` calls — once per id."""
+    results: list[BulkResultItem] = []
+    for venue_id in payload.venue_ids:
+        venue = db.get(Venue, venue_id)
+        if venue is None:
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error="Venue not found"))
+            continue
+        try:
+            _restore_or_raise(db, venue, user.id)
+            db.commit()
+        except HTTPException as exc:
+            db.rollback()
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error=_error_message(exc)))
+            continue
+        venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
+
+    succeeded = sum(1 for result in results if result.success)
+    return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
+
+
+@router.post("/bulk/delete", response_model=BulkOperationResponse)
+def bulk_delete_venues(
+    payload: BulkVenueIdsRequest,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
+):
+    """Same permission and the same permanent, non-cascading delete as
+    `DELETE /venues/{id}` below — just looped over a capped id list, same
+    partial-failure handling as every other bulk-* endpoint. A successful
+    row's `venue` is `None` (the row no longer exists to return), matching
+    how `BulkResultItem` already leaves fields unset for whichever fields
+    an operation doesn't produce (see its docstring).
+    """
+    results: list[BulkResultItem] = []
+    for venue_id in payload.venue_ids:
+        venue = db.get(Venue, venue_id)
+        if venue is None:
+            results.append(BulkResultItem(venue_id=venue_id, success=False, error="Venue not found"))
+            continue
+        db.delete(venue)
+        db.commit()
+        results.append(BulkResultItem(venue_id=venue_id, success=True))
+
+    succeeded = sum(1 for result in results if result.success)
+    return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
+
+
 @router.patch("/bulk", response_model=BulkOperationResponse)
 def bulk_update(
     payload: BulkUpdateRequest,
@@ -736,3 +852,131 @@ def reject_venue(
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
     return venue
+
+
+# ---------------------------------------------------------------------------
+# Venue Lifecycle Management — Draft/Approved/Archived, plus Delete
+#
+# Studio is otherwise frozen; this is the one gap the existing
+# draft -> review -> approved workflow above never covered: an `approved`
+# venue had no way back to `draft`, no way to retire it (`archived`) without
+# deleting it outright, and no real delete at all. `archived` was already a
+# legal value in `CONTENT_STATUSES`/the DB CHECK constraint (see
+# `app/db/models.py`) — added when that shared vocabulary was defined,
+# never wired to any transition until now. No migration needed.
+#
+# Same shape as every transition above: `require_status` guard, a private
+# `_x_or_raise` helper shared by the single-item route and its bulk-*
+# sibling, `log_activity`, caller commits. Gated behind
+# `Permission.CONTENT_APPROVE` — the same bar Approve/Reject already use,
+# since reversing an approval (back to Draft or to Archived) or restoring
+# one is the same class of editorial decision, not a lesser one.
+# ---------------------------------------------------------------------------
+
+
+def _move_to_draft_or_raise(db: Session, venue: Venue, actor: str) -> None:
+    """`approved -> draft` — an editor decided a live venue needs rework.
+    Distinct from `reject_venue`'s `review -> draft` (that's a reviewer
+    sending a submission back before it was ever approved); this is
+    un-approving something already live.
+    """
+    require_status(venue, expected="approved", target="draft")
+    venue.status = "draft"
+    log_activity(db, action="move_to_draft", entity_type="venue", entity_id=venue.id, actor=actor)
+
+
+@router.post("/{venue_id}/move-to-draft", response_model=VenueOut)
+def move_venue_to_draft(
+    venue_id: str,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    venue = db.get(Venue, venue_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    _move_to_draft_or_raise(db, venue, user.id)
+    db.commit()
+
+    venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+    return venue
+
+
+def _archive_or_raise(db: Session, venue: Venue, actor: str) -> None:
+    """`approved -> archived` — retires a venue from the Consumer Website
+    (the publish engine only ever includes `approved` rows, see
+    `app/publishing/engine.py`) without deleting it. Still fully editable
+    in Studio, and reversible via Restore.
+    """
+    require_status(venue, expected="approved", target="archived")
+    venue.status = "archived"
+    log_activity(db, action="archive", entity_type="venue", entity_id=venue.id, actor=actor)
+
+
+@router.post("/{venue_id}/archive", response_model=VenueOut)
+def archive_venue(
+    venue_id: str,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    venue = db.get(Venue, venue_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    _archive_or_raise(db, venue, user.id)
+    db.commit()
+
+    venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+    return venue
+
+
+def _restore_or_raise(db: Session, venue: Venue, actor: str) -> None:
+    """`archived -> approved` — the only way back out of Archived. Goes
+    straight to `approved`, not through `review`/`draft` again: nothing
+    about the venue's content changed while archived, so there's nothing
+    new to re-review.
+    """
+    require_status(venue, expected="archived", target="approved")
+    venue.status = "approved"
+    log_activity(db, action="restore", entity_type="venue", entity_id=venue.id, actor=actor)
+
+
+@router.post("/{venue_id}/restore", response_model=VenueOut)
+def restore_venue(
+    venue_id: str,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    venue = db.get(Venue, venue_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    _restore_or_raise(db, venue, user.id)
+    db.commit()
+
+    venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
+    return venue
+
+
+@router.delete("/{venue_id}", status_code=204)
+def delete_venue(
+    venue_id: str,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
+):
+    """Permanent delete, any status — same permission, same non-cascading
+    shape as `delete_destination` (`app/api/routes/destinations.py`), the
+    first delete endpoint in this codebase. No soft-delete: `archived`
+    already covers "hide without destroying," so Delete stays a real,
+    irreversible `DELETE`, per the same "don't invent a second
+    not-really-deleted state" reasoning `archived` itself was added for.
+    """
+    venue = db.get(Venue, venue_id)
+    if venue is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    db.delete(venue)
+    db.commit()
