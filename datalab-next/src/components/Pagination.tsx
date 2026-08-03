@@ -5,6 +5,11 @@ type PaginationProps = {
   pageSize: number
   total: number
   onPageChange: (page: number) => void
+  /** Events Module v1 — this component was venues-only until Events
+   * reused it, hardcoding "venues" in the summary line. Defaults to
+   * "venues" so the existing (only) caller before this change is
+   * unaffected either way. */
+  itemLabel?: string
 }
 
 /** Renders the existing backend pagination contract (`items`/`total`/
@@ -12,7 +17,7 @@ type PaginationProps = {
  * API shape, just the UI that was missing for it. `totalPages` is at
  * least 1 even when `total` is 0, so "Page 1 of 1" is always a sane
  * thing to show rather than "Page 1 of 0". */
-export function Pagination({ page, pageSize, total, onPageChange }: PaginationProps) {
+export function Pagination({ page, pageSize, total, onPageChange, itemLabel = 'venues' }: PaginationProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1
   const end = Math.min(page * pageSize, total)
@@ -20,7 +25,7 @@ export function Pagination({ page, pageSize, total, onPageChange }: PaginationPr
   return (
     <div className="flex flex-col gap-2 border-t border-gray-100 pt-3">
       <p className="text-xs text-gray-500">
-        Showing {start}–{end} of {total} venues
+        Showing {start}–{end} of {total} {itemLabel}
       </p>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-gray-500">
