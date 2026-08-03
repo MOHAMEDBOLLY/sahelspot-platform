@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard'
 import { QualityCenter } from './pages/QualityCenter'
 import { Venues } from './pages/Venues'
 import { Destinations } from './pages/Destinations'
+import { Events } from './pages/Events'
 import { Publishing } from './pages/Publishing'
 import { Activity } from './pages/Activity'
 import { Users } from './pages/Users'
@@ -30,6 +31,7 @@ function App() {
             <Route path="/quality" element={<QualityCenter />} />
             <Route path="/venues" element={<Venues />} />
             <Route path="/destinations" element={<Destinations />} />
+            <Route path="/events" element={<Events />} />
             <Route path="/publishing" element={<Publishing />} />
             <Route
               path="/map"

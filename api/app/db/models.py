@@ -1,9 +1,10 @@
-from datetime import datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     BigInteger,
@@ -12,6 +13,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     Text,
+    Time,
     UniqueConstraint,
     func,
     text,
@@ -186,6 +188,92 @@ class Venue(Base):
     # pre-authorized condition, not before.
     legacy_geo: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # §4.2 — see Destination.version above.
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    last_published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class Event(Base):
+    """Events Module v1. Same shape as `Venue`/`Destination`: `status`
+    shares `CONTENT_STATUSES` (one vocabulary, not a new one per entity —
+    see that constant's own docstring), `version` is the same optimistic-
+    concurrency column, cover-only media (no gallery — events don't need
+    one for v1).
+
+    `venue_id`/`destination_id` are both nullable and `ON DELETE SET
+    NULL` — an event may stand alone, or reference either (or both), but
+    neither reference is required, and deleting the venue/destination
+    must never be blocked by an event pointing at it (unlike
+    `Venue.destination_id`, which is a real ownership relationship).
+
+    Upcoming/Live/Ended is deliberately not a stored column — it's fully
+    derived from `start_date`/`end_date`/`start_time`/`end_time` at read
+    time (see `app/domain/event_timing.py`), so it's never stale and
+    never needs a background job to keep it correct.
+
+    Deliberately excluded from v1 (see docs — Events Module v1 scope):
+    recurring-event fields, artist fields, ticket-sync/automation fields,
+    pricing fields, festival fields. Every one of these is additive later
+    (a new nullable column or a new child table) — none require changing
+    what's here.
+    """
+
+    __tablename__ = "events"
+    __table_args__ = (
+        CheckConstraint(f"status IN {CONTENT_STATUSES}", name="ck_events_status"),
+        UniqueConstraint("slug", name="uq_events_slug"),
+        # 0013_events_require_location.py — each of venue_id/destination_id
+        # stays individually nullable, but at least one must be set; an
+        # event with neither has no location at all, which isn't a valid
+        # state to publish or display.
+        CheckConstraint(
+            "venue_id IS NOT NULL OR destination_id IS NOT NULL", name="ck_events_has_location"
+        ),
+        Index("ix_events_status", "status"),
+        Index("ix_events_venue_id", "venue_id"),
+        Index("ix_events_destination_id", "destination_id"),
+        Index("ix_events_featured", "featured"),
+        Index("ix_events_start_date", "start_date"),
+    )
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    slug: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    cover_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    short_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    # Nullable — a single-day event has no end_date; a multi-day event
+    # (still not "festival support," just two dates on one row) sets it.
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    start_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    end_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    venue_id: Mapped[str | None] = mapped_column(
+        ForeignKey("venues.id", ondelete="SET NULL"), nullable=True
+    )
+    venue: Mapped["Venue | None"] = relationship()
+    destination_id: Mapped[str | None] = mapped_column(
+        ForeignKey("destinations.id", ondelete="SET NULL"), nullable=True
+    )
+    destination: Mapped["Destination | None"] = relationship()
+    featured: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    # Ticketing — intentionally the simplest possible shape (three plain
+    # columns, no provider table, no sync engine). `ticket_provider` is
+    # free text, not a CHECK-constrained vocabulary: unlike
+    # VENUE_CATEGORIES/CONTENT_STATUSES, there's no known-closed set of
+    # providers today — same reasoning `Venue.brand` already gives for why
+    # an open-ended value stays plain text instead of an enum.
+    ticket_provider: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ticket_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Free text id from whatever ticket_provider issued it — opaque to
+    # this platform, never parsed or validated, just stored for whenever
+    # a future lookup/sync feature (out of v1 scope) needs to match back.
+    external_event_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     last_published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

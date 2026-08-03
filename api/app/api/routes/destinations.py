@@ -28,7 +28,7 @@ from app.api.schemas import (
 )
 from app.auth.dependencies import CurrentUser, get_current_user
 from app.auth.permissions import Permission, require_permission
-from app.db.models import DESTINATION_REGIONS, Destination, Venue
+from app.db.models import DESTINATION_REGIONS, Destination, Event, Venue
 from app.db.session import get_db
 from app.media.service import reject_if_declared_too_large, upload_image
 from app.validation.destinations import validate_destination
@@ -281,6 +281,28 @@ def delete_destination(
             detail={
                 "error": "destination_has_venues",
                 "message": f"Cannot delete '{destination.name}' — it still has {venue_count} venue(s).",
+            },
+        )
+
+    # Events Module v1 — same reasoning as `delete_venue`'s own guard:
+    # `events.destination_id` is `ON DELETE SET NULL`, but
+    # `ck_events_has_location` requires at least one of venue/destination,
+    # so an event whose *only* location is this destination can't have
+    # that FK silently nulled without violating the constraint.
+    orphaned_event_count = (
+        db.query(Event)
+        .filter(Event.destination_id == destination_id, Event.venue_id.is_(None))
+        .count()
+    )
+    if orphaned_event_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "destination_has_sole_events",
+                "message": (
+                    f"Cannot delete '{destination.name}' — {orphaned_event_count} event(s) have no "
+                    "other location and would be left with none. Give them a venue first, or delete them."
+                ),
             },
         )
 

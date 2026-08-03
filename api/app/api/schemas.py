@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -459,3 +459,150 @@ class UserRoleUpdate(BaseModel):
     """
 
     role: str
+
+
+class VenueRef(BaseModel):
+    """Events Module v1 — the same lightweight resolved-reference shape
+    `DestinationRef` already gives venues: id + display name only, so a
+    caller never has to look up a venue's name for an id itself.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+
+
+class EventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    title: str
+    slug: str
+    status: str
+    cover_image_url: str | None = None
+    short_description: str | None = None
+    start_date: date
+    end_date: date | None = None
+    start_time: time | None = None
+    end_time: time | None = None
+    venue: VenueRef | None = None
+    destination: DestinationRef | None = None
+    featured: bool
+    ticket_provider: str | None = None
+    ticket_url: str | None = None
+    external_event_id: str | None = None
+    version: int
+    last_published_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+    # Never a stored column — computed at response time by the route
+    # (see `app/api/event_timing.py`). Optional only because a bare
+    # `Event.model_validate(...)` (no route-level computation) wouldn't
+    # otherwise populate it; every route that returns `EventOut` sets it.
+    phase: str | None = None
+
+
+class EventListOut(BaseModel):
+    items: list[EventOut]
+    total: int
+    page: int
+    page_size: int
+
+
+class EventCreate(BaseModel):
+    """`id`/`slug` are caller-supplied, same reasoning `DestinationCreate`
+    already gives: no surrogate key, the caller picks a stable, human-
+    legible identifier. Every new event starts `draft`, same as every
+    other entity's creation path. `venue_id`/`destination_id` are both
+    optional at creation, same as they are for the lifetime of the row.
+    """
+
+    id: str = Field(min_length=1, max_length=200)
+    title: str = Field(min_length=1, max_length=200)
+    slug: str = Field(min_length=1, max_length=200)
+    start_date: date
+    end_date: date | None = None
+    start_time: time | None = None
+    end_time: time | None = None
+    venue_id: str | None = None
+    destination_id: str | None = None
+    short_description: str | None = Field(default=None, max_length=500)
+    ticket_provider: str | None = Field(default=None, max_length=200)
+    ticket_url: str | None = None
+    external_event_id: str | None = Field(default=None, max_length=200)
+
+
+class EventUpdate(BaseModel):
+    """Save Draft payload — same intent as `VenueUpdate`/`DestinationUpdate`:
+    every field Edit Mode exposes as editable. `id`, `slug`, `status`, and
+    timestamps are structural/workflow-controlled and aren't part of this
+    write path, same reasoning as the other two entities.
+    """
+
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    start_date: date | None = None
+    end_date: date | None = None
+    start_time: time | None = None
+    end_time: time | None = None
+    venue_id: str | None = None
+    destination_id: str | None = None
+    short_description: str | None = Field(default=None, max_length=500)
+    cover_image_url: str | None = None
+    featured: bool | None = None
+    ticket_provider: str | None = Field(default=None, max_length=200)
+    ticket_url: str | None = None
+    external_event_id: str | None = Field(default=None, max_length=200)
+
+
+class BulkEventIdsRequest(BaseModel):
+    """Same shape as `BulkVenueIdsRequest` — just the target ids, capped
+    at 100 per request."""
+
+    event_ids: list[str] = Field(min_length=1, max_length=100)
+
+
+class EventBulkResultItem(BaseModel):
+    """Same shape as `BulkResultItem`, for events — a distinct class
+    (not a shared generic) since the id/entity field names differ
+    (`event_id`/`event` vs. `venue_id`/`venue`), matching how this
+    codebase already gives venues their own `BulkResultItem` rather than
+    a generic parameterized one.
+    """
+
+    event_id: str
+    success: bool
+    error: str | None = None
+    event: EventOut | None = None
+    validation: ValidationResult | None = None
+
+
+class EventBulkOperationResponse(BaseModel):
+    results: list[EventBulkResultItem]
+    succeeded: int
+    failed: int
+
+
+class PublishedEventOut(BaseModel):
+    """The public read shape — same relationship to `EventOut` that
+    `PublishedVenueOut` has to `VenueOut`: no `status` (everything here is
+    implicitly published), no editorial-only fields. Sourced entirely from
+    a publish revision's frozen snapshot, never the live `events` table.
+    """
+
+    id: str
+    title: str
+    slug: str
+    cover_image_url: str | None = None
+    short_description: str | None = None
+    start_date: date
+    end_date: date | None = None
+    start_time: time | None = None
+    end_time: time | None = None
+    venue: VenueRef | None = None
+    destination: DestinationRef | None = None
+    featured: bool
+    ticket_provider: str | None = None
+    ticket_url: str | None = None
+    external_event_id: str | None = None
+    phase: str | None = None

@@ -34,7 +34,7 @@ from app.api.schemas import (
 )
 from app.auth.dependencies import CurrentUser, get_current_user
 from app.auth.permissions import Permission, require_permission
-from app.db.models import VENUE_CATEGORIES, Destination, Venue
+from app.db.models import VENUE_CATEGORIES, Destination, Event, Venue
 from app.db.session import get_db
 from app.media.service import delete_image, reject_if_declared_too_large, upload_image
 from app.validation.schemas import ValidationResult
@@ -426,6 +426,18 @@ def bulk_delete_venues(
         venue = db.get(Venue, venue_id)
         if venue is None:
             results.append(BulkResultItem(venue_id=venue_id, success=False, error="Venue not found"))
+            continue
+        orphaned_event_count = (
+            db.query(Event).filter(Event.venue_id == venue_id, Event.destination_id.is_(None)).count()
+        )
+        if orphaned_event_count > 0:
+            results.append(
+                BulkResultItem(
+                    venue_id=venue_id,
+                    success=False,
+                    error=f"{orphaned_event_count} event(s) have no other location.",
+                )
+            )
             continue
         db.delete(venue)
         db.commit()
@@ -1006,10 +1018,36 @@ def delete_venue(
     already covers "hide without destroying," so Delete stays a real,
     irreversible `DELETE`, per the same "don't invent a second
     not-really-deleted state" reasoning `archived` itself was added for.
+
+    Events Module v1 — `events.venue_id` is `ON DELETE SET NULL`, not
+    `RESTRICT` (an event outliving its venue link is a valid state), but
+    `ck_events_has_location` requires at least one of venue/destination —
+    so an event whose *only* location is this venue can't have that FK
+    silently nulled without violating that constraint. Pre-checked here
+    (same "clear 409 instead of a raw IntegrityError" reasoning
+    `delete_destination`'s venue-count check already uses) rather than
+    letting the CHECK constraint reject the delete with a raw 500.
     """
     venue = db.get(Venue, venue_id)
     if venue is None:
         raise HTTPException(status_code=404, detail="Venue not found")
+
+    orphaned_event_count = (
+        db.query(Event)
+        .filter(Event.venue_id == venue_id, Event.destination_id.is_(None))
+        .count()
+    )
+    if orphaned_event_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "venue_has_sole_events",
+                "message": (
+                    f"Cannot delete '{venue.name}' — {orphaned_event_count} event(s) have no other "
+                    "location and would be left with none. Give them a destination first, or delete them."
+                ),
+            },
+        )
 
     db.delete(venue)
     db.commit()

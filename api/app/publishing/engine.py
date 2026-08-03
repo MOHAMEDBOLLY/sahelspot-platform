@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.activity.service import log_activity
-from app.db.models import Destination, PublishRevision, Venue
+from app.db.models import Destination, Event, PublishRevision, Venue
 
 _CONCURRENT_PUBLISH_DETAIL = {
     "error": "concurrent_publish",
@@ -76,6 +76,34 @@ def _serialize_venue(venue: Venue) -> dict:
     }
 
 
+def _serialize_event(event: Event) -> dict:
+    """Events Module v1 — same reasoning as `_serialize_venue`: no
+    `status` (every event here is `approved` by construction), no
+    editorial-only fields. `venue_id`/`destination_id` are carried as
+    raw ids (resolved into refs at public-read time, same pattern
+    `resolve_published_venue` already established for
+    `venue.destination_id`) — both nullable, so `None` is a normal value,
+    not a sign this event is missing anything.
+    """
+    return {
+        "id": event.id,
+        "title": event.title,
+        "slug": event.slug,
+        "cover_image_url": event.cover_image_url,
+        "short_description": event.short_description,
+        "start_date": event.start_date.isoformat(),
+        "end_date": event.end_date.isoformat() if event.end_date else None,
+        "start_time": event.start_time.isoformat() if event.start_time else None,
+        "end_time": event.end_time.isoformat() if event.end_time else None,
+        "venue_id": event.venue_id,
+        "destination_id": event.destination_id,
+        "featured": event.featured,
+        "ticket_provider": event.ticket_provider,
+        "ticket_url": event.ticket_url,
+        "external_event_id": event.external_event_id,
+    }
+
+
 def publish(db: Session, *, actor: str) -> PublishRevision:
     """Gathers every currently `approved` destination and venue, freezes
     them into a new immutable `publish_revisions` row, and atomically makes
@@ -118,9 +146,20 @@ def publish(db: Session, *, actor: str) -> PublishRevision:
     venues = [v for v in all_approved_venues if v.destination_id in approved_destination_ids]
     excluded_venues = [v for v in all_approved_venues if v.destination_id not in approved_destination_ids]
 
+    # Events Module v1 — no referential-closure exclusion: an event's
+    # `venue_id`/`destination_id` are both optional by design (see
+    # `Event`'s docstring), so an approved event whose linked venue/
+    # destination isn't itself part of this snapshot still publishes —
+    # its ref just resolves to `None` at public-read time (same "resolve,
+    # don't hard-exclude" as `resolve_published_venue` gives a dangling
+    # `destination_id`, just without the venue/destination case's
+    # mandatory-relationship reason to exclude instead).
+    events = db.query(Event).filter(Event.status == "approved").order_by(Event.start_date).all()
+
     snapshot = {
         "destinations": [_serialize_destination(d) for d in destinations],
         "venues": [_serialize_venue(v) for v in venues],
+        "events": [_serialize_event(e) for e in events],
     }
 
     # Flip the old current (if any) and insert the new one in the same
@@ -133,6 +172,8 @@ def publish(db: Session, *, actor: str) -> PublishRevision:
         destination.last_published_at = now
     for venue in venues:
         venue.last_published_at = now
+    for event in events:
+        event.last_published_at = now
 
     revision = PublishRevision(
         snapshot=snapshot,

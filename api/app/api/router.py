@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from app.api.routes import (
     activity,
     destinations,
+    events,
     me,
     public,
     publish,
@@ -38,6 +39,7 @@ from app.auth.dependencies import get_current_user
 editor_router = APIRouter(prefix="/editor", dependencies=[Depends(get_current_user)])
 editor_router.include_router(destinations.router)
 editor_router.include_router(venues.router)
+editor_router.include_router(events.router)
 editor_router.include_router(publish.router)
 editor_router.include_router(activity.router)
 editor_router.include_router(me.router)

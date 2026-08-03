@@ -1,7 +1,16 @@
+from datetime import date, time
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.schemas import DestinationRef, PublishedDestinationOut, PublishedVenueOut
+from app.api.event_timing import compute_event_phase
+from app.api.schemas import (
+    DestinationRef,
+    PublishedDestinationOut,
+    PublishedEventOut,
+    PublishedVenueOut,
+    VenueRef,
+)
 from app.db.session import get_db
 from app.publishing.engine import get_current_revision
 
@@ -97,3 +106,72 @@ def list_published_destinations(db: Session = Depends(get_db)):
     if revision is None:
         return []
     return revision.snapshot.get("destinations", [])
+
+
+def resolve_published_event(
+    event: dict, venues_by_id: dict, destinations_by_id: dict
+) -> dict:
+    """Events Module v1 — resolves `venue_id`/`destination_id` into refs,
+    same pattern `resolve_published_venue` established for a venue's
+    `destination_id`. Unlike that function, a dangling reference here
+    resolves to `None` rather than excluding the whole event: both
+    relationships are optional by design (see `Event`'s docstring), so a
+    venue/destination not being in this snapshot just means this
+    particular event has one less related link, not that the event
+    itself is unpublishable. Also computes `phase` (Upcoming/Live/Ended)
+    from the snapshot's own stored date/time strings — never a stored
+    snapshot field itself (see `app/api/event_timing.py`).
+    """
+    venue = venues_by_id.get(event["venue_id"])
+    destination = destinations_by_id.get(event["destination_id"])
+    phase = compute_event_phase(
+        start_date=date.fromisoformat(event["start_date"]),
+        end_date=date.fromisoformat(event["end_date"]) if event["end_date"] else None,
+        start_time=time.fromisoformat(event["start_time"]) if event["start_time"] else None,
+        end_time=time.fromisoformat(event["end_time"]) if event["end_time"] else None,
+    )
+    return {
+        **event,
+        "venue": VenueRef(id=venue["id"], name=venue["name"]) if venue else None,
+        "destination": DestinationRef(id=destination["id"], name=destination["name"]) if destination else None,
+        "phase": phase,
+    }
+
+
+@router.get("/events", response_model=list[PublishedEventOut])
+def list_published_events(db: Session = Depends(get_db)):
+    """Events Module v1 — same snapshot-only guarantee as every other
+    `/public/*` route: reads only the current publish revision, never the
+    draft `events` table, so draft/in-review/archived events can never
+    appear here by construction."""
+    revision = get_current_revision(db)
+    if revision is None:
+        return []
+
+    venues_by_id = {v["id"]: v for v in revision.snapshot.get("venues", [])}
+    destinations_by_id = {d["id"]: d for d in revision.snapshot.get("destinations", [])}
+    return [
+        resolve_published_event(e, venues_by_id, destinations_by_id)
+        for e in revision.snapshot.get("events", [])
+    ]
+
+
+@router.get("/events/{event_slug}", response_model=PublishedEventOut)
+def get_published_event(event_slug: str, db: Session = Depends(get_db)):
+    """Single-event lookup for the Consumer detail page at `/events/{slug}`
+    — looked up by `slug`, not `id` (unlike venues' `/public/venues/{id}`),
+    per this module's own stable-public-slug requirement. Same `404`-
+    covers-every-reason contract `get_published_venue` already gives
+    (doesn't exist, draft/in-review, or approved but never published are
+    all indistinguishable to a public caller)."""
+    revision = get_current_revision(db)
+    if revision is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    event = next((e for e in revision.snapshot.get("events", []) if e["slug"] == event_slug), None)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    venues_by_id = {v["id"]: v for v in revision.snapshot.get("venues", [])}
+    destinations_by_id = {d["id"]: d for d in revision.snapshot.get("destinations", [])}
+    return resolve_published_event(event, venues_by_id, destinations_by_id)
