@@ -8,6 +8,15 @@ import type { NextConfig } from "next";
 // Content-Security-Policy/HSTS/COOP/COEP/CORP — those need their own
 // dedicated review, later.
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "mehujnymevedhnqdxydh.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+    ],
+  },
   async headers() {
     return [
       {
