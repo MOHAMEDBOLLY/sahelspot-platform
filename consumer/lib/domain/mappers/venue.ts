@@ -1,45 +1,8 @@
 import type { PublishedVenueDTO } from "@/lib/api/dto";
-import type { Venue, VenueCategory } from "@/lib/domain/venue";
+import type { Venue } from "@/lib/domain/venue";
+import { toVenueCategory } from "@/lib/domain/categories";
 import { toValidPhone, toValidUrl, toValidWhatsapp } from "@/lib/domain/validators";
 import { isOpenAt, toOpeningHours } from "@/lib/domain/openingHours";
-
-/** Real Studio category values, confirmed against publish revision 1071
- * (401 venues): `Restaurant` (156), `Cafe` (50), `Activity` (39), `Shopping`
- * (33), `Spa` (28), `Hotel` (26), `Services` (20), `Resort` (20),
- * `Beach Club` (19), `Nightlife` (8), `Other` (2).
- *
- * None of these match Stitch's five mood-grid categories literally except
- * `Nightlife` — the original `KNOWN_CATEGORIES` allowlist (checking for
- * `"beach"`/`"food"`/`"coffee"` verbatim) silently mapped 100% of real venues
- * outside Nightlife to `"general"`, including every restaurant and cafe. This
- * table is the actual translation Stitch's five-category design needs.
- *
- * `Activity`/`Shopping`/`Spa`/`Hotel`/`Services`/`Resort`/`Other` (168 venues,
- * 42% of the dataset) have no equivalent marker/icon in the Stitch design at
- * all — Stitch was designed around 5 categories, Studio's real taxonomy has
- * 11. These fall to `"general"` correctly, not as a bug: there is no
- * Stitch-designed treatment for "Spa" or "Hotel" to reproduce. Worth a
- * product conversation (does the mood grid/map need more categories?), not a
- * mapper fix. */
-const CATEGORY_MAP: Record<string, VenueCategory> = {
-  restaurant: "food",
-  cafe: "coffee",
-  "beach club": "beach",
-  nightlife: "nightlife",
-  // Accepted defensively in case Studio or seed data ever sends Stitch's own
-  // category names directly.
-  beach: "beach",
-  food: "food",
-  coffee: "coffee",
-};
-
-/** An unrecognized value (a new Studio category the client hasn't been
- * taught about yet) degrades to `"general"` rather than throwing — a marker
- * in the wrong-but-valid colour is a much smaller failure than one venue
- * disappearing from the whole app. */
-function toVenueCategory(raw: string): VenueCategory {
-  return CATEGORY_MAP[raw.trim().toLowerCase()] ?? "general";
-}
 
 /** `latitude`/`longitude` are `str | None` on the wire. A present-but-
  * unparseable value is treated the same as absent — excluded from the map

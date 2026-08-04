@@ -1,5 +1,3 @@
-import type { VenueCategory } from "@/lib/domain/venue";
-
 export const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
 /** Fallback camera position when no venue has real coordinates yet (an empty
@@ -9,30 +7,19 @@ export const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 export const DEFAULT_CENTER: [number, number] = [28.7, 31.05];
 export const DEFAULT_ZOOM = 10;
 
-/** Category marker colours — docs/consumer/DESIGN_TOKENS.md, read directly
- * from `interactive_map_1/code.html`. Distinct from the brand palette: these
- * are data encodings, not brand colour reuse (nightlife/coffee have no brand
- * token at all). */
-export const CATEGORY_MARKER_COLOR: Record<VenueCategory, string> = {
-  general: "#0D3B66",
-  beach: "#2AA198",
-  food: "#F28705",
-  nightlife: "#3730A3",
-  coffee: "#7F4400",
-};
+/** Screen-space chrome reserved over the map: the top search+filter overlay
+ * (measured ~140px) and the right-edge FAB column (locate/layers, 48px each
+ * + `right-4` = ~72px), plus a small margin on the other two edges so
+ * markers/clusters never render flush against the viewport. Set once as the
+ * map's native `padding` — every camera method (`flyTo`, `easeTo`,
+ * `jumpTo`) falls back to this automatically when it doesn't specify its
+ * own, so cluster-expansion and "locate me" both frame their target inside
+ * the safe area without each call needing to know about it. Also used to
+ * inset the viewport box `MapView` queries for visible markers, so a pin
+ * is never *built* already clipped by an edge or the FAB column. */
+export const MAP_SAFE_PADDING = { top: 140, right: 72, bottom: 24, left: 24 };
 
-export const CATEGORY_MARKER_ICON: Record<VenueCategory, string> = {
-  general: "place",
-  beach: "beach_access",
-  food: "restaurant",
-  nightlife: "nightlife",
-  coffee: "coffee",
-};
-
-export const CATEGORY_FILTERS: readonly { value: VenueCategory | "all"; label: string; icon?: string }[] = [
-  { value: "all", label: "All" },
-  { value: "beach", label: "Beaches", icon: "beach_access" },
-  { value: "food", label: "Food", icon: "restaurant" },
-  { value: "coffee", label: "Coffee", icon: "coffee" },
-  { value: "nightlife", label: "Nightlife", icon: "nightlife" },
-];
+/** The filter row now lives in the canonical taxonomy — see
+ * `@/lib/domain/categories`. Re-exported here so existing Map/Search
+ * imports don't need to change paths. */
+export { CATEGORY_FILTERS } from "@/lib/domain/categories";

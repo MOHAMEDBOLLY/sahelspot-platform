@@ -88,9 +88,11 @@ export function MapClient() {
           </div>
         ) : (
           <MapView
+            activeCategory={category}
+            isSaved={isSaved}
             onSelectVenue={handleSelectVenue}
+            onToggleSaved={toggle}
             ref={mapRef}
-            selectedVenueId={null}
             venues={visibleVenues}
           />
         )}
@@ -132,7 +134,7 @@ export function MapClient() {
           <StatTile
             accent="secondary"
             label="Dining"
-            value={destinationVenues.filter((v) => v.category === "food").length}
+            value={destinationVenues.filter((v) => v.category === "food" || v.category === "coffee").length}
           />
           <StatTile
             accent="info"

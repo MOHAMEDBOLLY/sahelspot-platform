@@ -1,4 +1,7 @@
 import type { OpeningHours } from "./openingHours";
+import type { VenueCategory } from "./categories";
+
+export type { VenueCategory } from "./categories";
 
 /** The UI-facing venue shape — docs/consumer/ARCHITECTURE.md §3.
  *
@@ -11,8 +14,6 @@ import type { OpeningHours } from "./openingHours";
  * Every field below that has no source in `PublishedVenueOut` today is
  * marked with the requirement it corresponds to and is `| null` — every
  * component that uses it must render correctly without it. */
-export type VenueCategory = "beach" | "food" | "coffee" | "nightlife" | "general";
-
 export type Venue = {
   id: string;
   slug: string;
