@@ -41,6 +41,7 @@ def _serialize_destination(destination: Destination) -> dict:
         "aliases": destination.aliases,
         "boundary": destination.boundary,
         "notes": destination.notes,
+        "cover_image_url": destination.cover_image_url,
     }
 
 

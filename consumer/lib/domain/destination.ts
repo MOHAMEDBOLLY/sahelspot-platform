@@ -4,6 +4,7 @@ export type Destination = {
   name: string;
   region: string;
   aliases: string[];
+  coverImageUrl: string | null;
 
   /** API_REQUIREMENTS.md §3 — no source yet ("124 Places" on DestinationCard). */
   venueCount: number | null;

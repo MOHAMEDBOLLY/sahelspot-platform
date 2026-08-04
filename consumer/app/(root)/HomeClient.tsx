@@ -166,7 +166,7 @@ export function HomeClient() {
                 <div className="w-[43%] min-w-[160px] shrink-0 snap-start" key={destination.id}>
                   <DestinationCard
                     href={`/search?destination=${destination.id}`}
-                    imageUrl={null}
+                    imageUrl={destination.coverImageUrl}
                     name={destination.name}
                     placeCount={destination.venueCount}
                   />

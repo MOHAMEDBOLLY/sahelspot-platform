@@ -402,6 +402,7 @@ class PublishedDestinationOut(BaseModel):
     region: str
     aliases: list[str] | None = None
     boundary: dict | None = None
+    cover_image_url: str | None = None
 
 
 class ActivityLogEntryOut(BaseModel):

@@ -43,6 +43,7 @@ export interface PublishedDestinationDTO {
   region: string;
   aliases: string[] | null;
   boundary: Record<string, unknown> | null;
+  cover_image_url: string | null;
 }
 
 export interface VenueRefDTO {
