@@ -3,6 +3,9 @@ import { Icon } from "@/components/ui/Icon";
 
 type CategoryChipOwnProps = {
   label: string;
+  /** Material Symbols glyph name — the one icon language this app uses.
+   * No emoji alternative: production UI carries zero emoji, enforced here
+   * by this prop being the only way to put a glyph in the tile at all. */
   icon: string;
 };
 
@@ -32,14 +35,28 @@ export function CategoryChip({
       // the same reason (see IconButton); this one relied on implicit
       // text-content naming and is the exception, not the pattern.
       aria-label={label}
-      className={`group flex flex-col items-center gap-2 focus-visible:outline-none ${className}`}
+      // `w-full`: without an explicit width, a `flex` element sizes to fit
+      // its own content (shrink-to-fit) rather than filling its parent —
+      // harmless where the parent is a CSS Grid cell (Grid already stretches
+      // items by default, e.g. Search's Popular Categories), but load-
+      // bearing wherever the parent is a plain flex row of fixed-width
+      // columns (Home's Activities rail): without it, every chip's icon
+      // square silently shrinks or grows to match its own label's text
+      // width instead of the intended uniform size.
+      className={`group flex w-full flex-col items-center gap-2 focus-visible:outline-none ${className}`}
       type="button"
       {...props}
     >
       <span className="flex aspect-square w-full items-center justify-center rounded-2xl bg-cream shadow-sm transition-all group-hover:bg-primary-container group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-primary/20">
         <Icon className="text-primary" name={icon} size={28} />
       </span>
-      <span className="text-[10px] font-bold tracking-wider text-on-surface-variant uppercase">
+      {/* `min-h-[26px]` reserves room for two lines at this size/leading —
+       * a one-word label (one line) and a two-word label that wraps (two
+       * lines, e.g. "Quick Bites") then bottom out at the same tile height
+       * instead of producing a ragged row. `text-center` keeps a wrapped
+       * label's second line centered under the icon rather than defaulting
+       * left within the (unstretched) label box. */}
+      <span className="min-h-[26px] text-center text-[10px] font-bold tracking-wider text-on-surface-variant uppercase leading-tight">
         {label}
       </span>
     </button>
