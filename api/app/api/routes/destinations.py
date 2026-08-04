@@ -19,6 +19,9 @@ from app.activity.service import log_activity
 from app.api.concurrency import require_if_match, set_etag
 from app.api.identifiers import check_reserved_id
 from app.api.schemas import (
+    BulkDestinationIdsRequest,
+    BulkDestinationOperationResponse,
+    BulkDestinationResultItem,
     DestinationCreate,
     DestinationListOut,
     DestinationOut,
@@ -166,6 +169,166 @@ def create_destination(
     return destination
 
 
+def _error_message(exc: HTTPException) -> str:
+    """Same unwrapping as `app/api/routes/venues.py`'s `_error_message` —
+    duplicated rather than imported since it's a single three-line
+    function, not worth a shared-module refactor for.
+    """
+    if isinstance(exc.detail, dict):
+        return exc.detail.get("message") or exc.detail.get("error") or str(exc.detail)
+    return str(exc.detail)
+
+
+@router.post("/bulk/move-to-draft", response_model=BulkDestinationOperationResponse)
+def bulk_move_destinations_to_draft(
+    payload: BulkDestinationIdsRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    """Calls `_move_to_draft_or_raise()` — the same function
+    `POST /destinations/{id}/move-to-draft` calls — once per id. Same
+    partial-failure handling as venues' bulk-* endpoints
+    (`app/api/routes/venues.py`).
+    """
+    results: list[BulkDestinationResultItem] = []
+    for destination_id in payload.destination_ids:
+        destination = db.get(Destination, destination_id)
+        if destination is None:
+            results.append(
+                BulkDestinationResultItem(destination_id=destination_id, success=False, error="Destination not found")
+            )
+            continue
+        try:
+            _move_to_draft_or_raise(db, destination, user.id)
+            db.commit()
+        except HTTPException as exc:
+            db.rollback()
+            results.append(
+                BulkDestinationResultItem(destination_id=destination_id, success=False, error=_error_message(exc))
+            )
+            continue
+        destination = db.get(Destination, destination_id)
+        results.append(BulkDestinationResultItem(destination_id=destination_id, success=True, destination=destination))
+
+    succeeded = sum(1 for result in results if result.success)
+    return BulkDestinationOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
+
+
+@router.post("/bulk/archive", response_model=BulkDestinationOperationResponse)
+def bulk_archive_destinations(
+    payload: BulkDestinationIdsRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    """Calls `_archive_or_raise()` — the same function
+    `POST /destinations/{id}/archive` calls — once per id."""
+    results: list[BulkDestinationResultItem] = []
+    for destination_id in payload.destination_ids:
+        destination = db.get(Destination, destination_id)
+        if destination is None:
+            results.append(
+                BulkDestinationResultItem(destination_id=destination_id, success=False, error="Destination not found")
+            )
+            continue
+        try:
+            _archive_or_raise(db, destination, user.id)
+            db.commit()
+        except HTTPException as exc:
+            db.rollback()
+            results.append(
+                BulkDestinationResultItem(destination_id=destination_id, success=False, error=_error_message(exc))
+            )
+            continue
+        destination = db.get(Destination, destination_id)
+        results.append(BulkDestinationResultItem(destination_id=destination_id, success=True, destination=destination))
+
+    succeeded = sum(1 for result in results if result.success)
+    return BulkDestinationOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
+
+
+@router.post("/bulk/restore", response_model=BulkDestinationOperationResponse)
+def bulk_restore_destinations(
+    payload: BulkDestinationIdsRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    """Calls `_restore_or_raise()` — the same function
+    `POST /destinations/{id}/restore` calls — once per id."""
+    results: list[BulkDestinationResultItem] = []
+    for destination_id in payload.destination_ids:
+        destination = db.get(Destination, destination_id)
+        if destination is None:
+            results.append(
+                BulkDestinationResultItem(destination_id=destination_id, success=False, error="Destination not found")
+            )
+            continue
+        try:
+            _restore_or_raise(db, destination, user.id)
+            db.commit()
+        except HTTPException as exc:
+            db.rollback()
+            results.append(
+                BulkDestinationResultItem(destination_id=destination_id, success=False, error=_error_message(exc))
+            )
+            continue
+        destination = db.get(Destination, destination_id)
+        results.append(BulkDestinationResultItem(destination_id=destination_id, success=True, destination=destination))
+
+    succeeded = sum(1 for result in results if result.success)
+    return BulkDestinationOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
+
+
+@router.post("/bulk/delete", response_model=BulkDestinationOperationResponse)
+def bulk_delete_destinations(
+    payload: BulkDestinationIdsRequest,
+    db: Session = Depends(get_db),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
+):
+    """Same permission and the same two guards (venue-count, orphaned-event)
+    as `DELETE /destinations/{id}` below — just looped over a capped id
+    list, same partial-failure handling as every other bulk-* endpoint.
+    """
+    results: list[BulkDestinationResultItem] = []
+    for destination_id in payload.destination_ids:
+        destination = db.get(Destination, destination_id)
+        if destination is None:
+            results.append(
+                BulkDestinationResultItem(destination_id=destination_id, success=False, error="Destination not found")
+            )
+            continue
+        venue_count = db.query(Venue).filter(Venue.destination_id == destination_id).count()
+        if venue_count > 0:
+            results.append(
+                BulkDestinationResultItem(
+                    destination_id=destination_id,
+                    success=False,
+                    error=f"'{destination.name}' still has {venue_count} venue(s).",
+                )
+            )
+            continue
+        orphaned_event_count = (
+            db.query(Event).filter(Event.destination_id == destination_id, Event.venue_id.is_(None)).count()
+        )
+        if orphaned_event_count > 0:
+            results.append(
+                BulkDestinationResultItem(
+                    destination_id=destination_id,
+                    success=False,
+                    error=f"{orphaned_event_count} event(s) have no other location.",
+                )
+            )
+            continue
+        db.delete(destination)
+        db.commit()
+        results.append(BulkDestinationResultItem(destination_id=destination_id, success=True))
+
+    succeeded = sum(1 for result in results if result.success)
+    return BulkDestinationOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
+
+
 @router.get("/{destination_id}", response_model=DestinationOut)
 def get_destination(
     destination_id: str,
@@ -308,6 +471,100 @@ def delete_destination(
 
     db.delete(destination)
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Destination Lifecycle Management — Draft/Approved/Archived, plus Delete
+#
+# Same gap, same fix, same shape as `app/api/routes/venues.py`'s "Venue
+# Lifecycle Management" block: an `approved` destination had no way back to
+# `draft`, no way to retire it (`archived`) without deleting it outright.
+# `archived` is already a legal `CONTENT_STATUSES` value (`app/db/models.py`)
+# shared by both tables — no migration needed. Gated behind
+# `Permission.CONTENT_APPROVE`, the same bar `approve_destination`/
+# `reject_destination` already use above.
+# ---------------------------------------------------------------------------
+
+
+def _move_to_draft_or_raise(db: Session, destination: Destination, actor: str) -> None:
+    """`approved -> draft` — same reasoning as venues' `_move_to_draft_or_raise`."""
+    require_status(destination, expected="approved", target="draft")
+    destination.status = "draft"
+    log_activity(db, action="move_to_draft", entity_type="destination", entity_id=destination.id, actor=actor)
+
+
+@router.post("/{destination_id}/move-to-draft", response_model=DestinationOut)
+def move_destination_to_draft(
+    destination_id: str,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    destination = db.get(Destination, destination_id)
+    if destination is None:
+        raise HTTPException(status_code=404, detail="Destination not found")
+
+    _move_to_draft_or_raise(db, destination, user.id)
+    db.commit()
+
+    destination = db.get(Destination, destination_id)
+    return destination
+
+
+def _archive_or_raise(db: Session, destination: Destination, actor: str) -> None:
+    """`approved -> archived` — retires a destination from the Consumer
+    Website (the publish engine only ever includes `approved` rows, see
+    `app/publishing/engine.py`) without deleting it. Still fully editable
+    in Studio, reversible via Restore.
+    """
+    require_status(destination, expected="approved", target="archived")
+    destination.status = "archived"
+    log_activity(db, action="archive", entity_type="destination", entity_id=destination.id, actor=actor)
+
+
+@router.post("/{destination_id}/archive", response_model=DestinationOut)
+def archive_destination(
+    destination_id: str,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    destination = db.get(Destination, destination_id)
+    if destination is None:
+        raise HTTPException(status_code=404, detail="Destination not found")
+
+    _archive_or_raise(db, destination, user.id)
+    db.commit()
+
+    destination = db.get(Destination, destination_id)
+    return destination
+
+
+def _restore_or_raise(db: Session, destination: Destination, actor: str) -> None:
+    """`archived -> approved` — same reasoning as venues' `_restore_or_raise`:
+    goes straight back to `approved`, not through `review`/`draft` again.
+    """
+    require_status(destination, expected="archived", target="approved")
+    destination.status = "approved"
+    log_activity(db, action="restore", entity_type="destination", entity_id=destination.id, actor=actor)
+
+
+@router.post("/{destination_id}/restore", response_model=DestinationOut)
+def restore_destination(
+    destination_id: str,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    _: CurrentUser = Depends(require_permission(Permission.CONTENT_APPROVE)),
+):
+    destination = db.get(Destination, destination_id)
+    if destination is None:
+        raise HTTPException(status_code=404, detail="Destination not found")
+
+    _restore_or_raise(db, destination, user.id)
+    db.commit()
+
+    destination = db.get(Destination, destination_id)
+    return destination
 
 
 @router.post("/{destination_id}/media", response_model=DestinationOut)

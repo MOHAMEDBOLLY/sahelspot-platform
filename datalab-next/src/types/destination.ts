@@ -34,3 +34,19 @@ export interface DestinationSearchParams {
   page?: number
   pageSize?: number
 }
+
+/** Destination Lifecycle Management — mirrors venues' `BulkResultItem`/
+ * `BulkOperationResponse` (types/venue.ts), with `destination`/
+ * `destination_id` in place of `venue`/`venue_id`. */
+export interface BulkDestinationResultItem {
+  destination_id: string
+  success: boolean
+  error: string | null
+  destination: Destination | null
+}
+
+export interface BulkDestinationOperationResponse {
+  results: BulkDestinationResultItem[]
+  succeeded: number
+  failed: number
+}

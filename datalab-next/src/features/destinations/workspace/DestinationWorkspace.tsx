@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Loader2, MapPinOff, Send, ThumbsUp, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, Loader2, MapPinOff, RotateCcw, Send, ThumbsUp, Trash2 } from 'lucide-react'
 import { useDestination } from '../useDestination'
 import { useUpdateDestination } from '../useUpdateDestination'
 import { useDeleteDestination } from '../useDeleteDestination'
 import { useRejectDestination } from '../useRejectDestination'
 import { useSubmitDestinationForReview } from '../useSubmitDestinationForReview'
 import { useApproveDestination } from '../useApproveDestination'
+import { useMoveDestinationToDraft } from '../useMoveDestinationToDraft'
+import { useArchiveDestination } from '../useArchiveDestination'
+import { useRestoreDestination } from '../useRestoreDestination'
 import { useUploadDestinationCover } from '../useUploadDestinationCover'
 import { toDestinationPatch } from '../api'
 import { validateDestinationDraft } from '../destinationValidation'
@@ -74,6 +77,9 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
     error: submitForReviewError,
   } = useSubmitDestinationForReview()
   const { mutate: approve, isPending: isApproving, error: approveError } = useApproveDestination()
+  const { mutate: moveToDraft, isPending: isMovingToDraft, error: moveToDraftError } = useMoveDestinationToDraft()
+  const { mutate: archive, isPending: isArchiving, error: archiveError } = useArchiveDestination()
+  const { mutate: restore, isPending: isRestoring, error: restoreError } = useRestoreDestination()
   const {
     mutate: uploadCover,
     isPending: isUploadingCover,
@@ -89,6 +95,14 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
     !isDirty && displayedDestination?.status === 'draft' && hasPermission(role, 'content_submit_review')
   const canApprove = !isDirty && displayedDestination?.status === 'review' && hasPermission(role, 'content_approve')
   const canReject = canApprove
+  // Destination Lifecycle Management — same status-eligibility gating as
+  // VenueWorkspace's canMoveToDraft/canArchive/canRestore.
+  const canMoveToDraft =
+    !isDirty && displayedDestination?.status === 'approved' && hasPermission(role, 'content_approve')
+  const canArchive =
+    !isDirty && displayedDestination?.status === 'approved' && hasPermission(role, 'content_approve')
+  const canRestore =
+    !isDirty && displayedDestination?.status === 'archived' && hasPermission(role, 'content_approve')
 
   const fieldErrors =
     mode === 'edit' && displayedDestination ? validateDestinationDraft(displayedDestination) : {}
@@ -147,6 +161,29 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
   function handleApprove() {
     if (!destinationId) return
     approve(destinationId, { onSuccess: commitSave })
+  }
+
+  function handleMoveToDraft() {
+    if (!destinationId) return
+    if (!window.confirm('Move this destination back to Draft? It will no longer be visible on the Consumer Website.'))
+      return
+    moveToDraft(destinationId, { onSuccess: commitSave })
+  }
+
+  function handleArchive() {
+    if (!destinationId) return
+    if (
+      !window.confirm(
+        'Archive this destination? It will no longer be visible on the Consumer Website, but stays editable here.',
+      )
+    )
+      return
+    archive(destinationId, { onSuccess: commitSave })
+  }
+
+  function handleRestore() {
+    if (!destinationId) return
+    restore(destinationId, { onSuccess: commitSave })
   }
 
   function handleUploadCover(file: File) {
@@ -270,6 +307,39 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
               </button>
             )}
             {canReject && <RejectDialog onReject={handleReject} />}
+            {canMoveToDraft && (
+              <button
+                type="button"
+                onClick={handleMoveToDraft}
+                disabled={isMovingToDraft}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isMovingToDraft ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                {isMovingToDraft ? 'Moving to Draft…' : 'Move to Draft'}
+              </button>
+            )}
+            {canArchive && (
+              <button
+                type="button"
+                onClick={handleArchive}
+                disabled={isArchiving}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isArchiving ? <Loader2 size={14} className="animate-spin" /> : <Archive size={14} />}
+                {isArchiving ? 'Archiving…' : 'Archive'}
+              </button>
+            )}
+            {canRestore && (
+              <button
+                type="button"
+                onClick={handleRestore}
+                disabled={isRestoring}
+                className="flex items-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isRestoring ? <Loader2 size={14} className="animate-spin" /> : <ArchiveRestore size={14} />}
+                {isRestoring ? 'Restoring…' : 'Restore'}
+              </button>
+            )}
           </>
         }
         extraStatus={
@@ -304,6 +374,30 @@ export function DestinationWorkspace({ destinationId, onDirtyChange, onDeleted }
                 title={rejectError instanceof ApiError ? rejectError.message : 'Failed to reject.'}
               >
                 {rejectError instanceof ApiError ? rejectError.message : 'Failed to reject.'}
+              </span>
+            )}
+            {moveToDraftError && (
+              <span
+                className="truncate text-xs font-medium text-red-600"
+                title={moveToDraftError instanceof ApiError ? moveToDraftError.message : 'Failed to move to draft.'}
+              >
+                {moveToDraftError instanceof ApiError ? moveToDraftError.message : 'Failed to move to draft.'}
+              </span>
+            )}
+            {archiveError && (
+              <span
+                className="truncate text-xs font-medium text-red-600"
+                title={archiveError instanceof ApiError ? archiveError.message : 'Failed to archive.'}
+              >
+                {archiveError instanceof ApiError ? archiveError.message : 'Failed to archive.'}
+              </span>
+            )}
+            {restoreError && (
+              <span
+                className="truncate text-xs font-medium text-red-600"
+                title={restoreError instanceof ApiError ? restoreError.message : 'Failed to restore.'}
+              >
+                {restoreError instanceof ApiError ? restoreError.message : 'Failed to restore.'}
               </span>
             )}
           </>

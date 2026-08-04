@@ -1,5 +1,10 @@
 import { apiDelete, apiDownload, apiGet, apiPatch, apiPost, apiPostJson, apiUpload } from '../../lib/apiClient'
-import type { Destination, DestinationListResponse, DestinationSearchParams } from '../../types/destination'
+import type {
+  BulkDestinationOperationResponse,
+  Destination,
+  DestinationListResponse,
+  DestinationSearchParams,
+} from '../../types/destination'
 
 /** Sprint 29 — same search + pagination shape venues' `fetchVenues` already
  * has (Sprint 27). No `status`/other filter — destinations have nothing
@@ -117,4 +122,43 @@ export function rejectDestination(id: string, reason: string): Promise<Destinati
 /** EP20-T01 — `GET /editor/destinations/export`. */
 export function exportDestinations(format: 'csv' | 'json'): Promise<void> {
   return apiDownload(`/editor/destinations/export?format=${format}`, `destinations.${format}`)
+}
+
+/** Destination Lifecycle Management — same shape as venues'
+ * `moveVenueToDraft`/`archiveVenue`/`restoreVenue`/`deleteVenue` and their
+ * bulk-* siblings (`features/venues/api.ts`). */
+export function moveDestinationToDraft(id: string): Promise<Destination> {
+  return apiPost<Destination>(`/editor/destinations/${encodeURIComponent(id)}/move-to-draft`)
+}
+
+export function archiveDestination(id: string): Promise<Destination> {
+  return apiPost<Destination>(`/editor/destinations/${encodeURIComponent(id)}/archive`)
+}
+
+export function restoreDestination(id: string): Promise<Destination> {
+  return apiPost<Destination>(`/editor/destinations/${encodeURIComponent(id)}/restore`)
+}
+
+export function bulkMoveDestinationsToDraft(destinationIds: string[]): Promise<BulkDestinationOperationResponse> {
+  return apiPostJson<BulkDestinationOperationResponse>('/editor/destinations/bulk/move-to-draft', {
+    destination_ids: destinationIds,
+  })
+}
+
+export function bulkArchiveDestinations(destinationIds: string[]): Promise<BulkDestinationOperationResponse> {
+  return apiPostJson<BulkDestinationOperationResponse>('/editor/destinations/bulk/archive', {
+    destination_ids: destinationIds,
+  })
+}
+
+export function bulkRestoreDestinations(destinationIds: string[]): Promise<BulkDestinationOperationResponse> {
+  return apiPostJson<BulkDestinationOperationResponse>('/editor/destinations/bulk/restore', {
+    destination_ids: destinationIds,
+  })
+}
+
+export function bulkDeleteDestinations(destinationIds: string[]): Promise<BulkDestinationOperationResponse> {
+  return apiPostJson<BulkDestinationOperationResponse>('/editor/destinations/bulk/delete', {
+    destination_ids: destinationIds,
+  })
 }

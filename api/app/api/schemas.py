@@ -290,6 +290,38 @@ class BulkOperationResponse(BaseModel):
     failed: int
 
 
+class BulkDestinationIdsRequest(BaseModel):
+    """Destination Lifecycle Management — the same request-body shape as
+    `BulkVenueIdsRequest`, just for destination ids. A separate class
+    (not a reused/generic one) because the field is genuinely named
+    `destination_ids`, not `venue_ids` — same reasoning `BulkResultItem`
+    below keeps `venue_id` and `destination_id` as two distinct optional
+    fields rather than inventing a generic `entity_id`.
+    """
+
+    destination_ids: list[str] = Field(min_length=1, max_length=100)
+
+
+class BulkDestinationResultItem(BaseModel):
+    """One row of a bulk destination-lifecycle operation's outcome —
+    same shape as `BulkResultItem`, with `destination`/`destination_id`
+    in place of `venue`/`venue_id`. Kept as its own class rather than
+    widening `BulkResultItem` with more optional fields, since the two
+    bulk-response families are never mixed in the same list.
+    """
+
+    destination_id: str
+    success: bool
+    error: str | None = None
+    destination: DestinationOut | None = None
+
+
+class BulkDestinationOperationResponse(BaseModel):
+    results: list[BulkDestinationResultItem]
+    succeeded: int
+    failed: int
+
+
 class PublishRevisionOut(BaseModel):
     """Metadata about a publish revision — not its full snapshot. Returned
     by the Publish action itself and by the revision-history list
