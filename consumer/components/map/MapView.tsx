@@ -20,9 +20,9 @@ type MapViewProps = {
   /** Drives cluster color — Brand Navy for "all", the category's own color
    * once a filter is active. */
   activeCategory: VenueCategory | "all";
+  /** Opens Venue Details for this venue directly — the map's marker/pin
+   * flow always resolves to a venue, never a destination. */
   onSelectVenue: (venueId: string) => void;
-  isSaved: (venueId: string) => boolean;
-  onToggleSaved: (venueId: string) => void;
 };
 
 const STYLES = ["mapbox://styles/mapbox/streets-v12", "mapbox://styles/mapbox/satellite-streets-v12"];
@@ -31,12 +31,17 @@ const SOURCE_ID = "venues-cluster";
 const CLUSTER_QUERY_LAYER = "venues-cluster-query-layer";
 const CLUSTER_RADIUS = 50;
 const CLUSTER_MAX_ZOOM = 14;
-/** Half-footprint of the preview chip in screen pixels — the chip itself is
- * `max-width: 220px` (see `createPreviewChipElement`) with a compact,
- * roughly fixed height, so a fixed estimate here is enough to keep it
- * fully inside the safe area without measuring the real DOM element. */
-const CHIP_HALF_WIDTH = 115;
-const CHIP_HALF_HEIGHT = 24;
+/** Screen-space footprint of the preview marker, in pixels — a fixed
+ * estimate is enough to keep it fully inside the safe area without
+ * measuring the real DOM element. It's anchored by its bottom edge (see the
+ * marker creation below), so it extends almost entirely *above* the
+ * coordinate, not symmetrically around it — `PIN_HEIGHT_ABOVE` and
+ * `PIN_HEIGHT_BELOW` reflect that; only the width (`PIN_WIDTH_HALF`) is
+ * still symmetric left/right. Matches `createPreviewChipElement`'s own
+ * `PIN_WIDTH`/`PIN_HEIGHT` (130 × 168). */
+const PIN_WIDTH_HALF = 69;
+const PIN_HEIGHT_ABOVE = 174;
+const PIN_HEIGHT_BELOW = 4;
 const CHIP_NUDGE_DURATION_MS = 200;
 
 type VenueFeatureCollection = GeoJSON.FeatureCollection<GeoJSON.Point, { id: string }>;
@@ -68,7 +73,7 @@ function toFeatureCollection(venues: Venue[]): VenueFeatureCollection {
  * user sees — pins, clusters, the preview chip — is a plain DOM element, the
  * same approach `createMarkerElement` already used before clustering existed. */
 export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
-  { venues, activeCategory, onSelectVenue, isSaved, onToggleSaved },
+  { venues, activeCategory, onSelectVenue },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -150,10 +155,10 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     function ensureActiveVenueVisible(lngLat: [number, number]) {
       const { width, height } = map.getContainer().getBoundingClientRect();
       const point = map.project(lngLat);
-      const minX = MAP_SAFE_PADDING.left + CHIP_HALF_WIDTH;
-      const maxX = width - MAP_SAFE_PADDING.right - CHIP_HALF_WIDTH;
-      const minY = MAP_SAFE_PADDING.top + CHIP_HALF_HEIGHT;
-      const maxY = height - MAP_SAFE_PADDING.bottom - CHIP_HALF_HEIGHT;
+      const minX = MAP_SAFE_PADDING.left + PIN_WIDTH_HALF;
+      const maxX = width - MAP_SAFE_PADDING.right - PIN_WIDTH_HALF;
+      const minY = MAP_SAFE_PADDING.top + PIN_HEIGHT_ABOVE;
+      const maxY = height - MAP_SAFE_PADDING.bottom - PIN_HEIGHT_BELOW;
       let dx = 0;
       let dy = 0;
       if (point.x < minX) dx = point.x - minX;
@@ -190,7 +195,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       const seenClusters = new Set<number>();
 
       function renderKeyFor(venueId: string) {
-        return `${venueId}:${venueId === activeVenueIdRef.current ? "chip" : "pin"}:${isSaved(venueId)}`;
+        return `${venueId}:${venueId === activeVenueIdRef.current ? "chip" : "pin"}`;
       }
 
       for (const feature of rendered) {
@@ -238,9 +243,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         const key = `venue:${venueId}`;
         nextKeys.add(key);
 
-        // Rebuilt (not reused) whenever this venue's active/saved state may
-        // have changed — the marker <-> chip morph and the heart toggle both
-        // need a fresh element, not a mutation of the old one.
+        // Rebuilt (not reused) whenever this venue's active state changes —
+        // the marker <-> pin morph needs a fresh element, not a mutation of
+        // the old one.
         const existing = markersRef.current.get(key);
         if (existing && existing.getElement().dataset.renderKey === renderKeyFor(venue.id)) continue;
         existing?.remove();
@@ -248,11 +253,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         const isActive = venue.id === activeVenueIdRef.current;
         if (isActive) ensureActiveVenueVisible([lng, lat]);
         const el = isActive
-          ? createPreviewChipElement(venue, {
-              saved: isSaved(venue.id),
-              onOpen: () => onSelectVenue(venue.id),
-              onToggleSaved: () => onToggleSaved(venue.id),
-            })
+          ? createPreviewChipElement(venue, { onOpen: () => onSelectVenue(venue.id) })
           : createMarkerElement(venue.category, { label: venue.name });
         el.dataset.renderKey = renderKeyFor(venue.id);
         // See the cluster click handler's comment — same reason this stops
@@ -261,7 +262,14 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           event.stopPropagation();
           if (!isActive) setActiveVenueId(venue.id);
         });
-        const marker = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+        // The active marker's own bottom edge — not its center — is what
+        // stays on the coordinate, so it can grow upward in place (see
+        // `createPreviewChipElement`); the ordinary marker is a symmetric
+        // circle, so `center` (Mapbox's default) is correct for it
+        // unchanged.
+        const marker = new mapboxgl.Marker({ element: el, anchor: isActive ? "bottom" : "center" })
+          .setLngLat([lng, lat])
+          .addTo(map);
         markersRef.current.set(key, marker);
       }
 

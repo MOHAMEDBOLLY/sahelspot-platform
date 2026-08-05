@@ -13,10 +13,28 @@ import { RatingStars } from "@/components/ui/RatingStars";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { GalleryThumbnails } from "@/components/venue/GalleryThumbnails";
 import { ImageGallery } from "@/components/venue/ImageGallery";
+import { VenueCard } from "@/components/venue/VenueCard";
 import { useVenue } from "@/lib/hooks/useVenue";
+import { useVenues } from "@/lib/hooks/useVenues";
 import { useSaved } from "@/lib/saved/useSaved";
 import { VENUE_CATEGORY_LABEL } from "@/lib/domain/venueCategoryLabel";
 import { formatOpenUntil } from "@/lib/domain/openingHours";
+import { distanceKm } from "@/lib/domain/geo";
+import type { Venue } from "@/lib/domain/venue";
+
+/** Same-destination venues ordered by real distance from `venue` — both
+ * this venue and the candidate need real coordinates to compute one;
+ * candidates without them are dropped rather than shown unordered. */
+function nearbyVenues(venue: Venue, allVenues: Venue[], limit: number): Venue[] {
+  if (!venue.coordinates) return [];
+  const origin = venue.coordinates;
+  return allVenues
+    .filter((candidate) => candidate.id !== venue.id && candidate.destinationId === venue.destinationId)
+    .flatMap((candidate) => (candidate.coordinates ? [{ candidate, km: distanceKm(origin, candidate.coordinates) }] : []))
+    .sort((a, b) => a.km - b.km)
+    .slice(0, limit)
+    .map(({ candidate }) => candidate);
+}
 
 /** WhatsApp's brand SVG — the one place a brand mark overrides the icon
  * system, confirmed in the Boca Beach export (`#25D366`, not a Material
@@ -43,6 +61,7 @@ function WhatsAppIcon() {
 export function VenueDetailsClient({ venueId }: { venueId: string }) {
   const router = useRouter();
   const venue = useVenue(venueId);
+  const allVenues = useVenues();
   const { isSaved, toggle } = useSaved();
   const [shareState, setShareState] = useState<"idle" | "copied">("idle");
 
@@ -100,6 +119,7 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
     (url): url is string => url !== null,
   );
   const tags = [VENUE_CATEGORY_LABEL[data.category], ...data.tags];
+  const nearby = nearbyVenues(data, allVenues.data ?? [], 6);
   const hoursLabel = data.openingHours ? formatOpenUntil(data.openingHours, new Date()) : null;
   const infoPills = [
     // Only rendered while genuinely open — see formatOpenUntil's own note on
@@ -247,11 +267,27 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
           </section>
         ) : null}
 
-        {/* "Nearby Places" is omitted entirely — the Public API has no real
-          * nearby-venue endpoint yet (API_REQUIREMENTS.md §4). Filtering the
-          * already-fetched venue list by shared destination was an
-          * approximation computed in the UI layer, not real nearby data, so
-          * it's removed rather than kept as a stand-in. */}
+        {/* Same-destination venues ordered by real distance — computed from
+          * both venues' real coordinates (`lib/domain/geo.ts`), not a
+          * fabricated or unordered approximation. Needs `data.coordinates`
+          * and at least one same-destination venue with coordinates of its
+          * own; omitted rather than shown empty or unordered otherwise. */}
+        {nearby.length > 0 ? (
+          <section className="space-y-4">
+            <SectionHeader size="lg" title="Nearby Places" />
+            <div className="space-y-3">
+              {nearby.map((nearbyVenue) => (
+                <VenueCard
+                  key={nearbyVenue.id}
+                  onToggleSaved={toggle}
+                  saved={isSaved(nearbyVenue.id)}
+                  variant="horizontal-row"
+                  venue={nearbyVenue}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     </div>
   );
