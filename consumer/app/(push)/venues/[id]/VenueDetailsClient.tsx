@@ -187,7 +187,7 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
       <div className="space-y-6 px-4 pt-6">
         <header className="space-y-2">
           <div>
-            <h1 className="text-3xl leading-none font-black tracking-tight text-primary">
+            <h1 className="font-headline text-3xl leading-none font-bold tracking-tight text-primary">
               {data.name}
             </h1>
             <p className="mt-1 font-medium text-on-surface-variant">

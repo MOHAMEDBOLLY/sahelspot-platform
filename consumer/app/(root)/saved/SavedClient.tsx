@@ -45,7 +45,7 @@ export function SavedClient() {
   return (
     <>
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <h1 className="text-xl font-bold text-primary">Saved</h1>
+        <h1 className="font-headline text-xl font-bold text-primary">Saved</h1>
         <IconButton
           icon={sort === "recent" ? "sort" : "sort_by_alpha"}
           label={

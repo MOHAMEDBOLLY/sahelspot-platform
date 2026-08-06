@@ -66,7 +66,7 @@ export function VenueCard(props: VenueCardProps) {
         className="flex items-center gap-4 rounded-2xl border border-outline-variant/10 bg-surface-container-low p-3 shadow-sm transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
         href={href}
       >
-        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-cream">
+        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl rounded-tr-none bg-cream">
           {venue.coverImageUrl ? (
             <Image
               alt={venue.name}
@@ -76,15 +76,19 @@ export function VenueCard(props: VenueCardProps) {
               src={venue.coverImageUrl}
             />
           ) : null}
-          <CornerAccent />
-          <span className="absolute top-1 left-1">
-            <SaveBadge
-              compact
-              onToggleSaved={onToggleSaved}
-              saved={saved}
-              venueId={venue.id}
-            />
-          </span>
+          <div aria-hidden="true" className="pointer-events-none absolute top-0 right-0 z-10 h-3.5 w-3.5 border-t-2 border-r-2 border-accent" />
+          <button
+            aria-pressed={saved}
+            aria-label={saved ? "Remove from saved" : "Save this place"}
+            className="absolute top-1.5 left-0 z-10 flex items-center rounded-r-full bg-accent px-1.5 py-1 text-on-accent shadow-sm transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            onClick={(event) => {
+              event.preventDefault();
+              onToggleSaved?.(venue.id);
+            }}
+            type="button"
+          >
+            <Icon filled name="bookmark" size={12} />
+          </button>
         </div>
         <div className="min-w-0 flex-grow space-y-1">
           <h3 className="truncate font-headline font-bold leading-tight text-primary">
