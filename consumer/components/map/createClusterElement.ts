@@ -1,8 +1,11 @@
 /** Cluster bubble — circular, white border, soft shadow, size scales with
- * count, centered count label. Navy for "All", category color when a filter
- * is active (`color` is passed in by the caller, which already knows the
- * active filter). Plain DOM, matching every other marker factory in this
- * module — Mapbox GL markers are DOM elements, not React. */
+ * count, centered count label. Always navy, per the frozen Mobile 2027
+ * Design System's data-marker rule (docs/consumer/MOBILE_2027_DESIGN_FREEZE.md
+ * §7 / Component Mapping §1) — `color` stays a caller-supplied param rather
+ * than a hardcoded literal here, but every call site now always passes navy,
+ * never a category color keyed to the active filter. Plain DOM, matching
+ * every other marker factory in this module — Mapbox GL markers are DOM
+ * elements, not React. */
 export function createClusterElement(count: number, color: string): HTMLButtonElement {
   const size = count < 10 ? 36 : count < 50 ? 44 : count < 100 ? 52 : 60;
   const el = document.createElement("button");

@@ -17,7 +17,7 @@ const CONTACT_EMAIL = "hello@sahelspot.com";
  * SahelSpot has approved; Contact is a real mailto:; Share uses the real Web
  * Share API. */
 export function MoreClient() {
-  const [shareState, setShareState] = useState<"idle" | "copied">("idle");
+  const [shareState, setShareState] = useState<"idle" | "copied" | "error">("idle");
 
   async function handleShare() {
     const shareData = { title: "SahelSpot", url: window.location.origin };
@@ -29,9 +29,20 @@ export function MoreClient() {
       }
       return;
     }
-    await navigator.clipboard.writeText(window.location.origin);
-    setShareState("copied");
-    setTimeout(() => setShareState("idle"), 2000);
+    // Clipboard fallback: `navigator.clipboard` can be absent (unsupported
+    // browser) and `writeText` can reject (permission denied) — both are
+    // real, expected outcomes here, not exceptional ones, so both surface
+    // the same user-visible failure state rather than an unhandled
+    // rejection or a silent no-op.
+    try {
+      if (!navigator.clipboard) throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(window.location.origin);
+      setShareState("copied");
+    } catch {
+      setShareState("error");
+    } finally {
+      setTimeout(() => setShareState("idle"), 2000);
+    }
   }
 
   return (
@@ -83,6 +94,10 @@ export function MoreClient() {
           {shareState === "copied" ? (
             <p aria-live="polite" className="px-1 text-xs text-on-surface-variant">
               Link copied to clipboard
+            </p>
+          ) : shareState === "error" ? (
+            <p aria-live="polite" className="px-1 text-xs text-error">
+              Couldn&apos;t copy the link. Please copy it from the address bar instead.
             </p>
           ) : null}
         </section>

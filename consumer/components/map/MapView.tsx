@@ -17,8 +17,9 @@ export type MapViewHandle = {
 
 type MapViewProps = {
   venues: Venue[];
-  /** Drives cluster color — Brand Navy for "all", the category's own color
-   * once a filter is active. */
+  /** Drives which venues are visible/clustered — no longer drives cluster
+   * color, which is always Brand Navy per the frozen Mobile 2027 Design
+   * System's data-marker rule. */
   activeCategory: VenueCategory | "all";
   /** Opens Venue Details for this venue directly — the map's marker/pin
    * flow always resolves to a venue, never a destination. */
@@ -82,7 +83,6 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   const styleIndexRef = useRef(0);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const venuesByIdRef = useRef<Map<string, Venue>>(new Map());
-  const activeCategoryRef = useRef(activeCategory);
   const [activeVenueId, setActiveVenueId] = useState<string | null>(null);
   const activeVenueIdRef = useRef<string | null>(null);
 
@@ -107,10 +107,6 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       mapRef.current.setStyle(STYLES[styleIndexRef.current]);
     },
   }));
-
-  useEffect(() => {
-    activeCategoryRef.current = activeCategory;
-  }, [activeCategory]);
 
   useEffect(() => {
     activeVenueIdRef.current = activeVenueId;
@@ -212,11 +208,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           nextKeys.add(key);
           if (!markersRef.current.has(key)) {
             const count = feature.properties?.point_count as number;
-            const color =
-              activeCategoryRef.current === "all"
-                ? CATEGORY_BY_VALUE.general.color
-                : CATEGORY_BY_VALUE[activeCategoryRef.current].color;
-            const el = createClusterElement(count, color);
+            const el = createClusterElement(count, CATEGORY_BY_VALUE.general.color);
             el.addEventListener("click", (event) => {
               // Marker elements sit inside the map's own container, so a
               // click here also bubbles up to `map.on("click", ...)` below

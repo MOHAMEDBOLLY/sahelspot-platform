@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { SignatureCard, OverlapPanel } from "@/components/venue/VenueCard";
+import { SignatureCard, OverlapPanel } from "@/components/patterns/CardShell";
 
 type DestinationCardProps = {
   href: string;

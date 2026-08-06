@@ -177,9 +177,27 @@ Noted for later, explicitly not in scope now:
 
 - **Onboarding** (3-slide build-out) — deferred until core product QA is complete, per direct instruction.
 - **Dark mode** — Stitch source defines one light theme only; `docs/consumer/SCREEN_ANALYSIS.md` §5 already flags this as an open decision for the "Theme" row on the More screen (shown disabled/"System" in v1). Not part of this visual-language freeze.
-- **Desktop adaptation** — Per `docs/consumer/ROADMAP.md`, desktop follows in Phase 11 using the same tokens/components/hierarchy established here, with layout-only adaptations (bottom nav → top nav, carousels → grids, map bottom sheet → side panel). No new visual vocabulary permitted when that phase begins.
-- **Interactive Map production substrate** — the Stitch/rebuilt version uses a static styled map illustration; per `docs/consumer/SCREEN_ANALYSIS.md` §3, production replaces this with real Mapbox GL JS. Marker, overlay, sheet, and control styling established in this freeze should carry over exactly; the map tile/imagery layer itself is out of scope for visual-language work.
+- **Desktop adaptation** — Per `docs/consumer/ROADMAP.md`, desktop follows in Phase 11 using the same tokens/components/hierarchy established here, with layout-only adaptations (bottom nav → top nav, carousels → grids, Map's Liquid Morph preview → side panel). No new visual vocabulary permitted when that phase begins.
+- **Interactive Map production substrate** — the Stitch/rebuilt version uses a static styled map illustration; per `docs/consumer/SCREEN_ANALYSIS.md` §3, production replaces this with real Mapbox GL JS. Marker, overlay, and control styling established in this freeze should carry over exactly (see §9 for the Map interaction model); the map tile/imagery layer itself is out of scope for visual-language work.
 - **Motion/interaction polish** — elevation and layering rules are defined structurally (§4–5) but no motion specification has been produced yet.
+
+---
+
+## 9. Map Interaction Model
+
+**Status: Permanent design decision, not deferred work.**
+
+The Interactive Map's marker-selection flow is fixed as follows and is not open for reinterpretation during the remainder of the Mobile 2027 migration:
+
+1. **Marker selection uses the Liquid Morph Preview.** Tapping a venue marker morphs it in place into an expanded preview chip (`createPreviewChipElement`) — the marker itself grows and reshapes into the chip; nothing is replaced or overlaid separately.
+2. **The preview is the only intermediate interaction surface.** There is no other selected-state UI between a marker and Venue Details — no bottom sheet, no side panel, no list drawer.
+3. **Venue Details is the next navigation destination.** Tapping the Liquid Morph Preview navigates directly to `/venues/[id]`. This is the map's only navigation target — the map never navigates to a destination, only ever to a venue (see §2).
+4. **No Bottom Sheet exists in Mobile 2027 by design.** This has been evaluated and explicitly rejected, not left incomplete: a bottom sheet would introduce a second intermediate interaction surface and a different product flow than Marker → Liquid Morph Preview → Venue Details, which is out of scope for this migration. Accordingly:
+   - No Bottom Sheet is added to the Map screen.
+   - No "Popular Nearby" strip is introduced on Map.
+   - No `VenueCard` `vertical-compact` (or any other variant) is injected into Map.
+
+Any future proposal to add an intermediate surface to Map is a product-flow change, not a visual migration task, and requires a new, separate, explicit decision — it is not achievable by extending this freeze.
 
 ---
 
