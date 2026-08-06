@@ -38,6 +38,13 @@ class Permission(str, Enum):
     CONTENT_APPROVE = "content_approve"
     CONTENT_PUBLISH = "content_publish"
     USER_MANAGE_ROLES = "user_manage_roles"
+    # Studio Operations dashboard (Phase 3, Sprint 1) — gates visibility of
+    # the read-only `/operations` page only. Not required by any route yet:
+    # every data source that page reads (`GET /`, `GET /health`,
+    # `GET /editor/publish/revisions`) already has its own access rule.
+    # Admin-only, same reasoning as `USER_MANAGE_ROLES` — infrastructure
+    # visibility isn't something editors/publishers need for their job.
+    SYSTEM_VIEW = "system_view"
 
 
 # The only place a role name and a permission are ever associated with
@@ -76,6 +83,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
             Permission.CONTENT_APPROVE,
             Permission.CONTENT_PUBLISH,
             Permission.USER_MANAGE_ROLES,
+            Permission.SYSTEM_VIEW,
         }
     ),
 }

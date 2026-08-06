@@ -9,6 +9,7 @@ import {
   Users as UsersIcon,
   Settings as SettingsIcon,
   ShieldCheck,
+  Gauge,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -29,5 +30,6 @@ export const navItems: NavItem[] = [
   { to: '/publishing', label: 'Publishing', icon: UploadCloud },
   { to: '/activity', label: 'Activity', icon: ActivityIcon },
   { to: '/users', label: 'Users', icon: UsersIcon },
+  { to: '/operations', label: 'Operations', icon: Gauge },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]

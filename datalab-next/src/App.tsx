@@ -10,6 +10,7 @@ import { Publishing } from './pages/Publishing'
 import { Activity } from './pages/Activity'
 import { Users } from './pages/Users'
 import { Settings } from './pages/Settings'
+import { Operations } from './pages/Operations'
 import { LoginPage } from './features/auth/LoginPage'
 import { ProtectedRoute } from './features/auth/ProtectedRoute'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -43,6 +44,7 @@ function App() {
             />
             <Route path="/activity" element={<Activity />} />
             <Route path="/users" element={<Users />} />
+            <Route path="/operations" element={<Operations />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>

@@ -13,6 +13,7 @@ export type Permission =
   | 'content_approve'
   | 'content_publish'
   | 'user_manage_roles'
+  | 'system_view'
 
 const ROLE_PERMISSIONS: Record<string, ReadonlySet<Permission>> = {
   viewer: new Set<Permission>(['content_view']),
@@ -31,6 +32,7 @@ const ROLE_PERMISSIONS: Record<string, ReadonlySet<Permission>> = {
     'content_approve',
     'content_publish',
     'user_manage_roles',
+    'system_view',
   ]),
 }
 
