@@ -201,4 +201,34 @@ Any future proposal to add an intermediate surface to Map is a product-flow chan
 
 ---
 
+## 10. Home Hero — Reserved Widget Slot
+
+**Status: Layout reserved, content planned, not implemented.**
+
+The 2026-08-06 Home Polish pass restructured the Home Hero's "North Coast" section into a `flex items-center justify-between` row specifically so a future right-aligned contextual widget could be added later without layout rework (`consumer/app/(root)/HomeClient.tsx`). At the time of that pass, the slot was intentionally left empty — no widget existed and none was implied.
+
+That slot's future content is now specified, not open-ended: a **Home Hero Weather Widget** — current temperature + Beach Flag status only, tap-through to a future Beach Weather screen. Full specification, including explicit content exclusions (no hourly forecast, wind, humidity, UV, waves, sea temperature, graphs, or long text) and component reuse plan, lives in `docs/consumer/BEACH_WEATHER_SPEC.md` §10 — this section is the pointer, not a duplicate of that spec.
+
+This slot remains reserved exclusively for that widget. No other feature may claim it without a new, separate decision revising both this section and `BEACH_WEATHER_SPEC.md` §10.
+
+**Implementation status: not started.** This is a documentation-only update recording the plan; no widget code, component, or route exists yet.
+
+---
+
+## 11. Mobile 2027 Migration — Completion Status
+
+**Frozen and complete (visual migration to the Mobile 2027 Design System):**
+
+- Home
+- Saved
+- Venue Details
+- Search
+- Map
+- More
+- Onboarding
+
+**Explicitly out of scope for this migration — not a gap, not deferred work:** **Explore** (`/explore`). Explore is a live, reachable route (bottom-nav tab, canonical Stitch screen `7d934167098745ad9746de6638486a35`, pixel-verified per §2) but its content depends on a Studio collections model that does not exist yet (`docs/consumer/API_REQUIREMENTS.md` §2, `docs/consumer/ROADMAP.md` Open Item #1 — a Studio-side sprint, not a Consumer visual-migration task). It was never included in this migration's screen checklist above and its exclusion is intentional, not an oversight. Explore's own visual migration (once content exists) requires a separate, explicit pass — it is not implicitly covered by this freeze.
+
+---
+
 *This report reflects project state as of the screen IDs and rules above. Any change to a canonical screen, the design system asset, or an approved rule requires a new dated revision of this document.*

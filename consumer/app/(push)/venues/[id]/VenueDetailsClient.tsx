@@ -63,7 +63,7 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
   const venue = useVenue(venueId);
   const allVenues = useVenues();
   const { isSaved, toggle } = useSaved();
-  const [shareState, setShareState] = useState<"idle" | "copied">("idle");
+  const [shareState, setShareState] = useState<"idle" | "copied" | "error">("idle");
 
   if (venue.isLoading) {
     return (
@@ -140,9 +140,20 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
       }
       return;
     }
-    await navigator.clipboard.writeText(window.location.href);
-    setShareState("copied");
-    setTimeout(() => setShareState("idle"), 2000);
+    // Clipboard fallback: `navigator.clipboard` can be absent (unsupported
+    // browser) and `writeText` can reject (permission denied) — both are
+    // real, expected outcomes here, not exceptional ones, so both surface
+    // the same user-visible failure state rather than an unhandled
+    // rejection or a silent no-op. Same fix as More's `handleShare`.
+    try {
+      if (!navigator.clipboard) throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(window.location.href);
+      setShareState("copied");
+    } catch {
+      setShareState("error");
+    } finally {
+      setTimeout(() => setShareState("idle"), 2000);
+    }
   }
 
   // JSON-LD from real fields only — no invented address/phone/rating.
@@ -181,6 +192,10 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
       {shareState === "copied" ? (
         <p aria-live="polite" className="px-4 pt-2 text-center text-xs text-on-surface-variant">
           Link copied to clipboard
+        </p>
+      ) : shareState === "error" ? (
+        <p aria-live="polite" className="px-4 pt-2 text-center text-xs text-error">
+          Couldn&apos;t copy the link. Please copy it from the address bar instead.
         </p>
       ) : null}
 

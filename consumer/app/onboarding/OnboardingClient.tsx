@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { LogoLockup } from "@/components/brand/LogoLockup";
 import { PageDots } from "@/components/patterns/PageDots";
 import { CTAButton } from "@/components/ui/CTAButton";
 import { useOnboardingSeen } from "@/lib/onboarding/useOnboardingSeen";
@@ -11,9 +12,14 @@ import { useOnboardingSeen } from "@/lib/onboarding/useOnboardingSeen";
  * state, as the spec itself recommends, not three separate pages.
  *
  * No slide has real imagery in either Stitch export (this screen was never
- * exported at all — spec-only, like Search). A solid gradient block stands
- * in for "large rounded photo/illustration" — the same treatment Splash's
- * `LogoLockup` gives its own missing mark, not an invented photograph. */
+ * exported at all — spec-only, like Search). The hero is infrastructure, not
+ * content: it exists only to occupy space until real brand photography
+ * exists, so it deliberately reuses Splash's own placeholder language
+ * (`bg-cream` + centered `LogoLockup`, docs/consumer/MOBILE_2027_DESIGN_FREEZE.md
+ * §9-adjacent placeholder decision) rather than inventing a second one. No
+ * gradient, no illustration, no accent-yellow fill — a large decorative
+ * yellow surface would violate Design Rule 1 ("yellow is structural, never
+ * decorative"). */
 const SLIDES = [
   {
     headline: "Discover Amazing Places",
@@ -46,20 +52,21 @@ export function OnboardingClient() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <div className="relative h-[60vh] shrink-0 overflow-hidden rounded-b-3xl bg-gradient-to-br from-primary to-accent">
+      <div className="relative flex h-[60vh] shrink-0 items-center justify-center overflow-hidden rounded-b-3xl bg-cream">
         <button
           aria-label="Skip onboarding"
-          className="absolute top-4 right-4 text-sm font-semibold text-white/90 hover:underline"
+          className="absolute top-4 right-4 text-sm font-semibold text-primary/90 hover:underline"
           onClick={finish}
           type="button"
         >
           Skip
         </button>
+        <LogoLockup showTagline={false} />
       </div>
 
       <div className="flex flex-grow flex-col items-center justify-between px-6 py-8 text-center">
         <div className="space-y-3">
-          <h1 className="text-xl font-bold text-primary">{slide.headline}</h1>
+          <h1 className="font-headline text-xl font-bold text-primary">{slide.headline}</h1>
           <p className="text-sm text-on-surface-variant">{slide.body}</p>
         </div>
 

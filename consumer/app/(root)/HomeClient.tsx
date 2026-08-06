@@ -168,11 +168,15 @@ export function HomeClient() {
       <TopAppBar greeting="Good Morning" title="SahelSpot" variant="greeting" />
 
       <main className="space-y-8 px-4 pt-2">
-        <section>
-          <h1 className="font-headline text-4xl leading-tight font-bold tracking-tight text-primary">
-            North
-            <br />
-            Coast
+        {/* `justify-between` on a single-child row today — reserved for the
+          * future Home Hero Weather Widget (temperature + Beach Flag status
+          * only, tap-through to the future Beach Weather screen; see
+          * docs/consumer/BEACH_WEATHER_SPEC.md §10 and
+          * docs/consumer/MOBILE_2027_DESIGN_FREEZE.md §10). Nothing renders
+          * in this slot yet — planning only, not implemented. */}
+        <section className="flex items-center justify-between gap-4">
+          <h1 className="font-headline text-4xl leading-tight font-bold tracking-tight text-primary whitespace-nowrap">
+            North Coast
           </h1>
           {/* The Stitch weather pill ("31°C Sunny") is live third-party data,
             * not published editorial content — showing invented numbers here
@@ -197,7 +201,7 @@ export function HomeClient() {
           <SectionHeader
             actionHref="/search"
             actionLabel="See All"
-            title="What do you want to do today?"
+            title="What do you want to do?"
           />
           {/* Plain scroll rail, deliberately not `CardCarousel`: activities
             * are lightweight navigation chips, not featured content — no
@@ -290,7 +294,7 @@ export function HomeClient() {
           isSaved={isSaved}
           onRetry={() => venues.refetch()}
           onToggleSaved={toggle}
-          title="Trending Today"
+          title="Trending"
           venues={featuredVenues}
         />
 

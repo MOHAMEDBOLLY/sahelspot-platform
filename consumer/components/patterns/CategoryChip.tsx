@@ -12,8 +12,11 @@ type CategoryChipOwnProps = {
 type CategoryChipProps = CategoryChipOwnProps &
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, keyof CategoryChipOwnProps>;
 
-/** Square cream tile + icon + uppercase label — Home's mood grid
- * (`grid-cols-5`) and Search's Popular Categories.
+/** Square white tile + icon + uppercase label — Home's mood grid
+ * (`grid-cols-5`) and Search's Popular Categories. Surface moved from cream
+ * to pure white with a subtle border and soft shadow (2026-08-06 polish
+ * pass) as the first step toward a future Glass/Soft 3D card language —
+ * deliberately restrained today (no blur, transparency, or glow).
  *
  * Home's square tile is canonical over Explore's circular Quick Browse
  * chip — the audit resolved that shape conflict in Home's favour, and
@@ -47,7 +50,7 @@ export function CategoryChip({
       type="button"
       {...props}
     >
-      <span className="flex aspect-square w-full items-center justify-center rounded-2xl bg-cream shadow-sm transition-all group-hover:bg-primary-container group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-primary/20">
+      <span className="flex aspect-square w-full items-center justify-center rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm transition-all group-hover:bg-primary-container group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-primary/20">
         <Icon className="text-primary" name={icon} size={28} />
       </span>
       {/* `min-h-[26px]` reserves room for two lines at this size/leading —

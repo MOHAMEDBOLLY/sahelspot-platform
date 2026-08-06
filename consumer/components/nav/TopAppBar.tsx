@@ -50,10 +50,10 @@ export function TopAppBar({ variant = "title", title, greeting }: TopAppBarProps
           {isGreeting ? (
             <div>
               <p className="text-xs font-medium text-on-surface-variant">{greeting}</p>
-              <h1 className="text-xl font-bold tracking-tight text-primary">{title}</h1>
+              <h1 className="font-headline text-xl font-bold tracking-tight text-primary">{title}</h1>
             </div>
           ) : (
-            <h1 className="text-2xl font-black tracking-tight text-primary">{title}</h1>
+            <h1 className="font-headline text-2xl font-black tracking-tight text-primary">{title}</h1>
           )}
         </div>
 
