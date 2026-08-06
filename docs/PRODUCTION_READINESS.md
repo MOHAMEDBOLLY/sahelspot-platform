@@ -55,7 +55,12 @@ Status per area, each tagged ✓ Complete / △ Partial / ○ Not Started, with 
 
 ## 3. Monitoring
 
-> **Revised 2026-08-06 — scope change.** Operational monitoring surfaces belong in **Studio**, not Consumer. Consumer stays lightweight: only the minimal client-side concerns (error reporting SDK, analytics SDK, performance metrics) live there — never a dashboard, never an ops-facing health route of its own. The original version of this section proposed a dedicated Consumer health endpoint; that proposal is **withdrawn**. Full detail: `docs/STUDIO_OPERATIONS_DASHBOARD.md`.
+> **Revised 2026-08-06 — permanent architectural decision.** Operational monitoring belongs to **Studio**. Consumer remains lightweight. Consumer's production responsibilities are limited to exactly three things:
+> - Error Reporting SDK
+> - Analytics SDK
+> - Performance Metrics
+>
+> Never operational dashboards, never a health-check surface of its own, never an ops-facing route. The original version of this section proposed a dedicated Consumer health endpoint; that proposal is **withdrawn** and superseded by the Studio Operations Dashboard. Full spec, including the now-permanent Dashboard Philosophy and Read-Only Rule governing that dashboard: `docs/STUDIO_OPERATIONS_DASHBOARD.md`.
 
 **Current state: zero observability tooling exists anywhere in the repo.** This is the single largest gap standing between "feature-complete" and "production-ready" — not because anything is broken, but because if something breaks in production today, the team would find out from a user complaint, not a system.
 

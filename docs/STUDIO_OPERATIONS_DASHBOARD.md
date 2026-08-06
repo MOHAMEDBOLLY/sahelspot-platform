@@ -2,6 +2,8 @@
 
 **Status: Planning only. No code implemented.** This document exists to be reviewed and approved before any implementation begins, per the Phase 3 scope change: **all operational monitoring belongs in Studio, not Consumer.** Consumer stays lightweight — it will only ever carry the minimal client-side concerns (error reporting SDK, analytics SDK, performance metrics) needed for its own health, never an operations surface of its own.
 
+The **Dashboard Philosophy**, **Read-Only Operations Dashboard**, **System Information Card**, and **Feature Flags Card** sections below are now **approved, permanent architectural decisions** — not proposals awaiting sign-off. Everything else in this document (specific endpoint choices, priority ordering, sequencing) remains an implementation plan pending approval, per the rest of Phase 3's process.
+
 This plan was built from a direct, read-only audit of `datalab-next/` (Studio) and `api/` — not assumptions. Every "Existing" claim below is cited; nothing is proposed for building that already exists.
 
 ---
@@ -12,7 +14,51 @@ Studio is already the authenticated, role-gated, internal control surface for Sa
 
 ---
 
+# Dashboard Philosophy
+
+**Status: Approved architectural decision, permanent.**
+
+The Studio Operations Dashboard is an operational overview.
+
+Its responsibility is **visibility**.
+
+Not management.
+Not administration.
+Not editing.
+
+The dashboard exists to answer one question: **"What is the current state of the platform?"**
+
+It is the Mission Control of SahelSpot — a single place to look to understand whether everything is working, not a place to make things happen. Every design decision in this document follows from that one sentence: if a proposed card or feature would let someone *change* platform state rather than *observe* it, it does not belong on this dashboard, no matter how convenient that might seem.
+
+---
+
+# Read-Only Operations Dashboard
+
+**Status: Approved architectural decision, permanent.**
+
+The Operations Dashboard is **strictly read-only**. It must never perform operational actions.
+
+| | |
+|---|---|
+| ✓ | Display system health |
+| ✓ | Display deployment status |
+| ✓ | Display version information |
+| ✓ | Display publishing summary |
+| ✓ | Display monitoring status |
+| ✓ | Display backup status |
+| ✗ | Publish |
+| ✗ | Delete |
+| ✗ | Edit |
+| ✗ | Restart services |
+| ✗ | Trigger jobs |
+
+Any operational action must navigate to the existing specialized module that already owns that responsibility — publishing happens on the Publishing page, role changes happen on the Users page, nowhere else. **The dashboard never replaces existing tools. It aggregates them.** This is not a limitation to work around later; it is the dashboard's defining constraint, and it is what keeps it from slowly regrowing into a second, competing admin surface next to the modules Studio already has.
+
+---
+
 ## Existing Functionality (do not rebuild)
+
+The dashboard reuses existing Studio modules rather than duplicating them. It must **not** re-implement Publishing, Activity Log, Platform Statistics, or User Management — each already exists, already works, and already owns its domain. The dashboard's only relationship to them is to summarize and link, never to reproduce their functionality inline (see **Navigation**, below).
 
 Confirmed by direct code read, not doc claims:
 
@@ -77,13 +123,64 @@ Per the audit: no existing permission fits "who can see ops/system info" — `US
 | API Health | `GET /health` | No |
 | Database Health | Same `/health` call's DB check | No |
 | Storage Health | New lightweight Storage reachability check | **Yes, small** |
-| Publishing Status | Link/summary card → existing `/publishing` page + latest `PublishRevision` timestamp (already fetchable via existing `GET /editor/publish/revisions`) | No |
-| Version Information | `GET /` (`{name, version}`) | No |
-| Environment | New field on `GET /` or `/health` | **Yes, small** |
+| Publishing Status | Summary card → existing `/publishing` page + latest `PublishRevision` timestamp (already fetchable via existing `GET /editor/publish/revisions`) | No |
+| Version Information | See **System Information Card**, below | No |
+| Environment | See **System Information Card**, below | **Yes, small** |
 | Background Jobs | Static "No background job system in this architecture" notice | No (explicitly not built) |
 | Backup Status | "Last backup" display — **blocked** until `backup_db.sh` records a queryable timestamp somewhere | **Yes** (backend/ops script change, separate from the dashboard itself) |
 | Monitoring Integration | Placeholder linking out to whichever external tool Sprint 1 approves (UptimeRobot/Better Stack), or the dashboard's own checks standing in until then | Depends on Sprint 1 outcome |
-| Analytics Integration (future) | Explicit "Future — pending Sprint 5" placeholder card, no real data | No (intentionally deferred) |
+| Analytics Integration (future) | See **Feature Flags** card's sibling — an explicit "Future — pending Sprint 5" placeholder, no real data | No (intentionally deferred) |
+
+### System Information Card
+
+**Status: Approved, required.**
+
+A single required card, titled **System Information**, holding:
+
+- Consumer Version
+- Studio Version
+- Backend Version
+- Environment
+- Current Git Commit
+- Last Deployment
+
+This card exists purely for **operational awareness and production support** — the fast "what exactly is running right now, and where" check someone reaches for while diagnosing an incident or confirming a deploy went out. It carries **no editing capability of any kind**: every field on it is a display value, sourced from build-time/deploy-time metadata and the existing `GET /` version endpoint (plus the new `environment` field noted in Missing Functionality, above) — never a form, never a control.
+
+### Feature Flags Card (Placeholder)
+
+**Status: Approved, placeholder only — no implementation.**
+
+A second card, titled **Feature Flags**, exists purely to reserve dashboard space. Example entries it might eventually show:
+
+- Beach Weather
+- AI Recommendations
+- Booking
+
+None of these are real toggles today — there is no feature-flag system anywhere in this codebase, and none is being built as part of this plan. The card's only purpose right now is architectural: it reserves a slot in the dashboard's layout so that **when** a future runtime feature-flag system is introduced, it has an obvious, already-designed-for home, and the dashboard doesn't need a redesign to accommodate it. Building the placeholder now, even empty, is cheaper than retrofitting the layout later.
+
+---
+
+## Navigation
+
+Every summary card that corresponds to an existing module is a link, not an inline management surface. Clicking it navigates to the module that already owns that responsibility:
+
+```
+Publishing Summary  →  Publishing module   (/publishing)
+Activity Summary    →  Activity Log        (/activity)
+User Summary         →  Users               (/users)
+```
+
+**The dashboard never contains full management interfaces.** A summary card shows just enough to answer "is this fine?" at a glance — a status, a count, a timestamp — and the moment more detail or any action is needed, navigation hands off to the specialized page that was built for exactly that job. This is the same rule as the Read-Only constraint above, expressed as a navigation pattern rather than a permissions one.
+
+---
+
+## Scope
+
+This dashboard is an **operational entry point**. It is **not another admin application**.
+
+It centralizes **visibility**. It does not centralize **responsibility**.
+
+Every existing module (Publishing, Activity, Stats, Users) keeps full ownership of its own domain, including every action within it. The dashboard's entire contribution is a single screen that answers "what's the state of everything" faster than checking each module individually — nothing more, and deliberately nothing more.
 
 ---
 
@@ -98,6 +195,8 @@ Per the audit: no existing permission fits "who can see ops/system info" — `US
 7. **Backup Status** — the one item with a real cross-cutting dependency (the backup script itself must change first) — correctly sequenced after Sprint 4 (Backups & Recovery), not before.
 8. **Background Jobs section** — lowest priority since it's a static "not applicable" notice, not a real integration; can ship whenever, or even be omitted until a real job system exists.
 9. **Analytics Integration placeholder** — explicitly last, gated on Sprint 5 approval, placeholder-only even then.
+10. **System Information Card** — sequenced alongside #1 and #4 once Version/Environment data is available; a required card, not optional, but has no earlier dependency than the data it displays.
+11. **Feature Flags placeholder card** — lowest priority of all, since it displays nothing real by design; ship whenever convenient, including last.
 
 ---
 
