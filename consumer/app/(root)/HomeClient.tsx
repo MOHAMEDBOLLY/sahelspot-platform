@@ -169,9 +169,11 @@ export function HomeClient() {
 
       <main className="space-y-8 px-4 pt-2">
         <section>
-          <h2 className="text-4xl font-extrabold tracking-tighter text-primary">
-            North Coast
-          </h2>
+          <h1 className="font-headline text-4xl leading-tight font-bold tracking-tight text-primary">
+            North
+            <br />
+            Coast
+          </h1>
           {/* The Stitch weather pill ("31°C Sunny") is live third-party data,
             * not published editorial content — showing invented numbers here
             * would be exactly the permanent mocking the architecture forbids.

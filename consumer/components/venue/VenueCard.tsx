@@ -149,9 +149,15 @@ export function VenueCard(props: VenueCardProps) {
   }
 
   // vertical-lg — the canonical construction, matched to the Stitch export.
+  const isClosed = venue.isOpenNow === false;
   return (
-    <SignatureCard className="w-64" href={href}>
-      <div className="relative h-48 bg-cream">
+    <SignatureCard className={`w-64 ${isClosed ? "opacity-70" : ""}`} href={href}>
+      <div className={`relative h-48 bg-cream ${isClosed ? "grayscale-[30%]" : ""}`}>
+        {isClosed ? (
+          <span className="absolute top-0 left-0 z-20 bg-error px-2 py-1 text-[10px] font-bold tracking-wider text-white uppercase">
+            Closed
+          </span>
+        ) : null}
         {venue.coverImageUrl ? (
           <Image alt={venue.name} className="object-cover" fill sizes="280px" src={venue.coverImageUrl} />
         ) : null}
@@ -221,16 +227,28 @@ export function OverlapPanel({
   children,
   tone = "light",
   border = false,
+  layout = "row",
 }: {
   children: React.ReactNode;
   tone?: "light" | "dark";
   border?: boolean;
+  /** `row` (default): `flex items-end justify-between` — a title/location
+   * block with an optional trailing element (venue cards, destination
+   * cards). `column`: `flex flex-col gap-2` — stacked rows of content, used
+   * where the panel carries more than one line of information after the
+   * title (Upcoming Events: title+badge row, then a date row, then a
+   * location row). Same shared shell either way; only the internal layout
+   * is contextual, per the frozen card system's own rule that construction
+   * is shared but layout adapts to each variant's content density. */
+  layout?: "row" | "column";
 }) {
   return (
     <div
-      className={`relative z-[5] mx-4 flex items-end justify-between rounded-[1.25rem] rounded-bl-none p-4 shadow-md ${
-        tone === "dark" ? "bg-primary" : "bg-surface-container-lowest"
-      } ${border ? "border border-outline-variant/20" : ""}`}
+      className={`relative z-[5] mx-4 rounded-[1.25rem] rounded-bl-none p-4 shadow-md ${
+        layout === "column" ? "flex flex-col gap-2" : "flex items-end justify-between"
+      } ${tone === "dark" ? "bg-primary" : "bg-surface-container-lowest"} ${
+        border ? "border border-outline-variant/20" : ""
+      }`}
       style={{ marginTop: "-32px", transform: "translateY(16px)" }}
     >
       {children}
@@ -309,49 +327,49 @@ function SaveBadge({
   );
 }
 
-/** The `event` variant's body — unchanged pre-Coastal-Fold construction,
- * pending its own fidelity pass. No standalone component; this is inlined
- * here because it is only ever reached through `VenueCard`'s `event`
- * variant. */
+/** The `event` variant's body — matched to the canonical Stitch export's
+ * Upcoming Events card: the same `SignatureCard`/`OverlapPanel` shell as
+ * every other card, `layout="column"` because an event's panel stacks a
+ * title+status row, a date row, and a location row rather than the
+ * title/location pair every venue card panel holds. No bookmark tab —
+ * events aren't saveable, so that affordance simply doesn't apply here,
+ * per the frozen system's own rule that the bookmark tab appears "only
+ * where save functionality exists." No standalone component; this is
+ * inlined here because it is only ever reached through `VenueCard`'s
+ * `event` variant. */
 function EventVariant({ event }: { event: Event }) {
   return (
-    <Link
-      className="block overflow-hidden rounded-3xl bg-surface-container-lowest shadow-md transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-      href={`/events/${event.slug}`}
-    >
+    <SignatureCard className="w-80" href={`/events/${event.slug}`}>
       <div className="relative h-48 bg-cream">
         {event.coverImageUrl ? (
-          <Image alt={event.title} className="object-cover" fill sizes="280px" src={event.coverImageUrl} />
+          <Image alt={event.title} className="object-cover" fill sizes="320px" src={event.coverImageUrl} />
         ) : null}
-        <CornerAccent />
         {event.featured ? (
-          <span className="absolute top-3 left-3 rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-on-accent">
+          <span className="absolute top-0 left-0 z-20 bg-accent px-2 py-1 text-[10px] font-bold tracking-wider text-on-accent uppercase">
             Featured
           </span>
         ) : null}
       </div>
-      <div className="-mt-4 mx-3 space-y-2 rounded-2xl bg-surface-container-lowest p-4 shadow-sm">
-        <div className="min-w-0">
-          <h3 className="truncate font-headline text-lg leading-tight font-bold text-on-surface">
-            {event.title}
-          </h3>
-          <p className="flex items-center gap-1 text-sm text-on-surface-variant">
-            <Icon className="shrink-0" name="calendar_today" size={16} />
-            <span className="truncate">{formatEventDateRange(event)}</span>
-          </p>
-          {event.venue || event.destination ? (
-            <p className="flex items-center gap-1 text-sm text-on-surface-variant">
-              <Icon className="shrink-0" name="location_on" size={16} />
-              <span className="truncate">{event.venue?.name ?? event.destination?.name}</span>
-            </p>
+      <OverlapPanel border layout="column" tone="light">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-headline text-lg leading-tight font-bold text-on-surface">{event.title}</h3>
+          {event.phase ? (
+            <span className="shrink-0 rounded-md bg-surface-container px-2 py-1 text-[10px] font-bold tracking-wider text-on-surface-variant uppercase">
+              {EVENT_PHASE_LABEL[event.phase]}
+            </span>
           ) : null}
         </div>
-        {event.phase ? (
-          <span className="inline-block rounded-full bg-surface-container px-2.5 py-0.5 text-xs font-medium text-on-surface-variant">
-            {EVENT_PHASE_LABEL[event.phase]}
-          </span>
+        <p className="flex items-center gap-1 text-sm font-bold text-accent">
+          <Icon size={16} name="calendar_month" />
+          {formatEventDateRange(event)}
+        </p>
+        {event.venue || event.destination ? (
+          <p className="flex items-center gap-1 text-sm text-on-surface-variant">
+            <Icon size={16} name="location_on" />
+            <span className="truncate">{event.venue?.name ?? event.destination?.name}</span>
+          </p>
         ) : null}
-      </div>
-    </Link>
+      </OverlapPanel>
+    </SignatureCard>
   );
 }

@@ -1,6 +1,8 @@
 # SahelSpot Mobile 2027 — Design Freeze Report
 
-**Status: FROZEN.** This document is the official visual-language baseline for SahelSpot Mobile 2027, effective 2026-08-06. It supersedes all prior in-progress design decisions made during the Stitch exploration phase. No screen, component, token, or rule listed as "Approved" below may change without an explicit, separate unfreeze decision.
+**Status: FROZEN.** This document is the official visual-language baseline for SahelSpot Mobile 2027, effective 2026-08-06.
+
+**Consumer implementation status:** The `consumer/` Home screen (`app/(root)/HomeClient.tsx` and every component it composes — Hero, Search, Categories, Best Beaches, Explore Destinations, Trending Today, Upcoming Events, Food Picks, Nightlife) passed Home Design QA on 2026-08-06 and is now **approved and frozen as the reference implementation** for visual language, the card system, search, typography, spacing, color discipline, and component hierarchy for the rest of the application. Do not revisit it except to fix a confirmed regression. Baseline commit: `6b1a4e55bc74d656ede575e42fa9414cc4c8137a` (pre-Home-completion state; a follow-up commit captures the Home-completion changes above it). It supersedes all prior in-progress design decisions made during the Stitch exploration phase. No screen, component, token, or rule listed as "Approved" below may change without an explicit, separate unfreeze decision.
 
 Stitch project: `SahelSpot Mobile 2027` — `projects/11511878731912312859`.
 
@@ -130,6 +132,18 @@ These are binding, not stylistic suggestions:
 ## 7. Outstanding Items
 
 Items that must be resolved before the product-wide QA pass can be considered complete:
+
+0. **[Deferred QA — functional, not visual] Verify all data-driven visual states using real production data.** The Home screen's Design QA (2026-08-06) validated the visual system only; it did not validate every conditional visual state against real API data, since not all states are represented in current sample data. Specifically still needing verification against real data:
+   - Open
+   - Closed (the dimmed-card / grayscale-image / red "Closed" ribbon treatment on `VenueCard`'s `vertical-lg` — implemented and code-reviewed, but no currently-loaded venue exercises it)
+   - Featured
+   - Upcoming
+   - Sold Out (if applicable — confirm whether this state exists in the domain model at all before treating its absence as a gap)
+   - Missing image (fallback rendering)
+   - Missing rating (fallback rendering)
+   - Missing place count (fallback rendering)
+
+   This does not block the Home freeze — Home is approved and frozen on visual-system grounds. This item is functional QA, tracked separately, to be picked up when representative data is available.
 
 1. **Home and Explore retain the previous active navigation treatment due to a verified Stitch edit pipeline failure.**
 
