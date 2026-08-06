@@ -9,7 +9,7 @@ export function StatusBadge({ isOpen }: StatusBadgeProps) {
   return (
     <span
       className={`rounded-lg px-2 py-1 text-xs font-bold ${
-        isOpen ? "bg-secondary/10 text-secondary" : "bg-on-surface-variant/10 text-on-surface-variant"
+        isOpen ? "bg-primary/10 text-primary" : "bg-on-surface-variant/10 text-on-surface-variant"
       }`}
     >
       {isOpen ? "OPEN" : "CLOSED"}

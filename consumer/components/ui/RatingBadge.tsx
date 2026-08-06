@@ -13,7 +13,7 @@ type RatingBadgeProps = {
 export function RatingBadge({ value, reviewCount, compact = false }: RatingBadgeProps) {
   return (
     <div className="flex items-center gap-1">
-      <Icon className="text-tertiary" filled name="star" size={compact ? 16 : 18} />
+      <Icon className="text-accent" filled name="star" size={compact ? 16 : 18} />
       <span className="text-sm font-bold text-on-surface">{value.toFixed(1)}</span>
       {reviewCount !== undefined ? (
         <span

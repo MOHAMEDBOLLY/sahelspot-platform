@@ -16,7 +16,14 @@ type SectionHeaderProps = {
  *
  * No disabled variant: a "See All" with nowhere to go still routes somewhere
  * real — either an existing screen or `/coming-soon` — rather than shipping
- * as an inert label. Stitch itself never shows a disabled action. */
+ * as an inert label. Stitch itself never shows a disabled action.
+ *
+ * Per the frozen SahelSpot Mobile 2027 Design System
+ * (docs/consumer/MOBILE_2027_DESIGN_FREEZE.md §3.3), every section header
+ * carries a small fixed yellow underline mark beneath the title, and the
+ * "See All" action is rendered in the accent color — it is the one
+ * actionable point this component owns, so it is the one place yellow
+ * belongs here. */
 export function SectionHeader({
   title,
   size = "md",
@@ -26,22 +33,25 @@ export function SectionHeader({
 }: SectionHeaderProps) {
   return (
     <div className="mb-4 flex items-center justify-between">
-      <h2
-        className={`font-bold text-primary ${size === "lg" ? "text-xl" : "text-lg"}`}
-      >
-        {title}
-      </h2>
+      <div>
+        <h2
+          className={`font-headline font-bold text-primary ${size === "lg" ? "text-xl" : "text-lg"}`}
+        >
+          {title}
+        </h2>
+        <div aria-hidden="true" className="mt-1 h-0.5 w-6 rounded-full bg-accent" />
+      </div>
       {actionLabel ? (
         actionHref ? (
           <Link
-            className="text-sm font-semibold text-secondary hover:underline"
+            className="text-sm font-semibold text-accent hover:underline"
             href={actionHref}
           >
             {actionLabel}
           </Link>
         ) : (
           <button
-            className="text-sm font-semibold text-secondary hover:underline"
+            className="text-sm font-semibold text-accent hover:underline"
             onClick={onActionClick}
             type="button"
           >

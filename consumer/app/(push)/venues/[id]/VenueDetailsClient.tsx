@@ -179,7 +179,7 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
         images={images}
       />
       {shareState === "copied" ? (
-        <p aria-live="polite" className="px-4 pt-2 text-center text-xs text-secondary">
+        <p aria-live="polite" className="px-4 pt-2 text-center text-xs text-on-surface-variant">
           Link copied to clipboard
         </p>
       ) : null}

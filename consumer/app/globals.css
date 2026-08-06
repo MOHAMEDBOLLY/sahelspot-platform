@@ -1,18 +1,21 @@
 @import "tailwindcss";
 
-/* Design tokens — docs/consumer/DESIGN_TOKENS.md.
+/* Design tokens — docs/consumer/MOBILE_2027_DESIGN_FREEZE.md (canonical,
+ * supersedes docs/consumer/DESIGN_TOKENS.md's earlier navy/teal/orange
+ * palette per the frozen SahelSpot Mobile 2027 Design System).
  *
- * Literal hex only. Every Stitch screen ships its own inline `tailwind.config`
- * and no two agree: `primary` resolves to #3b618e on Map and Venue Details,
- * `tertiary` to #904e00 on Home and Map, and `surface` differs between Home
- * and Explore. Those screens are frozen upstream and were not corrected, so a
- * Stitch colour *alias* is never a safe source. The values below are the
- * canonical ones, cross-checked against the design system's DESIGN.md. */
+ * Literal hex only, per the frozen system's own rule: no component may
+ * contain a hard-coded visual color — every color must resolve through one
+ * of these tokens. The palette is intentionally exactly three hues: white,
+ * navy, and a single Summer Yellow accent. There is no second or third
+ * brand accent color; `--color-accent` is used structurally — it marks only
+ * the single actionable/active point of a component (save, filter, "See
+ * All", active nav tab) and must never be used decoratively. */
 @theme {
   /* Brand */
   --color-primary: #0d3b66;
-  --color-secondary: #2aa198;
-  --color-tertiary: #f28705;
+  --color-accent: #ffc94a;
+  --color-on-accent: #0d3b66;
   --color-cream: #f5e6c8;
 
   /* Surface — the page is *not* white. Cards are white on a slightly tinted
@@ -24,8 +27,7 @@
   --color-surface-container-high: #e5e8f0;
 
   --color-primary-container: #9ec3f6;
-  --color-secondary-container: #89f5ea;
-  --color-on-secondary-container: #005c56;
+  --color-accent-container: #fff1cf;
 
   /* Content */
   --color-on-surface: #2e333a;
@@ -34,16 +36,22 @@
   --color-outline-variant: #aeb2bb;
   --color-error: #a83836;
 
-  /* Map marker categories — data encodings, not brand colours. Nightlife and
-   * coffee have no brand token; they exist only as marker colours. */
+  /* Map marker categories — data encodings, not brand colours. Slated for
+   * retirement when the Map markers restyle (implementation order step 5,
+   * "Cards"-adjacent) lands: the frozen system's Map spec is navy-only
+   * markers, no category color-coding. Left in place until that step so the
+   * build does not break mid-migration. */
   --color-pin-nightlife: #3730a3;
   --color-pin-coffee: #7f4400;
 
   /* WhatsApp brand green — the one place a brand mark overrides the icon
-   * system (Venue Details action row). */
+   * system (Venue Details action row). Exempt from the token-only rule by
+   * explicit design-system carve-out — this is a real external brand color,
+   * not a UI accent. */
   --color-whatsapp: #25d366;
 
   --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-headline: var(--font-space-grotesk), var(--font-inter), system-ui, sans-serif;
   --font-arabic: var(--font-ibm-plex-arabic), sans-serif;
 
   --radius-sm: 8px;

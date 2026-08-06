@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/patterns/EmptyState";
 import { IconButton } from "@/components/ui/IconButton";
 import { CTAButton } from "@/components/ui/CTAButton";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { EventCard } from "@/components/event/EventCard";
+import { VenueCard } from "@/components/venue/VenueCard";
 import { useEvents } from "@/lib/hooks/useEvents";
 
 /** Events Module v1 — the "Events List" screen the task requires. Same
@@ -48,7 +48,7 @@ export function EventsListClient() {
             title="No events yet"
           />
         ) : (
-          events.data?.map((event) => <EventCard event={event} key={event.id} />)
+          events.data?.map((event) => <VenueCard event={event} key={event.id} variant="event" />)
         )}
       </main>
     </div>

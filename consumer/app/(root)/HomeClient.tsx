@@ -8,7 +8,6 @@ import { CategoryChip } from "@/components/patterns/CategoryChip";
 import { SectionHeader } from "@/components/patterns/SectionHeader";
 import { CardCarousel } from "@/components/patterns/CardCarousel";
 import { DestinationCard } from "@/components/destination/DestinationCard";
-import { EventCard } from "@/components/event/EventCard";
 import { VenueCard } from "@/components/venue/VenueCard";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/patterns/EmptyState";
@@ -321,7 +320,7 @@ export function HomeClient() {
             <CardCarousel>
               {upcomingEvents.map((event) => (
                 <div className="w-[80%] min-w-[280px] shrink-0 snap-start" key={event.id}>
-                  <EventCard event={event} />
+                  <VenueCard event={event} variant="event" />
                 </div>
               ))}
             </CardCarousel>

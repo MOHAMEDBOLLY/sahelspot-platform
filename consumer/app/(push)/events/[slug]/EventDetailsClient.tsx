@@ -67,7 +67,7 @@ export function EventDetailsClient({ eventSlug }: { eventSlug: string }) {
           <IconButton icon="arrow_back" label="Go back" onClick={() => router.back()} variant="solid" />
         </div>
         {data.featured ? (
-          <span className="absolute top-4 right-4 rounded-full bg-tertiary px-2.5 py-1 text-xs font-bold text-on-tertiary">
+          <span className="absolute top-4 right-4 rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-on-accent">
             Featured
           </span>
         ) : null}
@@ -107,7 +107,7 @@ export function EventDetailsClient({ eventSlug }: { eventSlug: string }) {
             href={`/venues/${data.venue.id}`}
           >
             <div className="flex items-center gap-2">
-              <Icon className="text-secondary" name="storefront" size={20} />
+              <Icon className="text-on-surface-variant" name="storefront" size={20} />
               <span className="font-medium text-on-surface">{data.venue.name}</span>
             </div>
             <Icon className="text-primary" name="chevron_right" size={20} />
@@ -120,7 +120,7 @@ export function EventDetailsClient({ eventSlug }: { eventSlug: string }) {
             href={`/search?destination=${encodeURIComponent(data.destination.id)}`}
           >
             <div className="flex items-center gap-2">
-              <Icon className="text-secondary" name="location_on" size={20} />
+              <Icon className="text-on-surface-variant" name="location_on" size={20} />
               <span className="font-medium text-on-surface">{data.destination.name}</span>
             </div>
             <Icon className="text-primary" name="chevron_right" size={20} />

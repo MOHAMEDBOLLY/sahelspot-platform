@@ -1,7 +1,8 @@
 import type { Event } from "./event";
 
-/** "Sep 1, 2026" style, in the visitor's locale — used by both `EventCard`
- * and the event details page so date formatting only exists once. */
+/** "Sep 1, 2026" style, in the visitor's locale — used by both `VenueCard`'s
+ * `event` variant and the event details page so date formatting only exists
+ * once. */
 export function formatEventDateRange(event: Pick<Event, "startDate" | "endDate">): string {
   const start = new Date(`${event.startDate}T00:00:00`);
   const startLabel = start.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });

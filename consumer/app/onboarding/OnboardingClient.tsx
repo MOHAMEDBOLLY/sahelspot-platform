@@ -46,7 +46,7 @@ export function OnboardingClient() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <div className="relative h-[60vh] shrink-0 overflow-hidden rounded-b-3xl bg-gradient-to-br from-secondary to-tertiary">
+      <div className="relative h-[60vh] shrink-0 overflow-hidden rounded-b-3xl bg-gradient-to-br from-primary to-accent">
         <button
           aria-label="Skip onboarding"
           className="absolute top-4 right-4 text-sm font-semibold text-white/90 hover:underline"

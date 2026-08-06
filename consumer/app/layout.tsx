@@ -1,14 +1,23 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans_Arabic, Inter } from "next/font/google";
+import { IBM_Plex_Sans_Arabic, Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 
-/** Inter for Latin, IBM Plex Sans Arabic for RTL content. Both are declared in
- * every Stitch screen; Arabic is currently used only by the Splash tagline. */
+/** Inter for Latin body text, IBM Plex Sans Arabic for RTL content, Space
+ * Grotesk for headlines — per the frozen SahelSpot Mobile 2027 Design System
+ * (docs/consumer/MOBILE_2027_DESIGN_FREEZE.md §Typography). Space Grotesk
+ * gives the brand a distinct geometric voice; it is not merely a heavier
+ * weight of the body face. */
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800", "900"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
 });
 
 const ibmPlexArabic = IBM_Plex_Sans_Arabic({
@@ -65,7 +74,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html className={`${inter.variable} ${ibmPlexArabic.variable}`} lang="en">
+    <html
+      className={`${inter.variable} ${spaceGrotesk.variable} ${ibmPlexArabic.variable}`}
+      lang="en"
+    >
       <head>
         {/* oxlint-disable-next-line next/no-page-custom-font --
          * That rule is about pages/_document.js; in the App Router a <link> in

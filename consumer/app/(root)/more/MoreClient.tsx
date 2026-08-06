@@ -81,7 +81,7 @@ export function MoreClient() {
             />
           </div>
           {shareState === "copied" ? (
-            <p aria-live="polite" className="px-1 text-xs text-secondary">
+            <p aria-live="polite" className="px-1 text-xs text-on-surface-variant">
               Link copied to clipboard
             </p>
           ) : null}

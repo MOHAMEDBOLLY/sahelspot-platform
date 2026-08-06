@@ -10,8 +10,8 @@ type ChecklistRowProps = {
 export function ChecklistRow({ text }: ChecklistRowProps) {
   return (
     <div className="flex items-start gap-3">
-      <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary/10">
-        <Icon className="text-secondary" name="check" size={16} />
+      <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
+        <Icon className="text-primary" name="check" size={16} />
       </span>
       <p className="text-sm font-medium text-on-surface-variant">{text}</p>
     </div>

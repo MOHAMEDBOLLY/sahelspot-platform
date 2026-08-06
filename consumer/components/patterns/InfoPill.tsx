@@ -12,7 +12,7 @@ type InfoPillProps = {
 export function InfoPill({ icon, label }: InfoPillProps) {
   return (
     <div className="flex shrink-0 items-center gap-1.5 rounded-xl border border-outline-variant/10 bg-surface-container px-3 py-2.5">
-      <Icon className="text-secondary" name={icon} size={20} />
+      <Icon className="text-on-surface-variant" name={icon} size={20} />
       <span className="text-sm font-medium text-on-surface-variant">{label}</span>
     </div>
   );

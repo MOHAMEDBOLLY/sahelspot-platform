@@ -2,7 +2,7 @@ import Link from "next/link";
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { Icon } from "./Icon";
 
-type IconButtonVariant = "solid" | "glass" | "outlined" | "plain";
+type IconButtonVariant = "solid" | "glass" | "outlined" | "plain" | "accent";
 
 type IconButtonOwnProps = {
   /** Material Symbols glyph name. */
@@ -46,6 +46,14 @@ const VARIANTS: Record<IconButtonVariant, string> = {
     "border-2 border-outline-variant/20 text-primary active:bg-surface-container",
   /** In-flow controls: header bell, sheet close, list chevron. */
   plain: "text-on-surface-variant hover:bg-surface-container",
+  /** The frozen SahelSpot Mobile 2027 save affordance — filled yellow
+   * circle, navy icon. Fixed position (top-left of the card photo) and
+   * fixed shape everywhere it appears; see
+   * docs/consumer/MOBILE_2027_DESIGN_FREEZE.md §3.1. Distinct from `solid`,
+   * which is a translucent white control for hero back/share and other
+   * non-save floating actions — this variant must not be used for anything
+   * but the save action. */
+  accent: "bg-accent text-on-accent shadow-md",
 };
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(

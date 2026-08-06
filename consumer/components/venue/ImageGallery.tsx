@@ -55,7 +55,7 @@ export function ImageGallery({
       <div className="absolute top-4 right-4 flex gap-2">
         <IconButton icon="share" label="Share this place" onClick={onShare} variant="solid" />
         <IconButton
-          className={saved ? "text-tertiary" : undefined}
+          className={saved ? "text-accent" : undefined}
           filled={saved}
           icon="favorite"
           label={saved ? "Remove from saved" : "Save this place"}
