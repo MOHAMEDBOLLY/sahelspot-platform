@@ -1,10 +1,15 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.orm import Session
 
+from app.api.public_cache import (
+    client_has_current_revision,
+    not_modified_response,
+    set_public_cache_headers,
+)
 from app.api.routes.public import resolve_published_venue
 from app.api.schemas import PublishedVenueOut
 from app.db.session import get_db
-from app.publishing.engine import get_current_revision
+from app.publishing.engine import get_current_revision, get_current_revision_id
 
 # M7 (consumer Release 1) — search as its own capability, deliberately not
 # `q`/`category` params bolted onto `GET /public/venues`: that endpoint's
@@ -18,6 +23,8 @@ router = APIRouter(prefix="/search", tags=["search"])
 
 @router.get("/venues", response_model=list[PublishedVenueOut])
 def search_published_venues(
+    request: Request,
+    response: Response,
     q: str | None = Query(default=None, description="Case-insensitive substring match on venue name"),
     category: str | None = Query(default=None, description="Exact category match"),
     destination: str | None = Query(default=None, description="Exact destination id match"),
@@ -50,9 +57,20 @@ def search_published_venues(
     the resolved `DestinationRef`) — same id Home's Explore Destinations
     cards already link with.
     """
+    # H2 — the ETag is per-URL: one revision id validates every distinct
+    # query-string combination, because a given revision yields a
+    # deterministic result for a given query. Caches key on the full URL
+    # (RFC 9111 §4.1), so distinct queries never collide with each other.
+    revision_id = get_current_revision_id(db)
+    if revision_id is None:
+        return []
+    if client_has_current_revision(request, revision_id):
+        return not_modified_response(revision_id)
+
     revision = get_current_revision(db)
     if revision is None:
         return []
+    set_public_cache_headers(response, revision_id)
 
     requested_tags = {tag.strip() for tag in tags.split(",") if tag.strip()} if tags else None
 

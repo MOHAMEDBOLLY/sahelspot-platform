@@ -437,6 +437,25 @@ The platform is **not live-edit** — see [`PRODUCT.md`](PRODUCT.md#content--pub
 - **Rollback, as a distinct concept from Republish** — Sprint 18's Republish already does the "repoint `is_current` at a past revision" mechanism Rollback needs, and Sprint 22 adds who-did-it attribution via the activity log. What's still open is anything a more fully-featured Rollback might add on top (e.g. a confirmation step with a diff preview) — not the pointer-move itself, and not attribution.
 - **A known snapshot edge case, not yet handled**: `publish()` includes a venue only if its own `status` is `approved`, but does not require its `destination` to also be `approved`. If that ever diverges (an approved venue whose destination is still `draft`/`review`), `GET /public/venues` silently skips that venue rather than crashing, since it has no destination name to resolve in the snapshot — flagged as follow-up in `docs/ROADMAP.md`, not fixed this sprint, since the current seed data never exercises it (both the seeded destination and venue are `approved`).
 
+## Public API caching (H2)
+
+Every `/public/*` route is backed by an immutable publish snapshot, so the current revision's id is an exact cache validator: the same id always means byte-identical public data. Each successful `/public/*` response therefore carries:
+
+| Header | Value |
+|---|---|
+| `Cache-Control` | `public, max-age=60, stale-while-revalidate=300` |
+| `ETag` | `"pub-rev-{revision_id}"` |
+
+A conditional request whose `If-None-Match` names the current revision is answered `304 Not Modified` with an empty body, resolved from a single index-only id lookup — the snapshot (321 KiB in production today) is never loaded. Measured against a production-sized snapshot: **2.5× faster and 100% of response bytes eliminated** on revalidation.
+
+Behavioural contract:
+
+- **Response bodies are unchanged.** This is purely additive — same JSON, same status codes, same field shapes. Existing clients that ignore the headers behave exactly as before.
+- **A publish takes up to ~60 seconds to become publicly visible.** This is the deliberate cost of the freshness window. `/editor/*` is unaffected and always fresh.
+- **Negative responses are never cached.** A `404` carries no `Cache-Control`/`ETag`, so newly-published content appears immediately rather than after an expiry.
+- **`ETag` means two different things on the two namespaces.** On `/public/*` it is the snapshot revision (an HTTP cache validator); on `/editor/*` it is the row's optimistic-concurrency `version` (see [`app/api/concurrency.py`](../api/app/api/concurrency.py)). The `pub-rev-` prefix keeps them impossible to confuse.
+- **Shared caches and CDNs are safe.** Starlette's `CORSMiddleware` emits `Vary: Origin` (verified) because `allow_origins` is an explicit list, so a cache keys per origin and cannot serve one origin's `Access-Control-Allow-Origin` header to another. Search responses vary only by query string, which caches already key on as part of the URL.
+
 ## CORS
 
 As of Sprint 6, `GET` requests are allowed from the Studio dev origins so the browser-based frontend can call this API directly — see `api/app/main.py`. As of Sprint 11, `PATCH` is allowed too, for Save Draft; as of Sprint 12, `POST` is allowed, for Validate; as of Sprint 30, `DELETE` is allowed, for Destination CRUD Parity. Origin/method rules are unaffected by Sprint 23's path restructure — CORS matches on origin and method, not path. As of Sprint 30, allowed origins come from `Settings.allowed_origins` (env-configurable, comma-separated, no wildcard) rather than being hardcoded, defaulting to the Studio dev origins (`http://localhost:5173`, `http://127.0.0.1:5173`) so local dev keeps working unconfigured.
@@ -446,7 +465,7 @@ As of Sprint 6, `GET` requests are allowed from the Studio dev origins so the br
 - API style and endpoint conventions beyond the Sprint 1 foundation — not yet designed; FastAPI's built-in OpenAPI/REST conventions are the likely default.
 - Authorization (who's *allowed* to do what) — Sprint 22/23 answer authentication ("logged in or not," via Supabase Auth, enforced at the `/editor` router level), not authorization: every authenticated user can currently edit, review, publish, and roll back. Distinct per-action permissions are still undesigned.
 - Versioning strategy — not yet decided.
-- Whether `/public/*` ever needs its own rate limiting or caching layer (e.g. at a reverse proxy) — the namespace split (Sprint 23) makes this possible to add later without another route migration, but nothing has been added yet.
+- Whether `/public/*` needs its own **rate limiting** (e.g. at a reverse proxy) — still open; the namespace split (Sprint 23) makes it addable without a route migration. The **caching** half of this decision is now resolved — see [Public API caching (H2)](#public-api-caching-h2).
 
 ## Notes
 

@@ -318,6 +318,25 @@ def get_current_revision(db: Session) -> PublishRevision | None:
     return db.query(PublishRevision).filter(PublishRevision.is_current.is_(True)).one_or_none()
 
 
+def get_current_revision_id(db: Session) -> int | None:
+    """The current revision's id alone, without loading its `snapshot`.
+
+    H2 — every `/public/*` route previously had to load the entire
+    snapshot JSONB (321 KiB on production today) just to answer a request,
+    including requests whose answer is "nothing changed." This is the
+    cheap half of that lookup: an index-only read of one bigint, used to
+    build the HTTP cache validator and to answer a matching
+    `If-None-Match` with a `304` before the snapshot is ever touched.
+
+    Snapshots are immutable and only the `is_current` pointer ever moves,
+    so this id is an exact cache validator by construction: same id ⇒
+    byte-identical public data.
+    """
+    return (
+        db.query(PublishRevision.id).filter(PublishRevision.is_current.is_(True)).scalar()
+    )
+
+
 def republish(db: Session, revision_id: int, *, actor: str) -> PublishRevision:
     """Republish (Sprint 18) — makes an *existing* revision current again.
     Deliberately the inverse of the snapshot half of `publish()`: this
