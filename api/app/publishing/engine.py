@@ -15,7 +15,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.activity.service import log_activity
-from app.db.models import Destination, Event, PublishRevision, Venue
+from app.db.models import (
+    Collection,
+    CollectionVenue,
+    Destination,
+    Event,
+    PublishRevision,
+    Tag,
+    Venue,
+    VenueTag,
+)
 
 _CONCURRENT_PUBLISH_DETAIL = {
     "error": "concurrent_publish",
@@ -45,11 +54,22 @@ def _serialize_destination(destination: Destination) -> dict:
     }
 
 
-def _serialize_venue(venue: Venue) -> dict:
+def _serialize_venue(venue: Venue, tag_slugs: list[str]) -> dict:
     """Same reasoning as `_serialize_destination` — no `status`, no
     editorial-only fields (`internal_notes`, `source`, `last_published_at`,
     timestamps). Decimal columns are stringified since JSONB storage and
     the eventual JSON response both need a JSON-native type.
+
+    Category/Tags/Access Type/Badges/Collections architecture (Phase 1) —
+    `tag_slugs` is precomputed once for every venue being published (see
+    `publish()` below), not queried per-venue here: a per-call query would
+    turn an O(1) publish into an O(n) one for no reason, the same "batch
+    the join, don't N+1 it" discipline the rest of this module already
+    follows implicitly by working off pre-fetched lists. Collection
+    membership is NOT embedded per-venue — it's embedded once, per
+    collection, in `snapshot["collections"]` (see `_serialize_collections`)
+    since a collection's curated order lives on the collection side, not
+    the venue side.
     """
     return {
         "id": venue.id,
@@ -74,7 +94,44 @@ def _serialize_venue(venue: Venue) -> dict:
         "gallery_image_urls": venue.gallery_image_urls,
         "opening_hours": venue.opening_hours,
         "beach_details": venue.beach_details,
+        "access_type": venue.access_type,
+        "reservation_policy": venue.reservation_policy,
+        "tags": tag_slugs,
     }
+
+
+def _serialize_collections(db: Session, published_venue_ids: set[str]) -> list[dict]:
+    """Category/Tags/Access Type/Badges/Collections architecture (Phase 1)
+    — only `is_active` collections are embedded (an inactive one shouldn't
+    appear on the public site, same as an unapproved venue). Venue ids are
+    filtered down to `published_venue_ids` — the same referential-closure
+    discipline `publish()` already applies to venues-whose-destination-
+    isn't-approved: a collection can reference a venue that isn't part of
+    *this* snapshot (approved but not yet published, or since un-approved),
+    and that venue is silently dropped from the collection's list rather
+    than failing the whole publish. Each collection's `venue_ids` are
+    already in curated `sort_order` — nothing downstream needs to re-sort.
+    """
+    collections = db.query(Collection).filter(Collection.is_active.is_(True)).order_by(Collection.sort_order).all()
+    result = []
+    for collection in collections:
+        member_rows = (
+            db.query(CollectionVenue.venue_id)
+            .filter(CollectionVenue.collection_id == collection.id)
+            .order_by(CollectionVenue.sort_order)
+            .all()
+        )
+        venue_ids = [venue_id for (venue_id,) in member_rows if venue_id in published_venue_ids]
+        result.append(
+            {
+                "id": collection.id,
+                "slug": collection.slug,
+                "name": collection.name,
+                "description": collection.description,
+                "venue_ids": venue_ids,
+            }
+        )
+    return result
 
 
 def _serialize_event(event: Event) -> dict:
@@ -157,10 +214,28 @@ def publish(db: Session, *, actor: str) -> PublishRevision:
     # mandatory-relationship reason to exclude instead).
     events = db.query(Event).filter(Event.status == "approved").order_by(Event.start_date).all()
 
+    # Category/Tags/Access Type/Badges/Collections architecture (Phase 1) —
+    # one query for every venue-tag pairing being published, grouped in
+    # Python, rather than a per-venue query inside `_serialize_venue` (see
+    # that function's own docstring for why).
+    published_venue_ids = {v.id for v in venues}
+    tags_by_venue_id: dict[str, list[str]] = {v.id: [] for v in venues}
+    if published_venue_ids:
+        tag_rows = (
+            db.query(VenueTag.venue_id, Tag.slug)
+            .join(Tag, Tag.id == VenueTag.tag_id)
+            .filter(VenueTag.venue_id.in_(published_venue_ids))
+            .order_by(Tag.sort_order, Tag.slug)
+            .all()
+        )
+        for venue_id, slug in tag_rows:
+            tags_by_venue_id[venue_id].append(slug)
+
     snapshot = {
         "destinations": [_serialize_destination(d) for d in destinations],
-        "venues": [_serialize_venue(v) for v in venues],
+        "venues": [_serialize_venue(v, tags_by_venue_id[v.id]) for v in venues],
         "events": [_serialize_event(e) for e in events],
+        "collections": _serialize_collections(db, published_venue_ids),
     }
 
     # Flip the old current (if any) and insert the new one in the same

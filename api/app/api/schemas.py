@@ -128,6 +128,16 @@ class VenueOut(BaseModel):
     gallery_image_urls: list[str] | None = None
     opening_hours: dict | None = None
     beach_details: dict | None = None
+    # Category/Tags/Access Type/Badges/Collections architecture (Phase 1).
+    # `tags`/`collections` are never populated by `from_attributes` alone —
+    # `Venue` has no such ORM relationship; the route attaches them as
+    # plain instance attributes before returning (see `_attach_taxonomy` in
+    # app/api/routes/venues.py), the same pattern `PublishRevision.
+    # excluded_venue_count` already uses for a computed, non-column value.
+    access_type: str | None = None
+    reservation_policy: str | None = None
+    tags: list[str] = []
+    collections: list[str] = []
     internal_notes: str | None = None
     source: str | None = None
     brand: str | None = None
@@ -204,6 +214,19 @@ class VenueUpdate(BaseModel):
     # against the venue's resulting category — not here, since that check
     # needs the full picture of what's being set, not just this one field.
     beach_details: dict | None = None
+    # Category/Tags/Access Type/Badges/Collections architecture (Phase 1).
+    # `access_type`/`reservation_policy` are plain fields, same as any other
+    # column here. `tag_ids`/`collection_ids` are the one exception to this
+    # class's "mirrors a Venue column" pattern — there is no such column;
+    # each is a full-replace of the venue's many-to-many membership (not an
+    # incremental add/remove), applied in the route via `venue_tags`/
+    # `collection_venues`, per the approved "reuse the existing venue update
+    # endpoint for tags and new metadata" decision rather than dedicated
+    # endpoints.
+    access_type: str | None = None
+    reservation_policy: str | None = None
+    tag_ids: list[int] | None = None
+    collection_ids: list[str] | None = None
 
 
 class VenueCreate(BaseModel):
@@ -387,6 +410,61 @@ class PublishedVenueOut(BaseModel):
     gallery_image_urls: list[str] | None = None
     opening_hours: dict | None = None
     beach_details: dict | None = None
+    # Category/Tags/Access Type/Badges/Collections architecture (Phase 1).
+    # No `collections` field here, deliberately — collection membership
+    # isn't embedded per-venue in the snapshot (see `_serialize_collections`,
+    # app/publishing/engine.py); it's embedded once, per collection, in
+    # `snapshot["collections"]`. `GET /public/collections/{slug}` is the
+    # read path for "which venues are in this collection," not this model.
+    access_type: str | None = None
+    reservation_policy: str | None = None
+    tags: list[str] = []
+
+
+class TagOut(BaseModel):
+    """Category/Tags/Access Type/Badges/Collections architecture (Phase 1)
+    — `GET /editor/tags`'s response shape. Read-only in Phase 1: no tag
+    CRUD exists yet (see `Tag`'s docstring, app/db/models.py).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    slug: str
+    label: str
+    category: str
+    sort_order: int
+
+
+class CollectionOut(BaseModel):
+    """`GET /editor/collections`'s response shape — Phase 1 is assignment-
+    only (no create/update/delete endpoint exists yet), so this is a plain
+    read model, not paired with a `CollectionCreate`/`CollectionUpdate`.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    slug: str
+    name: str
+    description: str | None = None
+    is_active: bool
+    sort_order: int
+
+
+class PublishedCollectionOut(BaseModel):
+    """The public read shape for a collection — sourced entirely from the
+    current publish revision's frozen snapshot, same guarantee every other
+    `Published*Out` model gives. `venues` is already in the collection's
+    curated `sort_order`, resolved server-side (see
+    app/api/routes/public.py) — the caller never has to re-sort.
+    """
+
+    id: str
+    slug: str
+    name: str
+    description: str | None = None
+    venues: list[PublishedVenueOut]
 
 
 class PublishedDestinationOut(BaseModel):

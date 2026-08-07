@@ -72,6 +72,8 @@ export type VenuePatch = Pick<
   | 'gallery_image_urls'
   | 'beach_details'
   | 'translations'
+  | 'access_type'
+  | 'reservation_policy'
 >
 
 /** Empty strings from cleared text inputs mean "no value" for these nullable
@@ -107,7 +109,32 @@ export function toVenuePatch(venue: Venue): VenuePatch {
     // stale value the backend would reject with invalid_beach_details.
     beach_details: venue.category === 'Beach' ? venue.beach_details : null,
     translations: venue.translations,
+    access_type: venue.access_type,
+    reservation_policy: venue.reservation_policy,
   }
+}
+
+/** Category/Tags/Access Type/Badges/Collections architecture (Phase 1) —
+ * `tag_ids`/`collection_ids` aren't plain `Venue` fields (the venue only
+ * ever exposes read-only `tags`/`collections` slugs, see that type's own
+ * comment), so this is a separate, narrower patch shape rather than an
+ * addition to `VenuePatch`/`toVenuePatch`. Each is a full-replace of the
+ * venue's membership, not an incremental add/remove — matches
+ * `PATCH /editor/venues/{id}`'s own `tag_ids`/`collection_ids` semantics
+ * (api/app/api/schemas.py's `VenueUpdate`). Reuses the same endpoint,
+ * per the approved "reuse the existing venue update endpoint for tags and
+ * new metadata" decision — no dedicated `/tags`/`/collections` write path. */
+export interface VenueTaxonomyPatch {
+  tag_ids?: number[]
+  collection_ids?: string[]
+}
+
+export function updateVenueTaxonomy(
+  id: string,
+  version: number,
+  patch: VenueTaxonomyPatch,
+): Promise<Venue> {
+  return apiPatch<Venue>(`/editor/venues/${encodeURIComponent(id)}`, patch, { 'If-Match': String(version) })
 }
 
 /** EP22 — `version` is the venue's currently-loaded version, sent as

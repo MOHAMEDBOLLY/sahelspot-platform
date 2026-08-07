@@ -50,6 +50,19 @@ export interface Venue {
   gallery_image_urls: string[] | null
   opening_hours: OpeningHours | null
   beach_details: Record<string, unknown> | null
+  /** Category/Tags/Access Type/Badges/Collections architecture (Phase 1) —
+   * plain nullable fields, independent of category (a paid-entry restaurant
+   * is exactly as valid as a QR-gated beach). See api/app/db/models.py's
+   * ACCESS_TYPES/RESERVATION_POLICIES for the fixed vocabularies. */
+  access_type: string | null
+  reservation_policy: string | null
+  /** Read-only here — tag slugs currently assigned to this venue. Written
+   * via `tag_ids` on `VenueUpdate`/`VenuePatch` (see features/venues/api.ts),
+   * not through this field directly; the backend attaches it as a computed
+   * value (see `_attach_taxonomy`, api/app/api/routes/venues.py). */
+  tags: string[]
+  /** Same read/write asymmetry as `tags` above, via `collection_ids`. */
+  collections: string[]
   internal_notes: string | null
   source: string | null
   /** Brand Asset Propagation — free text, never inferred from `name`.

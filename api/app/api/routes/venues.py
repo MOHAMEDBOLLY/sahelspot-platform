@@ -34,11 +34,26 @@ from app.api.schemas import (
 )
 from app.auth.dependencies import CurrentUser, get_current_user
 from app.auth.permissions import Permission, require_permission
-from app.db.models import VENUE_CATEGORIES, Destination, Event, Venue
+from app.db.models import (
+    VENUE_CATEGORIES,
+    Collection,
+    CollectionVenue,
+    Destination,
+    Event,
+    Tag,
+    Venue,
+    VenueTag,
+)
 from app.db.session import get_db
 from app.media.service import delete_image, reject_if_declared_too_large, upload_image
 from app.validation.schemas import ValidationResult
-from app.validation.venues import validate_beach_details_shape, validate_venue
+from app.validation.venues import (
+    validate_access_type,
+    validate_beach_details_shape,
+    validate_reservation_policy,
+    validate_tag_ids,
+    validate_venue,
+)
 from app.workflow.transitions import require_status
 
 # Editorial only — mounted under /editor by app/api/router.py, which also
@@ -52,6 +67,41 @@ from app.workflow.transitions import require_status
 # re-verifies the token.
 router = APIRouter(prefix="/venues", tags=["venues"])
 logger = logging.getLogger(__name__)
+
+
+def _attach_taxonomy(db: Session, venue: Venue) -> Venue:
+    """Category/Tags/Access Type/Badges/Collections architecture (Phase 1)
+    — `tags`/`collections` aren't ORM relationships on `Venue` (see that
+    model's own docstring reasoning for staying explicit-query rather than
+    relationship-traversal, matching this codebase's existing style, e.g.
+    `AppUser` has none by design). Attached here as plain instance
+    attributes, the same pattern `PublishRevision.excluded_venue_count`
+    already uses for a computed, non-column value that `VenueOut`'s
+    `from_attributes=True` can still read. Every route that returns a
+    `VenueOut` calls this first — a two-query cost per venue, acceptable at
+    this data volume (matches the docs/DATABASE.md-documented "sequential
+    scan is fine" tolerance for GET /venues' own `ILIKE` search).
+    """
+    venue.tags = [
+        slug
+        for (slug,) in (
+            db.query(Tag.slug)
+            .join(VenueTag, VenueTag.tag_id == Tag.id)
+            .filter(VenueTag.venue_id == venue.id)
+            .order_by(Tag.sort_order, Tag.slug)
+            .all()
+        )
+    ]
+    venue.collections = [
+        slug
+        for (slug,) in (
+            db.query(Collection.slug)
+            .join(CollectionVenue, CollectionVenue.collection_id == Collection.id)
+            .filter(CollectionVenue.venue_id == venue.id)
+            .all()
+        )
+    ]
+    return venue
 
 
 @router.get("", response_model=VenueListOut)
@@ -101,6 +151,8 @@ def list_venues(
 
     total = query.count()
     items = query.order_by(Venue.name).offset((page - 1) * page_size).limit(page_size).all()
+    for item in items:
+        _attach_taxonomy(db, item)
 
     return VenueListOut(items=items, total=total, page=page, page_size=page_size)
 
@@ -149,7 +201,7 @@ def create_venue(
     db.commit()
 
     venue = db.get(Venue, payload.id, options=[joinedload(Venue.destination)])
-    return venue
+    return _attach_taxonomy(db, venue)
 
 
 @router.get("/export")
@@ -282,7 +334,7 @@ def bulk_submit_venues_for_review(
             results.append(BulkResultItem(venue_id=venue_id, success=False, error=_error_message(exc)))
             continue
         venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
+        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=_attach_taxonomy(db, venue)))
 
     succeeded = sum(1 for result in results if result.success)
     return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
@@ -313,7 +365,7 @@ def bulk_approve_venues(
             results.append(BulkResultItem(venue_id=venue_id, success=False, error=_error_message(exc)))
             continue
         venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
+        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=_attach_taxonomy(db, venue)))
 
     succeeded = sum(1 for result in results if result.success)
     return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
@@ -344,7 +396,7 @@ def bulk_move_venues_to_draft(
             results.append(BulkResultItem(venue_id=venue_id, success=False, error=_error_message(exc)))
             continue
         venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
+        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=_attach_taxonomy(db, venue)))
 
     succeeded = sum(1 for result in results if result.success)
     return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
@@ -373,7 +425,7 @@ def bulk_archive_venues(
             results.append(BulkResultItem(venue_id=venue_id, success=False, error=_error_message(exc)))
             continue
         venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
+        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=_attach_taxonomy(db, venue)))
 
     succeeded = sum(1 for result in results if result.success)
     return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
@@ -402,7 +454,7 @@ def bulk_restore_venues(
             results.append(BulkResultItem(venue_id=venue_id, success=False, error=_error_message(exc)))
             continue
         venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
+        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=_attach_taxonomy(db, venue)))
 
     succeeded = sum(1 for result in results if result.success)
     return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
@@ -504,7 +556,7 @@ def bulk_update(
             results.append(BulkResultItem(venue_id=venue_id, success=False, error=error))
             continue
         venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=venue))
+        results.append(BulkResultItem(venue_id=venue_id, success=True, venue=_attach_taxonomy(db, venue)))
 
     succeeded = sum(1 for result in results if result.success)
     return BulkOperationResponse(results=results, succeeded=succeeded, failed=len(results) - succeeded)
@@ -521,7 +573,7 @@ def get_venue(
     if venue is None:
         raise HTTPException(status_code=404, detail="Venue not found")
     set_etag(response, venue)
-    return venue
+    return _attach_taxonomy(db, venue)
 
 
 @router.patch("/{venue_id}", response_model=VenueOut)
@@ -563,16 +615,53 @@ def update_venue(
     if "beach_details" in updates:
         resulting_category = updates.get("category", venue.category)
         validate_beach_details_shape(resulting_category, updates["beach_details"])
+    if "access_type" in updates:
+        validate_access_type(updates["access_type"])
+    if "reservation_policy" in updates:
+        validate_reservation_policy(updates["reservation_policy"])
+
+    # Category/Tags/Access Type/Badges/Collections architecture (Phase 1) —
+    # `tag_ids`/`collection_ids` aren't real `Venue` columns (unlike every
+    # other field in `updates`), so they're popped out before the generic
+    # `setattr` loop below and handled as a full-replace of the venue's
+    # many-to-many rows instead. Reuses this same endpoint per the approved
+    # "reuse the existing venue update endpoint for tags and new metadata"
+    # decision, rather than dedicated `PUT .../tags` / `.../collections`
+    # endpoints.
+    tag_ids = updates.pop("tag_ids", None)
+    collection_ids = updates.pop("collection_ids", None)
+    if tag_ids is not None:
+        resulting_category = updates.get("category", venue.category)
+        validate_tag_ids(db, resulting_category, tag_ids)
+    if collection_ids is not None:
+        found_collection_ids = {
+            c.id for c in db.query(Collection.id).filter(Collection.id.in_(collection_ids)).all()
+        }
+        missing = [cid for cid in collection_ids if cid not in found_collection_ids]
+        if missing:
+            raise HTTPException(
+                status_code=422,
+                detail={"error": "invalid_collection_ids", "message": f"Unknown collection id(s): {missing}."},
+            )
 
     for field, value in updates.items():
         setattr(venue, field, value)
     venue.version += 1
 
+    if tag_ids is not None:
+        db.query(VenueTag).filter(VenueTag.venue_id == venue_id).delete()
+        for tag_id in tag_ids:
+            db.add(VenueTag(venue_id=venue_id, tag_id=tag_id))
+    if collection_ids is not None:
+        db.query(CollectionVenue).filter(CollectionVenue.venue_id == venue_id).delete()
+        for collection_id in collection_ids:
+            db.add(CollectionVenue(collection_id=collection_id, venue_id=venue_id))
+
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
     set_etag(response, venue)
-    return venue
+    return _attach_taxonomy(db, venue)
 
 
 @router.delete("/{venue_id}/media", response_model=VenueOut)
@@ -612,7 +701,7 @@ def delete_venue_media(
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-    return venue
+    return _attach_taxonomy(db, venue)
 
 
 @router.post("/{venue_id}/media", response_model=VenueOut)
@@ -691,7 +780,7 @@ async def upload_venue_media(
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-    return venue
+    return _attach_taxonomy(db, venue)
 
 
 @router.post("/{venue_id}/media/set-cover", response_model=VenueOut)
@@ -729,7 +818,7 @@ def set_cover_from_gallery(
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-    return venue
+    return _attach_taxonomy(db, venue)
 
 
 @router.post("/{venue_id}/validate", response_model=ValidationResult)
@@ -801,7 +890,7 @@ def submit_venue_for_review(
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-    return venue
+    return _attach_taxonomy(db, venue)
 
 
 def _approve_or_raise(db: Session, venue: Venue, actor: str) -> None:
@@ -861,7 +950,7 @@ def approve_venue(
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-    return venue
+    return _attach_taxonomy(db, venue)
 
 
 @router.post("/{venue_id}/reject", response_model=VenueOut)
@@ -896,7 +985,7 @@ def reject_venue(
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-    return venue
+    return _attach_taxonomy(db, venue)
 
 
 # ---------------------------------------------------------------------------
@@ -945,7 +1034,7 @@ def move_venue_to_draft(
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-    return venue
+    return _attach_taxonomy(db, venue)
 
 
 def _archive_or_raise(db: Session, venue: Venue, actor: str) -> None:
@@ -974,7 +1063,7 @@ def archive_venue(
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-    return venue
+    return _attach_taxonomy(db, venue)
 
 
 def _restore_or_raise(db: Session, venue: Venue, actor: str) -> None:
@@ -1003,7 +1092,7 @@ def restore_venue(
     db.commit()
 
     venue = db.get(Venue, venue_id, options=[joinedload(Venue.destination)])
-    return venue
+    return _attach_taxonomy(db, venue)
 
 
 @router.delete("/{venue_id}", status_code=204)

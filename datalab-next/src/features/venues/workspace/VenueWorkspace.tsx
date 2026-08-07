@@ -28,6 +28,7 @@ import { ValidationSummary } from './ValidationSummary'
 import { VenueMissingDataChips } from '../../../components/VenueMissingDataChips'
 import { evaluateVenueQuality } from '../../../lib/venueQuality'
 import { BasicInfoSection } from './sections/BasicInfoSection'
+import { TagsCollectionsSection } from './sections/TagsCollectionsSection'
 import { BeachDetailsSection } from './sections/BeachDetailsSection'
 import { LocationSection } from './sections/LocationSection'
 import { ContactSection } from './sections/ContactSection'
@@ -422,6 +423,7 @@ export function VenueWorkspace({ venueId, onDirtyChange, onDeleted }: VenueWorks
       <VenueMissingDataChips quality={evaluateVenueQuality(displayedVenue)} />
       {validationResult && <ValidationSummary result={validationResult} />}
       <BasicInfoSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} errors={fieldErrors} />
+      <TagsCollectionsSection venue={displayedVenue} onSaved={commitSave} />
       {displayedVenue.category === 'Beach' && (
         <BeachDetailsSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} />
       )}

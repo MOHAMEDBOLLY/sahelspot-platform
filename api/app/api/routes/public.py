@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.event_timing import compute_event_phase
 from app.api.schemas import (
     DestinationRef,
+    PublishedCollectionOut,
     PublishedDestinationOut,
     PublishedEventOut,
     PublishedVenueOut,
@@ -92,6 +93,70 @@ def get_published_venue(venue_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Venue not found")
 
     return resolved
+
+
+@router.get("/discover/no-qr", response_model=list[PublishedVenueOut])
+def list_no_qr_venues(db: Session = Depends(get_db)):
+    """Category/Tags/Access Type/Badges/Collections architecture (Phase 1)
+    — "No QR" is deliberately computed here, not read from a stored
+    collection: every published venue whose `access_type` isn't
+    'QR Required', including venues with no `access_type` set at all
+    (unclassified — never QR-gated is the reasonable default reading of
+    "we don't know," not the reverse). Same snapshot-only guarantee as
+    every other `/public/*` route.
+    """
+    revision = get_current_revision(db)
+    if revision is None:
+        return []
+
+    destinations_by_id = {d["id"]: d for d in revision.snapshot.get("destinations", [])}
+    results = []
+    for venue in revision.snapshot.get("venues", []):
+        if venue.get("access_type") == "QR Required":
+            continue
+        resolved = resolve_published_venue(venue, destinations_by_id)
+        if resolved is not None:
+            results.append(resolved)
+    return results
+
+
+@router.get("/collections/{slug}", response_model=PublishedCollectionOut)
+def get_published_collection(slug: str, db: Session = Depends(get_db)):
+    """Category/Tags/Access Type/Badges/Collections architecture (Phase 1)
+    — resolves a collection's `venue_ids` (already in curated order, see
+    `_serialize_collections`) into full `PublishedVenueOut` entries.
+    A `venue_id` that no longer resolves (shouldn't happen — the publish
+    engine already filters to published venues — but snapshot data is
+    immutable once written, so this stays defensive) is silently skipped
+    rather than raising, same reasoning `resolve_published_event` already
+    gives for a dangling ref.
+    """
+    revision = get_current_revision(db)
+    if revision is None:
+        raise HTTPException(status_code=404, detail="Collection not found")
+
+    collection = next((c for c in revision.snapshot.get("collections", []) if c["slug"] == slug), None)
+    if collection is None:
+        raise HTTPException(status_code=404, detail="Collection not found")
+
+    venues_by_id = {v["id"]: v for v in revision.snapshot.get("venues", [])}
+    destinations_by_id = {d["id"]: d for d in revision.snapshot.get("destinations", [])}
+    venues = []
+    for venue_id in collection["venue_ids"]:
+        venue = venues_by_id.get(venue_id)
+        if venue is None:
+            continue
+        resolved = resolve_published_venue(venue, destinations_by_id)
+        if resolved is not None:
+            venues.append(resolved)
+
+    return {
+        "id": collection["id"],
+        "slug": collection["slug"],
+        "name": collection["name"],
+        "description": collection["description"],
+        "venues": venues,
+    }
 
 
 @router.get("/destinations", response_model=list[PublishedDestinationOut])

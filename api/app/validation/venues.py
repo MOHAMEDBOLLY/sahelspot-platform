@@ -1,8 +1,9 @@
 from decimal import Decimal
 
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
-from app.db.models import VENUE_CATEGORIES, Venue
+from app.db.models import ACCESS_TYPES, RESERVATION_POLICIES, VENUE_CATEGORIES, Tag, Venue
 
 from .schemas import FieldError, ValidationResult, build_validation_result
 
@@ -46,6 +47,62 @@ def validate_beach_details_shape(category: str, beach_details: dict | None) -> N
                 "message": "beach_details may only be set when category is 'Beach'.",
             },
         )
+
+def validate_access_type(access_type: str | None) -> None:
+    """Same shape as `validate_beach_details_shape`: a structured 422 for
+    an illegal value, so a typo/bad client fails cleanly here rather than
+    as a raw `IntegrityError` from the DB CHECK constraint. `None` is
+    always legal — an unclassified venue, not an error.
+    """
+    if access_type is not None and access_type not in ACCESS_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "invalid_access_type",
+                "message": f"access_type must be one of: {', '.join(ACCESS_TYPES)}.",
+            },
+        )
+
+
+def validate_reservation_policy(reservation_policy: str | None) -> None:
+    """Same reasoning as `validate_access_type` above."""
+    if reservation_policy is not None and reservation_policy not in RESERVATION_POLICIES:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "invalid_reservation_policy",
+                "message": f"reservation_policy must be one of: {', '.join(RESERVATION_POLICIES)}.",
+            },
+        )
+
+
+def validate_tag_ids(db: Session, category: str, tag_ids: list[int]) -> None:
+    """Every assigned tag must exist and must be scoped to the venue's
+    *resulting* category (mirrors `validate_beach_details_shape`'s own
+    "checked against the resulting category, not the pre-update one"
+    reasoning) — a Coffee tag on a Restaurant venue is rejected here, not
+    just hidden by the Studio picker UI.
+    """
+    if not tag_ids:
+        return
+    found = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+    found_by_id = {tag.id: tag for tag in found}
+    missing = [tag_id for tag_id in tag_ids if tag_id not in found_by_id]
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_tag_ids", "message": f"Unknown tag id(s): {missing}."},
+        )
+    mismatched = [tag.id for tag in found if tag.category != category]
+    if mismatched:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "tag_category_mismatch",
+                "message": f"Tag id(s) {mismatched} do not belong to category '{category}'.",
+            },
+        )
+
 
 # The observed range of all current venue coordinates (see docs/DATABASE.md's
 # "Validation rules" section) — a sanity bound, not a hard DB constraint,

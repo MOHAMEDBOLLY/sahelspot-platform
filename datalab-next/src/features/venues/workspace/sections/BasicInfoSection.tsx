@@ -7,7 +7,7 @@ import { TextAreaField } from '../../../../components/workspace/fields/TextAreaF
 import { SelectField } from '../../../../components/workspace/fields/SelectField'
 import { CheckboxField } from '../../../../components/workspace/fields/CheckboxField'
 import type { WorkspaceMode } from '../../../../components/workspace/types'
-import { VENUE_CATEGORIES } from '../../venueCategories'
+import { ACCESS_TYPES, RESERVATION_POLICIES, VENUE_CATEGORIES } from '../../venueCategories'
 import type { FieldErrors } from '../../../../lib/validation'
 
 type BasicInfoSectionProps = {
@@ -44,6 +44,37 @@ export function BasicInfoSection({ venue, mode, onFieldChange, errors = {} }: Ba
             value={venue.category}
             onChange={(v) => onFieldChange('category', v)}
             options={VENUE_CATEGORIES}
+          />
+        )}
+
+        {/* Category/Tags/Access Type/Badges/Collections architecture
+            (Phase 1) — independent of category (see `Venue.access_type`'s
+            own docstring, api/app/db/models.py), so it lives here in Basic
+            Information alongside Category, not in a category-conditional
+            section the way BeachDetailsSection is. The leading '' option
+            maps to `null` ("not yet classified") — not the same as any of
+            the 5 real values. */}
+        {mode === 'view' ? (
+          <WorkspaceField label="Access Type" value={venue.access_type} />
+        ) : (
+          <SelectField
+            label="Access Type"
+            value={venue.access_type ?? ''}
+            onChange={(v) => onFieldChange('access_type', v === '' ? null : v)}
+            options={['', ...ACCESS_TYPES]}
+          />
+        )}
+
+        {/* Badges, not a filter (see the architecture doc) — still a plain
+            venue-level field, same reasoning as Access Type above. */}
+        {mode === 'view' ? (
+          <WorkspaceField label="Reservation Policy" value={venue.reservation_policy} />
+        ) : (
+          <SelectField
+            label="Reservation Policy"
+            value={venue.reservation_policy ?? ''}
+            onChange={(v) => onFieldChange('reservation_policy', v === '' ? null : v)}
+            options={['', ...RESERVATION_POLICIES]}
           />
         )}
 

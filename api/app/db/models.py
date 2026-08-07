@@ -64,6 +64,21 @@ DESTINATION_REGIONS = (
 # changing, so it's a CHECK-constrained text column, not a lookup table.
 APP_USER_ROLES = ("viewer", "editor", "publisher", "admin")
 
+# Category/Tags/Access Type/Badges/Collections architecture (Phase 1) — a
+# small, fixed, closed set cutting across every category (a QR-gated
+# restaurant is exactly as valid as a QR-gated beach), same CHECK-constraint
+# treatment as VENUE_CATEGORIES/CONTENT_STATUSES. Deliberately plain text
+# values matching VENUE_CATEGORIES' own "Title Case, human-readable, no
+# label-mapping layer needed" convention, not snake_case codes.
+ACCESS_TYPES = (
+    "Public",
+    "Paid Entry",
+    "QR Required",
+    "Residents Only",
+    "Hotel Guests Only",
+)
+RESERVATION_POLICIES = ("Required", "Recommended")
+
 
 class Destination(Base):
     """A named compound/resort/development along the North Coast."""
@@ -122,6 +137,15 @@ class Venue(Base):
             "(category = 'Beach' AND beach_details ? 'type' AND beach_details ? 'publicAccess')",
             name="ck_venues_beach_details_shape",
         ),
+        # Category/Tags/Access Type/Badges/Collections architecture (Phase 1)
+        # — both independent of category, unlike beach_details above; a
+        # paid-entry restaurant or a QR-gated nightlife venue are exactly as
+        # valid as a QR-gated beach. See ACCESS_TYPES/RESERVATION_POLICIES.
+        CheckConstraint(f"access_type IS NULL OR access_type IN {ACCESS_TYPES}", name="ck_venues_access_type"),
+        CheckConstraint(
+            f"reservation_policy IS NULL OR reservation_policy IN {RESERVATION_POLICIES}",
+            name="ck_venues_reservation_policy",
+        ),
         # PLATFORM_SPEC_v1.0_FROZEN.md §3.1 — destination-scoped venue
         # lists and FK join performance; category/status filters; the
         # composite serves the referential-closure publish query directly
@@ -170,6 +194,16 @@ class Venue(Base):
     # the field (e.g. switching a venue's category away from 'Beach') would
     # store JSON null and spuriously fail the constraint.
     beach_details: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
+    # Category/Tags/Access Type/Badges/Collections architecture (Phase 1) —
+    # a single venue-level property, not nested inside beach_details (that
+    # JSONB column stays Beach-only and is kept temporarily for backward
+    # compatibility; publicAccess is a narrower 3-value yes/no/unknown
+    # concept, not the same thing as this 5-value Access Type). Reservation
+    # Policy is informational/badge-only, never a filter (see Badges in the
+    # architecture doc) — stored here rather than a lookup table for the
+    # same "small, fixed, closed set" reasoning ACCESS_TYPES itself uses.
+    access_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reservation_policy: Mapped[str | None] = mapped_column(Text, nullable=True)
     internal_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Brand Asset Propagation — free text, not a CHECK-constrained
@@ -196,6 +230,99 @@ class Venue(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class Tag(Base):
+    """Category-scoped venue-characteristic vocabulary (Restaurant's
+    'Seafood', Coffee's 'Specialty Coffee', ...) — the Tags layer of the
+    Category -> Tags -> Access Type -> Badges -> Collections architecture.
+    Deliberately a real table, not a CHECK-constrained string like
+    VENUE_CATEGORIES: tags are expected to grow, and adding one must never
+    require a migration (a data INSERT instead). Studio has no tag CRUD UI
+    in Phase 1 (rows are seeded once, in migration 0014) — editors can only
+    assign existing tags to venues; CRUD is future work if needed.
+
+    `category` scopes a tag to the one venue category it applies to (a
+    Restaurant tag should never be assignable to a Coffee venue) — both the
+    DB CHECK constraint and the API's assignment validator enforce this, not
+    just the Studio picker UI hiding the option.
+    """
+
+    __tablename__ = "tags"
+    __table_args__ = (
+        CheckConstraint(f"category IN {VENUE_CATEGORIES}", name="ck_tags_category"),
+        UniqueConstraint("slug", name="uq_tags_slug"),
+        Index("ix_tags_category", "category"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, Identity(always=True), primary_key=True)
+    slug: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+
+
+class VenueTag(Base):
+    """The venue<->tag many-to-many join. No payload columns of its own —
+    membership is the only fact this table records. Multi-tag filtering
+    (see app/api/routes/search.py) uses OR semantics — a venue matches if
+    it carries *any* of the requested tags, not all of them.
+    """
+
+    __tablename__ = "venue_tags"
+    __table_args__ = (Index("ix_venue_tags_tag_id", "tag_id"),)
+
+    venue_id: Mapped[str] = mapped_column(ForeignKey("venues.id", ondelete="CASCADE"), primary_key=True)
+    tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id", ondelete="RESTRICT"), primary_key=True)
+
+
+class Collection(Base):
+    """A curated, cross-category grouping of venues (e.g. "Editor's
+    Choice", "Best Sunset") — the Collections layer of the architecture.
+    Deliberately distinct from both Category (structural, one per venue,
+    stable) and Tags (category-scoped, objective characteristics):
+    Collections are editorial curation, can span every category, and are
+    explicitly ordered (see CollectionVenue.sort_order below). Unlike Tags,
+    Collections are expected to get real Studio CRUD eventually (they're
+    editorial content, not a fixed vocabulary) — just not in Phase 1
+    (assignment-only per the approved plan); this shape doesn't need to
+    change when that lands.
+
+    "No QR" is deliberately NOT a row here — it's a computed discovery
+    query (every venue whose access_type isn't 'QR Required'), never
+    persisted, never assigned to. See app/api/routes/public.py.
+    """
+
+    __tablename__ = "collections"
+    __table_args__ = (UniqueConstraint("slug", name="uq_collections_slug"),)
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    slug: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class CollectionVenue(Base):
+    """The collection<->venue many-to-many join. Unlike `VenueTag`, this
+    one carries a real payload column (`sort_order`): collection membership
+    is editorially ordered (a curated list has a deliberate sequence),
+    unlike tag membership, which is an unordered set.
+    """
+
+    __tablename__ = "collection_venues"
+    __table_args__ = (Index("ix_collection_venues_venue_id", "venue_id"),)
+
+    collection_id: Mapped[str] = mapped_column(ForeignKey("collections.id", ondelete="CASCADE"), primary_key=True)
+    venue_id: Mapped[str] = mapped_column(ForeignKey("venues.id", ondelete="CASCADE"), primary_key=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
 
 
 class Event(Base):

@@ -10,6 +10,7 @@ from app.api.routes import (
     search,
     stats,
     system,
+    taxonomy,
     users,
     venues,
 )
@@ -45,6 +46,7 @@ editor_router.include_router(activity.router)
 editor_router.include_router(me.router)
 editor_router.include_router(users.router)
 editor_router.include_router(stats.router)
+editor_router.include_router(taxonomy.router)
 
 public_router = APIRouter(prefix="/public")
 public_router.include_router(public.router)
