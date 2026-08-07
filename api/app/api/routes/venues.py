@@ -665,7 +665,7 @@ def update_venue(
 
 
 @router.delete("/{venue_id}/media", response_model=VenueOut)
-def delete_venue_media(
+async def delete_venue_media(
     venue_id: str,
     slot: Literal["cover", "gallery"] = Query(...),
     url: str | None = Query(default=None, description="Required when slot=gallery"),
@@ -685,7 +685,7 @@ def delete_venue_media(
 
     if slot == "cover":
         if venue.cover_image_url:
-            delete_image(venue.cover_image_url)
+            await delete_image(venue.cover_image_url)
             venue.cover_image_url = None
     else:
         if not url:
@@ -695,7 +695,7 @@ def delete_venue_media(
             )
         gallery = venue.gallery_image_urls or []
         if url in gallery:
-            delete_image(url)
+            await delete_image(url)
             venue.gallery_image_urls = [item for item in gallery if item != url]
 
     db.commit()
@@ -753,7 +753,7 @@ async def upload_venue_media(
     reject_if_declared_too_large(request.headers.get("content-length"))
 
     file_bytes = await file.read()
-    url = upload_image(
+    url = await upload_image(
         file_bytes,
         filename=file.filename or "upload",
         content_type=file.content_type or "application/octet-stream",

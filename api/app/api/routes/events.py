@@ -630,7 +630,7 @@ async def upload_event_media(
     reject_if_declared_too_large(request.headers.get("content-length"))
 
     file_bytes = await file.read()
-    url = upload_image(
+    url = await upload_image(
         file_bytes,
         filename=file.filename or "upload",
         content_type=file.content_type or "application/octet-stream",
@@ -644,7 +644,7 @@ async def upload_event_media(
 
 
 @router.delete("/{event_id}/media", response_model=EventOut)
-def delete_event_media(
+async def delete_event_media(
     event_id: str,
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(require_permission(Permission.CONTENT_EDIT)),
@@ -654,7 +654,7 @@ def delete_event_media(
         raise HTTPException(status_code=404, detail="Event not found")
 
     if event.cover_image_url:
-        delete_image(event.cover_image_url)
+        await delete_image(event.cover_image_url)
         event.cover_image_url = None
     db.commit()
 

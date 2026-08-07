@@ -592,7 +592,7 @@ async def upload_destination_cover(
     reject_if_declared_too_large(request.headers.get("content-length"))
 
     file_bytes = await file.read()
-    url = upload_image(
+    url = await upload_image(
         file_bytes,
         filename=file.filename or "upload",
         content_type=file.content_type or "application/octet-stream",

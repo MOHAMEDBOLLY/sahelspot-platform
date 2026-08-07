@@ -5,6 +5,8 @@ bulk actions, and Consumer-visibility (only Approved, only after publish).
 """
 
 import httpx
+
+from app.media import service as media_service
 import pytest
 
 from app.core.config import settings
@@ -54,14 +56,14 @@ def configured_storage(monkeypatch):
 
 @pytest.fixture()
 def mock_successful_upload(monkeypatch):
-    def _fake_put(url, *, content, headers, timeout):
+    async def _fake_put(url, *, content, headers):
         return httpx.Response(status_code=200, request=httpx.Request("PUT", url))
 
-    def _fake_delete(url, *, headers, timeout):
+    async def _fake_delete(url, *, headers):
         return httpx.Response(status_code=200, request=httpx.Request("DELETE", url))
 
-    monkeypatch.setattr(httpx, "put", _fake_put)
-    monkeypatch.setattr(httpx, "delete", _fake_delete)
+    monkeypatch.setattr(media_service, "_storage_put", _fake_put)
+    monkeypatch.setattr(media_service, "_storage_delete", _fake_delete)
 
 
 class TestCreateEvent:

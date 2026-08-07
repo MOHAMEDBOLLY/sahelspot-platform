@@ -10,6 +10,7 @@ import httpx
 import pytest
 
 from app.core.config import settings
+from app.media import service as media_service
 
 
 def _tag() -> str:
@@ -19,14 +20,16 @@ def _tag() -> str:
 @pytest.fixture(autouse=True)
 def configured_storage(monkeypatch):
     """Same fixture `test_media.py` defines for itself — `delete_image()`
-    needs storage to appear configured, and a mocked `httpx.delete` so
+    needs storage to appear configured, and a mocked storage-delete seam so
     these tests never make a real network call.
     """
     monkeypatch.setattr(settings, "supabase_url", "https://example.supabase.co")
     monkeypatch.setattr(settings, "supabase_service_role_key", "test-service-role-key")
-    monkeypatch.setattr(
-        httpx, "delete", lambda url, *, headers, timeout: httpx.Response(200, request=httpx.Request("DELETE", url))
-    )
+
+    async def _fake_delete(url, *, headers):
+        return httpx.Response(200, request=httpx.Request("DELETE", url))
+
+    monkeypatch.setattr(media_service, "_storage_delete", _fake_delete)
 
 
 class TestCreateVenue:

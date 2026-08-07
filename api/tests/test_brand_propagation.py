@@ -7,6 +7,8 @@ the same real route, permission gating, and database.
 """
 
 import httpx
+
+from app.media import service as media_service
 import pytest
 
 from app.core.config import settings
@@ -20,10 +22,10 @@ def configured_storage(monkeypatch):
 
 @pytest.fixture()
 def mock_successful_upload(monkeypatch):
-    def _fake_put(url, *, content, headers, timeout):
+    async def _fake_put(url, *, content, headers):
         return httpx.Response(status_code=200, request=httpx.Request("PUT", url))
 
-    monkeypatch.setattr(httpx, "put", _fake_put)
+    monkeypatch.setattr(media_service, "_storage_put", _fake_put)
 
 
 class TestBrandFilter:

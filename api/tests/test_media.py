@@ -13,6 +13,8 @@ content-type/size validation, all against the real database.
 """
 
 import httpx
+
+from app.media import service as media_service
 import pytest
 
 from app.auth.dependencies import CurrentUser, get_current_user
@@ -35,10 +37,10 @@ def configured_storage(monkeypatch):
 
 @pytest.fixture()
 def mock_successful_upload(monkeypatch):
-    def _fake_put(url, *, content, headers, timeout):
+    async def _fake_put(url, *, content, headers):
         return httpx.Response(status_code=200, request=httpx.Request("PUT", url))
 
-    monkeypatch.setattr(httpx, "put", _fake_put)
+    monkeypatch.setattr(media_service, "_storage_put", _fake_put)
 
 
 @pytest.fixture()
@@ -187,10 +189,10 @@ class TestStorageNotConfigured:
 
 class TestUploadStorageFailure:
     def test_returns_502_when_storage_rejects_the_upload(self, client, make_venue, monkeypatch):
-        def _fake_put(url, *, content, headers, timeout):
+        async def _fake_put(url, *, content, headers):
             return httpx.Response(status_code=500, request=httpx.Request("PUT", url))
 
-        monkeypatch.setattr(httpx, "put", _fake_put)
+        monkeypatch.setattr(media_service, "_storage_put", _fake_put)
         venue = make_venue()
 
         response = client.post(
