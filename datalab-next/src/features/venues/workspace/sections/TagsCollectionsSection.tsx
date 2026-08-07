@@ -5,6 +5,7 @@ import { useTags } from '../../../taxonomy/useTags'
 import { useCollections } from '../../../taxonomy/useCollections'
 import { useUpdateVenueTaxonomy } from '../../useUpdateVenueTaxonomy'
 import { LoadingState } from '../../../../components/LoadingState'
+import { ApiError } from '../../../../lib/apiClient'
 import type { Venue } from '../../../../types/venue'
 
 type TagsCollectionsSectionProps = {
@@ -15,6 +16,12 @@ type TagsCollectionsSectionProps = {
    * cover promotion): keeps the workspace's displayed venue in sync with
    * what actually got persisted. */
   onSaved: (venue: Venue) => void
+  /** Same "someone else saved since you loaded this" recovery as the
+   * Basic Info Save Draft conflict banner (`VenueWorkspace.tsx`'s
+   * `handleReloadAfterConflict`) — reused here rather than duplicated,
+   * since a stale `version` can just as easily come from this section's
+   * own immediate-save calls racing another save. */
+  onConflict: () => void
 }
 
 /** Category/Tags/Access Type/Badges/Collections architecture (Phase 1) —
@@ -35,12 +42,16 @@ type TagsCollectionsSectionProps = {
  * *current* category's catalog) until explicitly reassigned. Acceptable
  * for the approved "keep it simple" Phase 1 scope; not solved here.
  */
-export function TagsCollectionsSection({ venue, onSaved }: TagsCollectionsSectionProps) {
+export function TagsCollectionsSection({ venue, onSaved, onConflict }: TagsCollectionsSectionProps) {
   const { data: categoryTags, isPending: tagsPending } = useTags(venue.category)
   const { data: collections, isPending: collectionsPending } = useCollections()
-  const { mutate: updateTaxonomy, isPending: isSaving } = useUpdateVenueTaxonomy()
+  const { mutate: updateTaxonomy, isPending: isSaving, error, reset: resetError } = useUpdateVenueTaxonomy()
+
+  const isConflict = error instanceof ApiError && error.status === 409
+  const errorMessage = error instanceof ApiError ? error.message : error ? 'Failed to save.' : null
 
   function toggleTag(tagId: number, nextChecked: boolean) {
+    resetError()
     const currentIds = (categoryTags ?? []).filter((tag) => venue.tags.includes(tag.slug)).map((tag) => tag.id)
     const nextIds = nextChecked ? [...currentIds, tagId] : currentIds.filter((id) => id !== tagId)
     updateTaxonomy(
@@ -50,6 +61,7 @@ export function TagsCollectionsSection({ venue, onSaved }: TagsCollectionsSectio
   }
 
   function toggleCollection(collectionId: string, nextChecked: boolean) {
+    resetError()
     // `Collection.id` is its slug (same convention `Destination` already
     // uses), so `venue.collections` — already slugs — doubles as the
     // current id list with no lookup needed.
@@ -64,6 +76,23 @@ export function TagsCollectionsSection({ venue, onSaved }: TagsCollectionsSectio
 
   return (
     <WorkspaceSection title="Tags & Collections" icon={Tags}>
+      {errorMessage && (
+        <div className="mb-4 flex items-center justify-between gap-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span>{errorMessage}</span>
+          {isConflict && (
+            <button
+              type="button"
+              onClick={() => {
+                resetError()
+                onConflict()
+              }}
+              className="shrink-0 rounded-lg border border-amber-400 px-3 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100"
+            >
+              Reload
+            </button>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
         <div>
           <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
