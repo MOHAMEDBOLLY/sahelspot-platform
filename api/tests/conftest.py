@@ -1,11 +1,19 @@
 """Shared test fixtures.
 
-These tests run against the same Supabase Postgres database used for
-manual development verification (see docs/TESTING.md for why — no local
-Postgres/Docker is available in this environment, and the app's models use
-Postgres-specific types (JSONB, ARRAY, partial indexes) that a SQLite
-in-memory substitute couldn't faithfully exercise). Isolation is achieved
-by convention instead of by a separate database:
+These tests run against a **disposable Postgres** chosen by
+`TEST_DATABASE_URL` and validated by `tests/database_guard.py`, which the
+root `api/conftest.py` invokes before this module's `from app...` imports
+build the engine. They previously ran against the shared Supabase project;
+that caused a production incident (publish metadata rewritten on hundreds
+of live rows, and the public API left with no current revision), and the
+guard now makes it impossible. See docs/TESTING.md.
+
+A real Postgres is still required — not SQLite — because the models use
+Postgres-specific types (JSONB, ARRAY, partial indexes) that SQLite
+couldn't faithfully exercise.
+
+The conventions below still apply *within* a run, so the same local
+database can be reused across runs without a reset:
 
 - Every entity this suite creates uses a `test-`-prefixed id, so it can
   never collide with the real Sprint 4 seed data (`v00001`, `marassi`).
@@ -204,8 +212,11 @@ def preserve_seed_state(db):
     """`publish()`/`republish()` operate on the whole dataset, so a test
     that calls either will incidentally stamp `last_published_at` on the
     real Sprint 4 seed row (it's `approved`, same as any test fixture).
-    This snapshots and restores it, so the suite never leaves the shared
-    dev database in a different state than it found it.
+    This snapshots and restores it, so the suite never leaves the
+    database in a different state than it found it. Retained after the
+    move to a disposable test database: a local database is still reused
+    across runs, and both lookups below already tolerate the seed rows
+    being absent entirely.
     """
     seed_venue = db.get(Venue, SEED_VENUE_ID)
     seed_destination = db.get(Destination, SEED_DESTINATION_ID)
@@ -230,14 +241,45 @@ def _clean_global_tables(db):
     append-only, so no per-venue/destination teardown ever touches them —
     this waterlines their max id before every test and deletes anything
     created above it after, regardless of which test it was.
+
+    Fix C — the watermark delete alone was not a complete undo. `publish()`
+    does two things: it flips whatever revision is currently
+    `is_current=True` to `False`, *and* it inserts a new current one.
+    Deleting the new row undid only the second half, leaving the database
+    with **zero** current revisions — which makes `get_current_revision()`
+    return `None` and every `/public/*` route serve nothing. That is
+    exactly the state the production incident left behind. So the pointer
+    is now snapshotted alongside the watermarks and restored here.
+
+    Order matters on the way back: the partial unique index
+    `uq_publish_revisions_is_current` permits only one `True` row, so any
+    other current revision is cleared *before* the original is restored.
     """
     revision_watermark = db.query(func.max(PublishRevision.id)).scalar() or 0
     activity_watermark = db.query(func.max(ActivityLogEntry.id)).scalar() or 0
+    # `None` when nothing was published yet (e.g. a fresh CI database) —
+    # there is then no pointer to restore, and the code below no-ops.
+    current_revision_id = (
+        db.query(PublishRevision.id).filter(PublishRevision.is_current.is_(True)).scalar()
+    )
 
     yield
 
     db.query(PublishRevision).filter(PublishRevision.id > revision_watermark).delete()
     db.query(ActivityLogEntry).filter(ActivityLogEntry.id > activity_watermark).delete()
+
+    if current_revision_id is not None:
+        # Safe against the unique index: this can only ever match a
+        # revision the test itself made current and that survived the
+        # delete above (i.e. a `republish` of an older revision).
+        db.query(PublishRevision).filter(
+            PublishRevision.is_current.is_(True),
+            PublishRevision.id != current_revision_id,
+        ).update({"is_current": False}, synchronize_session=False)
+        db.query(PublishRevision).filter(PublishRevision.id == current_revision_id).update(
+            {"is_current": True}, synchronize_session=False
+        )
+
     db.commit()
 
 

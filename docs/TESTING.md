@@ -6,11 +6,70 @@ Automated test infrastructure was added in Sprint 20, after 19 sprints of manual
 
 ## Backend testing strategy
 
-### Why these tests run against the real Supabase project, not a separate test database
+### The test database is isolated, and the isolation is enforced in code
 
-There is no local Postgres or Docker available in this development environment, and the app's models use Postgres-specific types (`JSONB`, `ARRAY`, a partial unique index) that a SQLite in-memory substitute couldn't faithfully exercise — a passing SQLite test wouldn't actually prove the partial-unique-index-backed "exactly one current revision" guarantee that `publish_revisions` depends on. Rather than test against a technology the app doesn't actually run on, the suite runs against the same Supabase Postgres database used for manual development verification throughout Sprints 1–19.
+> **This supersedes the previous "why these tests run against the real
+> Supabase project" rationale.** That trade-off was withdrawn after it
+> caused a production incident: because `publish()` stamps
+> `last_published_at` on *every* approved row and the suite issues dozens
+> of publishes, a routine `pytest` run rewrote publish metadata on
+> hundreds of live rows — and because `_clean_global_tables` deletes the
+> `publish_revisions` rows those publishes create without restoring the
+> previous pointer, it left the platform with **no current publish
+> revision**, which blanks the entire public API. The Postgres-not-SQLite
+> reasoning below still holds; sharing the *production* database was the
+> part that was wrong.
 
-This is a deliberate, documented trade-off, not an oversight — see [Known limitations](#known-limitations-and-honest-trade-offs) below for what it costs and what would remove the cost (a dedicated ephemeral test database, e.g. via Docker Compose or a second Supabase project, once that infrastructure is available).
+The suite requires a **real, disposable Postgres** — the models use
+Postgres-specific types (`JSONB`, `ARRAY`, a partial unique index) that a
+SQLite substitute couldn't faithfully exercise: a passing SQLite test
+wouldn't prove the partial-unique-index-backed "exactly one current
+revision" guarantee that `publish_revisions` depends on.
+
+Which database that is comes from **`TEST_DATABASE_URL` only**, defaulting
+to `postgresql+psycopg://postgres:postgres@127.0.0.1:5432/sahelspot_test`.
+`DATABASE_URL` is deliberately never consulted, so a developer's working
+`.env` cannot leak into a test run.
+
+`api/conftest.py` (the root conftest, which pytest loads before
+`tests/conftest.py` and therefore before the SQLAlchemy engine is built)
+calls `enforce_isolated_test_database()` from
+[`api/tests/database_guard.py`](../api/tests/database_guard.py), which
+applies two rules:
+
+1. **Managed-provider hosts are refused unconditionally** — Supabase, RDS,
+   Neon and similar. There is no override. Attempting it aborts the run at
+   collection time, before any connection is opened.
+2. **Non-loopback hosts are refused by default** — lift this only for a
+   genuinely disposable remote database, with `ALLOW_REMOTE_TEST_DATABASE=1`.
+   Rule 1 still applies on top.
+
+The guard has its own tests (`tests/test_database_guard.py`) which run
+without any database at all, so the safety mechanism is verifiable on any
+machine.
+
+### Setting up the local test database
+
+Any Postgres 16 will do. With Docker:
+
+```bash
+docker run -d --name sahelspot-test-db \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=sahelspot_test \
+  -p 5432:5432 postgres:16
+```
+
+Create the schema. Note `DATABASE_URL` is what **Alembic** reads — pytest
+reads `TEST_DATABASE_URL` — so point it explicitly for this one command
+rather than relying on whatever `.env` holds:
+
+```bash
+cd api
+DATABASE_URL=postgresql+psycopg://postgres:postgres@127.0.0.1:5432/sahelspot_test alembic upgrade head
+```
+
+The database needs **schema only, no seed data** — every fixture creates
+what it needs, and the seed-dependent fixtures already tolerate the seed
+rows being absent.
 
 ### How isolation is achieved without a separate database
 
@@ -55,6 +114,9 @@ api/
 ```
 
 ## How to run the backend tests
+
+Requires a local, disposable Postgres — see [Setting up the local test
+database](#setting-up-the-local-test-database) first.
 
 ```bash
 cd api
@@ -114,6 +176,6 @@ Add a `<Component>.test.tsx` next to the component it tests, following `StatusBa
 
 ## Known limitations and honest trade-offs
 
-- **Shared database, not a dedicated test database.** Every test run touches the same Supabase project used for manual verification. Isolation is real (see above) but relies on disciplined fixture design rather than physical separation — a bug in a fixture's cleanup logic could leak test data into the shared dev database in a way a fresh-database-per-run architecture couldn't. Recommended future hardening: an ephemeral Postgres instance (Docker Compose, or a second Supabase project) that the suite can freely reset between runs.
+- **~~Shared database, not a dedicated test database.~~ RESOLVED.** This was the suite's most serious limitation and it caused a real incident (see [above](#the-test-database-is-isolated-and-the-isolation-is-enforced-in-code)). The suite now runs against a disposable Postgres selected by `TEST_DATABASE_URL`, with a guard that refuses managed-provider hosts outright. The convention-based *intra-run* isolation (test-prefixed ids, self-cleaning fixtures, the global-table watermark) is still in place and still worth keeping — it is what lets one local database be reused across runs without a reset — but it is no longer the only thing standing between a test run and production data.
 - **No CI wiring yet.** These tests run locally, on demand. Wiring `pytest`/`vitest` into a CI pipeline (GitHub Actions or similar) — including making the database-access trade-off above a CI-time decision, not just a local one — is future work, not part of this sprint.
 - **Coverage is backend-only.** `pytest-cov` reports on `api/app/`; there is no frontend coverage tooling configured yet (Vitest supports `@vitest/coverage-v8` — not added this sprint, since one smoke test doesn't need a coverage report to be meaningful).

@@ -36,7 +36,16 @@ jobs:
           --health-timeout=5s
           --health-retries=5
     env:
+      # Used by `alembic upgrade head` below (alembic/env.py reads
+      # settings.database_url). pytest does NOT read this — see
+      # TEST_DATABASE_URL.
       DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/sahelspot_ci
+      # The only database variable pytest reads (see
+      # api/tests/database_guard.py). Same disposable CI Postgres, named
+      # explicitly: the guard deliberately never falls back to
+      # DATABASE_URL, so a developer's production-pointing .env can never
+      # reach a test run.
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/sahelspot_ci
       # Only used to sign/verify tokens the test suite mints for itself
       # (see tests/conftest.py) — never a real Supabase secret, and never
       # used to reach a real Supabase project.
