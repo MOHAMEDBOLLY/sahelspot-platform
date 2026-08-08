@@ -16,6 +16,30 @@ routes (`/search`, `/venues/[id]`) — unlike Studio, it **cannot** be
 deployed as static files; it needs a running Node process. See its own
 section below.
 
+## Production Stabilization release (2026-08-08)
+
+Tagged `production-baseline-2026-08-08`, commit `2c830c5`. See
+`docs/RELEASE_NOTES_PRODUCTION_STABILIZATION.md` for the full write-up;
+summarized here because each item changed something this guide
+describes:
+
+| Item | What changed | Where it's documented |
+|---|---|---|
+| **P0** | Test suite isolated from ever reaching the production database | `docs/TESTING.md`, `api/tests/database_guard.py` |
+| **OPS-001** | Fixed `proxy_pass` upstream identification (container name, not a network alias that had silently gone missing) | `docs/adr/0009-upstream-identification-strategy.md` |
+| **H1** | Reverse-proxy rate limiting added | [Rate limiting](#rate-limiting-h1) below, `docs/adr/0008-rate-limit-attachment-strategy.md` |
+| **H2** | `/public/*` gained `ETag`/`Cache-Control`/`304` support | `docs/API.md` |
+| **H3** | Media upload/delete no longer block the event loop | `api/app/media/service.py` |
+| **H4** | API runs 2 uvicorn workers, not 1 | This guide's `docker run`/Dockerfile references, below |
+| **R1 / R2** | Production redeployed from H1–H4; Supabase connection pool size raised 15→30 to fit the new worker count | `docs/adr/0010-supabase-connection-pool-capacity.md` |
+| **C1** | `AUTO_PROVISION_USERS` setting added (deployed `true` — no behavior change; hardening to `false` is a deliberate future step) | `api/.env.example` |
+
+The `docker run`/rollback commands throughout this guide already reflect
+the post-H4/OPS-001 state (2 workers baked into the image, no host port
+publish, network + restart-policy flags, mandatory nginx reload). If
+you're reading an old copy of this file, that's the tell it predates
+2026-08-08.
+
 ## Prerequisites
 
 - A Supabase project (Postgres database + Storage bucket + Auth already
@@ -150,22 +174,53 @@ matters — this section is the command-level how-to for one deploy.
    to undo.
 3. **Run migrations** against the target database (`alembic upgrade
    head`, above).
-4. **Stop the old container, start the new one**, passing the environment
-   variables listed above:
+4. **Stop the old container, rename it (don't remove — it's your fastest
+   rollback), start the new one.** Verified production practice as of the
+   2026-08-08 baseline does **not** publish port 8000 to the host — the
+   API is reachable only through the reverse proxy, on its own Docker
+   network:
    ```bash
+   docker stop sahelspot-api
+   docker rename sahelspot-api sahelspot-api-<old-tag>-retired
    docker run -d \
      --name sahelspot-api \
-     -p 8000:8000 \
+     --network sahelspot_net \
+     --restart unless-stopped \
      --env-file /path/to/production.env \
      sahelspot-api:<tag>
    ```
-5. **Build and publish Studio** (`datalab-next/`):
+   **Then reload the reverse proxy — this step is not optional.**
+   `proxy_pass` resolves its upstream hostname once, at nginx config load
+   time; it does not notice the new container's IP on its own, even
+   though Docker's embedded DNS updates immediately. Skipping this step
+   caused a real ~4.5-minute production outage (`502` on every request)
+   during an earlier deploy in this project's history — see
+   `docs/PRODUCTION_DEPLOYMENT_REPORT.md` and OPS-001's investigation.
+   ```bash
+   docker exec sahelspot-web nginx -t && docker exec sahelspot-web nginx -s reload
+   ```
+5. **Build and publish Studio** (`datalab-next/`). If the host has no
+   native Node.js install (verified true for the current production
+   host — `node`/`npm` are not on `PATH`), build in a throwaway container
+   instead of installing Node on the host:
    ```bash
    cd datalab-next
-   npm ci
-   npm run build
-   # deploy dist/ to your static host / reverse-proxied path
+   docker run --rm -v "$PWD:/app" -w /app node:20-slim \
+     sh -c "cp .env.production .env.local && npm ci && npm run build && rm .env.local"
    ```
+   `dist/` is what gets deployed — see the note below on *how* for why no
+   restart or reload is needed for this one.
+
+   **How Studio actually goes live:** if `dist/` is the same host
+   directory bind-mounted into the proxy container (verified true for
+   production — `/opt/sahelspot/repo/datalab-next/dist` →
+   `/usr/share/nginx/datalab`, read-only, as a **directory** mount, not a
+   single-file one), the new build takes effect immediately on the next
+   request — nginx serves static files fresh from disk per request, with
+   no restart or reload required. This is a different case from the
+   nginx *config* file below: a single-file bind mount is pinned by
+   inode and does require special handling; a directory mount that's
+   itself the served root does not.
 6. **Build and start Consumer** (`consumer/`) — see Consumer deployment
    above. `NEXT_PUBLIC_API_BASE_URL` must be set **before** the build
    step, not the start step:
@@ -221,13 +276,28 @@ and remember a rebuild, not a restart, is what's needed to fix that.
 Rollback has independent parts — API code, schema, Studio, and Consumer —
 because a bad deploy might involve any subset of them.
 
-**API code:**
+**API code — fastest path, if the previous container is still retained
+(not removed) from the deploy that's being rolled back:**
 ```bash
-docker run -d --name sahelspot-api -p 8000:8000 --env-file /path/to/production.env sahelspot-api:<previous-tag>
+docker stop sahelspot-api && docker rm sahelspot-api
+docker rename sahelspot-api-<previous-tag>-retired sahelspot-api
+docker start sahelspot-api
+docker exec sahelspot-web nginx -t && docker exec sahelspot-web nginx -s reload
 ```
-This only works if you keep previous image tags around — don't overwrite
-`latest` in place; tag builds so the last few are addressable (e.g. by git
-SHA or version).
+This is why the deploy sequence above renames rather than removes the
+outgoing container — it turns rollback into a rename instead of a
+rebuild. If it was already removed, rebuild from the previous tag
+instead:
+```bash
+docker run -d --name sahelspot-api --network sahelspot_net \
+  --restart unless-stopped --env-file /path/to/production.env \
+  sahelspot-api:<previous-tag>
+docker exec sahelspot-web nginx -t && docker exec sahelspot-web nginx -s reload
+```
+Either way, **the nginx reload is required**, for the same upstream-IP
+reason as the forward deploy above. This only works if you keep previous
+image tags around — don't overwrite `latest` in place; tag builds so the
+last few are addressable (e.g. by git SHA or version).
 
 **Consumer code:** check out the previous release's source and rebuild
 (`npm ci && NEXT_PUBLIC_API_BASE_URL=... npm run build`), then restart the
