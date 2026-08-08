@@ -16,9 +16,25 @@ import { useVenues } from "@/lib/hooks/useVenues";
 import { useDestinations } from "@/lib/hooks/useDestinations";
 import { useEvents } from "@/lib/hooks/useEvents";
 import { useSaved } from "@/lib/saved/useSaved";
+import { FilterChip } from "@/components/patterns/FilterChip";
 import { activityHref, ESSENTIAL_SERVICES, HOME_ACTIVITIES } from "@/lib/home/activities";
 import { getDestinationGeoMetadata, sortDestinationsGeographically } from "@/lib/home/destinationOrder";
+import { topTags, venuesWithTag } from "@/lib/domain/tags";
 import type { Venue } from "@/lib/domain/venue";
+
+/** A tag rail only earns its own section once enough venues actually carry
+ * it — otherwise "Sushi Spots" for two venues reads as noise, not
+ * discovery. Same reasoning `notableAccessType` (VenueCard) gives for
+ * hiding the common case: a threshold that keeps a data-driven section
+ * from firing on thin data. */
+const MIN_TAG_RAIL_SIZE = 5;
+/** Popular Tags chip row — enough to fill the scroll rail without turning
+ * it into the entire tag vocabulary. */
+const POPULAR_TAG_COUNT = 10;
+/** At most this many dynamic "X Spots" rails per Home render — Home
+ * already carries five venue rails; taxonomy should be felt, not let it
+ * crowd out Trending/Explore Destinations/Events. */
+const MAX_TAG_RAILS = 2;
 
 /** Temporarily hidden per product review — the section, its data, and its
  * `lib/home/activities.ts` mapping are untouched; only its render is gated
@@ -149,6 +165,23 @@ export function HomeClient() {
     [allVenues],
   );
 
+  /** Category/Tags/Access Type/Badges/Collections architecture (Phase 1) —
+   * Home's taxonomy discovery surface. `popularTags` drives the chip row;
+   * `tagRails` turns the biggest of those tags (past `MIN_TAG_RAIL_SIZE`)
+   * into their own "X Spots" rails, reusing `VenueRail` exactly like
+   * Best Beaches/Food Picks/Nightlife already do for `category` — tags are
+   * just a second, complementary axis over the same venue list, not a
+   * parallel mechanism. */
+  const popularTags = useMemo(() => topTags(allVenues, POPULAR_TAG_COUNT), [allVenues]);
+  const tagRails = useMemo(
+    () =>
+      popularTags
+        .filter((tag) => tag.count >= MIN_TAG_RAIL_SIZE)
+        .slice(0, MAX_TAG_RAILS)
+        .map((tag) => ({ tag, venues: venuesWithTag(allVenues, tag.slug) })),
+    [popularTags, allVenues],
+  );
+
   /** Events already carry a server-computed `phase`; "upcoming" here means
    * anything not already over, so a festival running today still shows. */
   const upcomingEvents = useMemo(
@@ -228,6 +261,31 @@ export function HomeClient() {
           </div>
         </section>
 
+        {/* Category/Tags/Access Type/Badges/Collections architecture
+          * (Phase 1/2) — the taxonomy discovery surface: real tag slugs
+          * observed across published venues (`lib/domain/tags.ts`), never
+          * hardcoded, most-popular first. Same `FilterChip` component
+          * Search's own filter rows already use, so tapping one and
+          * landing on Search's matching, already-active chip is one
+          * continuous interaction, not two different controls for the
+          * same idea. Omitted entirely (not shown empty) once the catalog
+          * has fewer tags than would fill a scroll row worth showing. */}
+        {popularTags.length > 0 ? (
+          <section>
+            <SectionHeader actionHref="/search" actionLabel="See All" title="Popular Tags" />
+            <div className="hide-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-2">
+              {popularTags.map((tag) => (
+                <FilterChip
+                  icon="sell"
+                  key={tag.slug}
+                  label={tag.label}
+                  onClick={() => router.push(`/search?tags=${encodeURIComponent(tag.slug)}`)}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         <VenueRail
           actionHref="/search?category=Beach%20Club"
           emptyDescription="Published beaches and beach clubs will appear here."
@@ -241,6 +299,30 @@ export function HomeClient() {
           title="Best Beaches"
           venues={beachVenues}
         />
+
+        {/* Dynamic tag rails — the "Sushi Spots"/"Seafood Spots" style
+          * section the taxonomy work exists to enable, generated from
+          * whichever tags are actually popular in the current publish
+          * snapshot rather than a fixed editorial list (see `tagRails`
+          * above). Reuses `VenueRail` verbatim: a tag rail and a category
+          * rail (Best Beaches) are the same shape of section over the same
+          * `Venue[]`, just filtered along a different taxonomy axis. */}
+        {tagRails.map(({ tag, venues: tagVenues }) => (
+          <VenueRail
+            actionHref={`/search?tags=${encodeURIComponent(tag.slug)}`}
+            emptyDescription={`Published spots tagged ${tag.label} will appear here.`}
+            emptyIcon="sell"
+            emptyTitle={`No ${tag.label} spots yet`}
+            isError={venues.isError}
+            isLoading={venues.isLoading}
+            isSaved={isSaved}
+            key={tag.slug}
+            onRetry={() => venues.refetch()}
+            onToggleSaved={toggle}
+            title={`${tag.label} Spots`}
+            venues={tagVenues}
+          />
+        ))}
 
         <section>
           <SectionHeader actionHref="/coming-soon?feature=destinations" actionLabel="See All" title="Explore Destinations" />

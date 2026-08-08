@@ -8,10 +8,24 @@ import { toVenue } from "@/lib/domain/mappers/venue";
  * when both params are empty is what keeps the "default" state (recent
  * searches + categories, no query yet) from firing a request at all. */
 export function useSearchVenues(params: VenueSearchParams) {
-  const hasQuery = Boolean(params.q?.trim() || params.category || params.destination);
+  const hasQuery = Boolean(
+    params.q?.trim() ||
+      params.category ||
+      params.destination ||
+      params.accessType ||
+      (params.tags && params.tags.length > 0),
+  );
 
   return useQuery({
-    queryKey: ["venues", "search", params.q ?? "", params.category ?? "", params.destination ?? ""],
+    queryKey: [
+      "venues",
+      "search",
+      params.q ?? "",
+      params.category ?? "",
+      params.destination ?? "",
+      (params.tags ?? []).join(","),
+      params.accessType ?? "",
+    ],
     queryFn: async () => {
       const dtos = await searchVenues(params);
       return dtos.map(toVenue);

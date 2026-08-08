@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
 import { RatingBadge } from "@/components/ui/RatingBadge";
 import { StatusBadge } from "@/components/patterns/StatusBadge";
+import { Pill } from "@/components/ui/Pill";
 import { BookmarkTab, LBracketAccent, OverlapPanel, SignatureCard } from "@/components/patterns/CardShell";
 import type { Venue } from "@/lib/domain/venue";
 import type { Event, EventPhase } from "@/lib/domain/event";
@@ -34,6 +35,15 @@ const EVENT_PHASE_LABEL: Record<NonNullable<EventPhase>, string> = {
   live: "Happening now",
   ended: "Ended",
 };
+
+/** `"Public"` is the overwhelmingly common case (see
+ * lib/domain/accessType.ts) — surfacing it on every card would be clutter,
+ * not information. Only a genuine restriction (QR code, paid entry, a
+ * reservation requirement, ...) is worth a visitor's attention before they
+ * tap in, so that's the only case this returns non-null for. */
+function notableAccessType(venue: Venue): string | null {
+  return venue.accessType && venue.accessType !== "Public" ? venue.accessType : null;
+}
 
 /** The one card family in the product — one component, five variants, never
  * five components.
@@ -106,6 +116,9 @@ export function VenueCard(props: VenueCardProps) {
           {venue.rating !== null ? (
             <RatingBadge compact reviewCount={venue.reviewCount ?? undefined} value={venue.rating} />
           ) : null}
+          {notableAccessType(venue) ? (
+            <Pill variant="tag">{notableAccessType(venue)}</Pill>
+          ) : null}
         </div>
         <Icon className="text-primary" name="chevron_right" size={20} />
       </Link>
@@ -146,6 +159,9 @@ export function VenueCard(props: VenueCardProps) {
             ) : null}
             {venue.distanceLabel ? (
               <span className="text-xs text-on-surface-variant">· {venue.distanceLabel}</span>
+            ) : null}
+            {notableAccessType(venue) ? (
+              <Pill variant="tag">{notableAccessType(venue)}</Pill>
             ) : null}
           </div>
         </div>

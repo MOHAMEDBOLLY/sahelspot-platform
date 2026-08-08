@@ -37,7 +37,7 @@ type SearchFieldProps = SearchFieldOwnProps &
  * input outline, matching the export's own listener behavior — only the
  * ring's visual treatment changed, not the mechanism. */
 export function SearchField({
-  variant = "solid",
+  variant: _variant = "solid",
   onFilterClick,
   filterLabel = "Open filters",
   className = "",

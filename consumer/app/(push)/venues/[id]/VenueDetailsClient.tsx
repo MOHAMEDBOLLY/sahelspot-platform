@@ -20,6 +20,7 @@ import { useSaved } from "@/lib/saved/useSaved";
 import { VENUE_CATEGORY_LABEL } from "@/lib/domain/venueCategoryLabel";
 import { formatOpenUntil } from "@/lib/domain/openingHours";
 import { distanceKm } from "@/lib/domain/geo";
+import { ACCESS_TYPE_ICON, type AccessType } from "@/lib/domain/accessType";
 import type { Venue } from "@/lib/domain/venue";
 
 /** Same-destination venues ordered by real distance from `venue` — both
@@ -32,6 +33,34 @@ function nearbyVenues(venue: Venue, allVenues: Venue[], limit: number): Venue[] 
     .filter((candidate) => candidate.id !== venue.id && candidate.destinationId === venue.destinationId)
     .flatMap((candidate) => (candidate.coordinates ? [{ candidate, km: distanceKm(origin, candidate.coordinates) }] : []))
     .sort((a, b) => a.km - b.km)
+    .slice(0, limit)
+    .map(({ candidate }) => candidate);
+}
+
+/** Category/Tags/Access Type/Badges/Collections architecture (Phase 2) —
+ * "Similar Experiences": venues sharing at least one tag with `venue`,
+ * most shared tags first, a second and independent "you might also like"
+ * axis alongside `nearbyVenues`'s distance-within-destination one. A venue
+ * with no tags has no basis for this section (an empty overlap isn't a
+ * recommendation), so it's omitted rather than falling back to something
+ * unrelated. `exclude` keeps this additive to Nearby Places instead of
+ * repeating the same cards under a second heading. */
+function similarVenues(
+  venue: Venue,
+  allVenues: Venue[],
+  exclude: ReadonlySet<string>,
+  limit: number,
+): Venue[] {
+  if (venue.tags.length === 0) return [];
+  const venueTags = new Set(venue.tags);
+  return allVenues
+    .filter((candidate) => candidate.id !== venue.id && !exclude.has(candidate.id))
+    .map((candidate) => ({
+      candidate,
+      sharedTagCount: candidate.tags.filter((tag) => venueTags.has(tag)).length,
+    }))
+    .filter(({ sharedTagCount }) => sharedTagCount > 0)
+    .sort((a, b) => b.sharedTagCount - a.sharedTagCount)
     .slice(0, limit)
     .map(({ candidate }) => candidate);
 }
@@ -120,13 +149,36 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
   );
   const tags = [VENUE_CATEGORY_LABEL[data.category], ...data.tags];
   const nearby = nearbyVenues(data, allVenues.data ?? [], 6);
+  const similar = similarVenues(
+    data,
+    allVenues.data ?? [],
+    new Set([data.id, ...nearby.map((venue) => venue.id)]),
+    6,
+  );
   const hoursLabel = data.openingHours ? formatOpenUntil(data.openingHours, new Date()) : null;
+  // Access Type/Reservation Policy — Category/Tags/Access Type/Badges/
+  // Collections architecture (Phase 1). Rendered as info pills alongside
+  // hours/price/distance/amenities — same row, same treatment, no new
+  // visual language: whether a place needs a QR code or a reservation is
+  // exactly the kind of practical, scannable fact this row already exists
+  // for. `accessType` is looked up in `ACCESS_TYPE_ICON` (a closed,
+  // backend-defined vocabulary — see lib/domain/accessType.ts); an
+  // unrecognized value still renders with a generic fallback icon rather
+  // than being dropped, since a raw Studio value is more useful shown than
+  // hidden.
+  const accessTypeIcon = data.accessType
+    ? (ACCESS_TYPE_ICON[data.accessType as AccessType] ?? "info")
+    : null;
   const infoPills = [
     // Only rendered while genuinely open — see formatOpenUntil's own note on
     // why there's no "closed, opens at X" fallback copy to show instead.
     hoursLabel ? { icon: "schedule", label: hoursLabel } : null,
     data.priceRange ? { icon: "payments", label: data.priceRange } : null,
     data.distanceLabel ? { icon: "distance", label: data.distanceLabel } : null,
+    data.accessType ? { icon: accessTypeIcon!, label: data.accessType } : null,
+    data.reservationPolicy
+      ? { icon: "event_available", label: `Reservation ${data.reservationPolicy}` }
+      : null,
     ...data.amenities.map((amenity) => ({ icon: "check_circle", label: amenity })),
   ].filter((pill): pill is { icon: string; label: string } => pill !== null);
 
@@ -298,6 +350,23 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
                   saved={isSaved(nearbyVenue.id)}
                   variant="horizontal-row"
                   venue={nearbyVenue}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {similar.length > 0 ? (
+          <section className="space-y-4">
+            <SectionHeader size="lg" title="Similar Experiences" />
+            <div className="space-y-3">
+              {similar.map((similarVenue) => (
+                <VenueCard
+                  key={similarVenue.id}
+                  onToggleSaved={toggle}
+                  saved={isSaved(similarVenue.id)}
+                  variant="horizontal-row"
+                  venue={similarVenue}
                 />
               ))}
             </div>

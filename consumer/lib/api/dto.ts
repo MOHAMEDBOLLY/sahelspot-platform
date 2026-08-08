@@ -35,6 +35,17 @@ export interface PublishedVenueDTO {
   gallery_image_urls: string[] | null;
   opening_hours: Record<string, unknown> | null;
   beach_details: Record<string, unknown> | null;
+  // Category/Tags/Access Type/Badges/Collections architecture (Phase 1) —
+  // mirrors `PublishedVenueOut` (api/app/api/schemas.py) since commit
+  // e71880c. No `collections` field here, deliberately, matching the
+  // backend model exactly: collection membership isn't embedded per-venue
+  // in the snapshot, it's embedded once per collection in
+  // `snapshot["collections"]` — see `PublishedCollectionDTO` below, the
+  // `GET /public/collections/{slug}` read path for "which venues are in
+  // this collection."
+  access_type: string | null;
+  reservation_policy: string | null;
+  tags: string[];
 }
 
 export interface PublishedDestinationDTO {
@@ -49,6 +60,19 @@ export interface PublishedDestinationDTO {
 export interface VenueRefDTO {
   id: string;
   name: string;
+}
+
+/** Mirrors `PublishedCollectionOut` (api/app/api/schemas.py) — the
+ * `GET /public/collections/{slug}` response shape. `venues` arrives
+ * already in the collection's curated `sort_order`, resolved server-side
+ * (see api/app/api/routes/public.py's `get_published_collection`); the
+ * caller never has to re-sort. */
+export interface PublishedCollectionDTO {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  venues: PublishedVenueDTO[];
 }
 
 /** Mirrors `PublishedEventOut` (api/app/api/schemas.py) — Events Module v1.

@@ -67,10 +67,16 @@ export function toVenue(dto: PublishedVenueDTO): Venue {
     // geolocation, neither wired yet.
     distanceLabel: null,
 
-    // API_REQUIREMENTS.md §8 — none of these exist on PublishedVenueOut yet.
+    // API_REQUIREMENTS.md §8 — `priceRange`/`amenities`/`highlights` still
+    // have no source on `PublishedVenueOut`; `tags`/`access_type`/
+    // `reservation_policy` do, as of commit e71880c (Phase 1 taxonomy) —
+    // mapped below instead of hardcoded.
     priceRange: null,
-    tags: [],
     amenities: [],
     highlights: [],
+
+    tags: dto.tags,
+    accessType: dto.access_type,
+    reservationPolicy: dto.reservation_policy,
   };
 }

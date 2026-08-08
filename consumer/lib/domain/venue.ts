@@ -50,7 +50,19 @@ export type Venue = {
   /** API_REQUIREMENTS.md §8 — no source yet. */
   distanceLabel: string | null;
   priceRange: string | null;
-  tags: string[];
   amenities: string[];
   highlights: string[];
+
+  /** Category/Tags/Access Type/Badges/Collections architecture (Phase 1) —
+   * sourced from `PublishedVenueOut.tags`/`.access_type`/`.reservation_policy`
+   * since commit e71880c. `tags` are raw Studio slugs (e.g.
+   * `"specialty-coffee"`), rendered as-is — there's no public label catalog
+   * to translate them through (`GET /editor/tags` is auth-gated), matching
+   * how `category`'s own raw Studio strings are the only vocabulary
+   * `/public/search/venues` accepts. `accessType`/`reservationPolicy` are
+   * `null` for the common "no restriction" case, exactly like every other
+   * optional field on this type. */
+  tags: string[];
+  accessType: string | null;
+  reservationPolicy: string | null;
 };
