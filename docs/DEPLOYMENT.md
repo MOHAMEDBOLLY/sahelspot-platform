@@ -30,6 +30,8 @@ section below.
   Node process that terminates HTTPS (nginx, Caddy, or your host's
   managed load balancer). Neither serves TLS itself — the API listens on
   plain HTTP on port 8000, `consumer/` on port 3000 by default.
+  **This proxy is also where the API's rate limits live** — see
+  [Rate limiting](#rate-limiting-h1) below.
 - PostgreSQL client tools (`pg_dump`, `psql`) installed wherever you run
   backups/restores from (see `api/scripts/`) — not required on the host
   running the container itself, only wherever you operate on the database.
@@ -292,3 +294,86 @@ Health Check
    works end to end — CORS, network rules, and env var typos all pass
    silently through steps 1-4 and only surface here (or in a real browser
    against either frontend).
+
+## Rate limiting (H1)
+
+The API ships no application-level rate limiting. Limits are enforced at
+the reverse proxy this guide already requires, using
+[`deploy/nginx.conf`](../deploy/nginx.conf).
+
+**Why the proxy and not the application.** The API runs two uvicorn
+workers (H4) that share no state — there is no Redis and no in-process
+cache anywhere in the codebase — so an in-application counter would be
+per-worker, enforcing a configured limit of N as an effective 2N. The
+proxy is a single process in front of both, so its counters are correct.
+It also rejects abusive traffic before that traffic can occupy a
+threadpool thread or a database connection, which application-level
+limiting cannot do.
+
+### Applying it
+
+**Merging this config does not rate-limit production.** It takes effect
+only once an operator adopts it. Either `include` it from your existing
+nginx configuration, or port the three `limit_req_zone` directives and
+their matching `limit_req` lines into whatever proxy you run — Caddy and
+managed load balancers have equivalents.
+
+```bash
+# nginx: place it where your other server blocks live, then
+nginx -t && nginx -s reload
+```
+
+| Zone | Scope | Rate | Burst |
+|---|---|---|---|
+| `sahelspot_search` | `/public/search/*` | 5 r/s | 15 |
+| `sahelspot_public` | `/public/*`, `/`, `/health` | 10 r/s | 30 |
+| `sahelspot_editor` | `/editor/*` | 30 r/s | 60 |
+
+Search is limited far more tightly than the rest of `/public/*` because
+it is the one public route the H2 caching layer cannot protect: each
+distinct query string is a distinct cache entry, so varying `q` bypasses
+the cache and forces a full snapshot load every time. `/editor/*` is
+deliberately the loosest — Studio's bulk operations issue one request per
+item sequentially, and `burst=60` lets a 50-item bulk action through
+untouched.
+
+Also set: `client_max_body_size 6m`, so an oversized upload is rejected
+at the edge instead of being buffered by the application first.
+
+### Required: the API must not be reachable except through the proxy
+
+Rate limits key on the proxy's own view of the TCP peer
+(`$binary_remote_addr`), which cannot be spoofed by a header. But if the
+API container's port 8000 is reachable directly, that path has no limits
+at all. Publish port 8000 only on the proxy's network, or firewall it —
+this is a deployment requirement, not an application setting.
+
+(Separately, the API's `--forwarded-allow-ips=*` means the *application*
+trusts `X-Forwarded-For` from any peer. That affects the client IP
+recorded in auth-failure logs, not the enforcement of these limits.
+Narrowing it to the proxy's address is worthwhile once the proxy address
+is fixed, and is tracked separately.)
+
+### Verifying
+
+```bash
+# Should return 200s, then 429s once the burst is consumed
+for i in $(seq 1 40); do curl -s -o /dev/null -w '%{http_code} ' \
+  https://<your-api-host>/public/search/venues?q=test; done
+```
+
+A rejected request returns `429` with `Retry-After` and the same
+structured body shape as every other API error:
+
+```json
+{"detail": {"error": "rate_limited", "message": "Too many requests. Please slow down and try again."}}
+```
+
+### Tuning
+
+`deploy/nginx.conf` logs `$limit_req_status` (PASSED / DELAYED /
+REJECTED) per request. Run with the limits in place and watch for
+sustained REJECTED on legitimate traffic — particularly during a real
+bulk operation in Studio — before tightening anything. The numbers above
+are derived from measured endpoint cost, not from observed production
+traffic.

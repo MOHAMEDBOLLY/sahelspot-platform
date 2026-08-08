@@ -456,6 +456,28 @@ Behavioural contract:
 - **`ETag` means two different things on the two namespaces.** On `/public/*` it is the snapshot revision (an HTTP cache validator); on `/editor/*` it is the row's optimistic-concurrency `version` (see [`app/api/concurrency.py`](../api/app/api/concurrency.py)). The `pub-rev-` prefix keeps them impossible to confuse.
 - **Shared caches and CDNs are safe.** Starlette's `CORSMiddleware` emits `Vary: Origin` (verified) because `allow_origins` is an explicit list, so a cache keys per origin and cannot serve one origin's `Access-Control-Allow-Origin` header to another. Search responses vary only by query string, which caches already key on as part of the URL.
 
+## Rate limiting (H1)
+
+Rate limits are enforced at the reverse proxy, not in the application — see [`deploy/nginx.conf`](../deploy/nginx.conf) and the Rate limiting section of [`DEPLOYMENT.md`](DEPLOYMENT.md#rate-limiting-h1). No application code, middleware, or dependency implements limiting, and none of the 83 routes changed.
+
+| Zone | Scope | Rate | Burst |
+|---|---|---|---|
+| Search | `/public/search/*` | 5 r/s | 15 |
+| Public | `/public/*`, `/`, `/health` | 10 r/s | 30 |
+| Editor | `/editor/*` | 30 r/s | 60 |
+
+An exceeded limit returns **`429 Too Many Requests`** with a `Retry-After` header and the same structured body shape as every other API error:
+
+```json
+{"detail": {"error": "rate_limited", "message": "Too many requests. Please slow down and try again."}}
+```
+
+Contract notes:
+
+- **`429` is a new status for clients.** No route returned it before. Studio's `apiClient.ts` raises `ApiError` on any non-OK response, so it surfaces the message without a code change; a tailored retry UX is a possible follow-up, not a requirement.
+- **No successful response changed** — same paths, methods, bodies, and status codes. A client that never exceeds a limit cannot tell the difference.
+- **Limits key on the proxy's view of the TCP peer**, which a client cannot spoof via a header. This depends on the API not being reachable except through the proxy; see DEPLOYMENT.md.
+
 ## CORS
 
 As of Sprint 6, `GET` requests are allowed from the Studio dev origins so the browser-based frontend can call this API directly — see `api/app/main.py`. As of Sprint 11, `PATCH` is allowed too, for Save Draft; as of Sprint 12, `POST` is allowed, for Validate; as of Sprint 30, `DELETE` is allowed, for Destination CRUD Parity. Origin/method rules are unaffected by Sprint 23's path restructure — CORS matches on origin and method, not path. As of Sprint 30, allowed origins come from `Settings.allowed_origins` (env-configurable, comma-separated, no wildcard) rather than being hardcoded, defaulting to the Studio dev origins (`http://localhost:5173`, `http://127.0.0.1:5173`) so local dev keeps working unconfigured.
