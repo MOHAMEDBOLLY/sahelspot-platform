@@ -61,6 +61,71 @@ If the database is unreachable, returns `503` with:
 }
 ```
 
+### `GET /version`
+
+Returns `version.json` (`api/version.json`) verbatim — the single, manually-maintained source of truth for Consumer/Studio/Backend version, environment, git commit, deploy time, and live-DB-sourced publish/schema revision. Never generated, never inspects git/Docker. `503` with `{"detail": {"error": "version_unavailable"}}` if the file is missing/unreadable.
+
+```json
+{
+  "consumer_version": "1.0.0",
+  "studio_version": "1.0.0",
+  "backend_version": "1.0.0",
+  "environment": "production",
+  "git_commit": "2c830c5",
+  "last_deployment": "2026-08-08T13:32:19Z",
+  "publish_revision": 1456,
+  "schema_revision": "0016"
+}
+```
+
+### `GET /system/health`
+
+Live server/database/API metrics for Studio's System Health Dashboard, plus an overall `healthy`/`warning`/`critical` status (worst of: CPU/RAM/Disk thresholds, DB latency). Always `200` — any section that can't be read (DB down, OS-level read failure) degrades to `null` fields rather than raising. `docker` is permanently `{"available": false}` — Docker monitoring is intentionally out of scope (no socket, no SDK, no CLI inspection).
+
+```json
+{
+  "timestamp": "2026-08-08T15:33:28.643568+00:00",
+  "status": "healthy",
+  "server": {
+    "cpu_percent": 23.4, "cpu_cores": 8,
+    "load_average": {"1m": 3.24, "5m": 2.53, "15m": 2.27},
+    "memory": {"used_percent": 80.6, "used_gb": 3.25, "total_gb": 8.0},
+    "disk": {"used_percent": 21.1, "used_gb": 11.7, "total_gb": 460.43}
+  },
+  "database": {"status": "connected", "latency_ms": 11.85, "publish_revision": 1456, "schema_revision": "0016"},
+  "api": {"workers": 2, "uptime_seconds": 137.67, "uptime": "2m", "version": "1.0.0", "git_commit": "2c830c5"},
+  "docker": {"available": false}
+}
+```
+
+### `GET /system/backups`
+
+Reads the newest file in `api/backups/` (read-only — never writes, moves, or deletes) and reports its age/size. `status: "warning"` with all fields `null` if the directory is missing or empty — not a `5xx`. Age thresholds: `≤24h` healthy, `24–72h` warning, `>72h` critical.
+
+```json
+{
+  "last_backup": "2026-08-08T15:14:46.171873+00:00",
+  "backup_size": "3.1 KB",
+  "backup_location": "/opt/sahelspot/repo/api/backups",
+  "backup_age": "0m",
+  "status": "healthy"
+}
+```
+
+### `GET /system/logs`
+
+Summary counts only — never streams or returns log content. `api_errors` is a real in-process counter (an ERROR-level logging handler, resets on worker restart). `nginx_errors` is always `null` — nginx runs in a separate container this endpoint doesn't reach into. `last_deploy` reuses `GET /version`'s reader (not a duplicate source). Always `200`.
+
+```json
+{
+  "api_errors": 0,
+  "nginx_errors": null,
+  "last_restart": "2026-08-08T15:16:50.401053+00:00",
+  "last_deploy": "2026-08-08T13:32:19Z",
+  "status": "healthy"
+}
+```
+
 ### `GET /editor/destinations`
 
 Returns all destinations. Added Sprint 4, unchanged since.

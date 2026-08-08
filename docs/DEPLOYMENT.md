@@ -247,6 +247,19 @@ A `503` with `{"status": "error", "database": "disconnected"}` means the
 container is up but can't reach the database — check `DATABASE_URL` and
 network/firewall rules before assuming the deploy itself failed.
 
+Also check `GET /version` and `GET /system/health` return `200` — both
+are new as of the Version Information / System Health Dashboard phases
+(see `docs/API.md`) and are what Studio's Operations page actually
+depends on. **A backend-only deploy is not the whole picture for
+anything touching `datalab-next/`** — this project's Phase 2A/2B
+production deployment initially validated the API correctly but missed
+that Studio's static `dist/` build (step 5 above) hadn't been rebuilt,
+so the new dashboard wasn't visible even though every API check passed.
+Confirm the Studio bundle actually contains what you expect
+(`grep -l "<a string unique to the new feature>" datalab-next/dist/assets/*.js`)
+whenever a deploy includes frontend changes, not just that the build
+command exited `0`.
+
 Also confirm the frontend can actually reach the API from a real browser
 (not just `curl`) — a CORS misconfiguration (`ALLOWED_ORIGINS` not
 matching the deployed frontend's origin) won't show up in `/health` at
