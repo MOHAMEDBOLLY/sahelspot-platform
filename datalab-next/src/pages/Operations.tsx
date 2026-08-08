@@ -5,6 +5,9 @@ import { PagePlaceholder } from '../components/PagePlaceholder'
 import { SystemInformationCard } from '../features/ops/SystemInformationCard'
 import { ApiHealthCard } from '../features/ops/ApiHealthCard'
 import { PublishingSummaryCard } from '../features/ops/PublishingSummaryCard'
+import { SystemHealthDashboard } from '../features/ops/SystemHealthDashboard'
+import { BackupDashboardCard } from '../features/ops/BackupDashboardCard'
+import { LogsDashboardCard } from '../features/ops/LogsDashboardCard'
 
 /** Studio Production Operations dashboard (Phase 3, Sprint 1 — foundation
  * only). Strictly read-only: every card either displays information or
@@ -39,6 +42,13 @@ export function Operations() {
         <SystemInformationCard />
         <ApiHealthCard />
         <PublishingSummaryCard />
+      </div>
+
+      <SystemHealthDashboard />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <BackupDashboardCard />
+        <LogsDashboardCard />
       </div>
     </div>
   )

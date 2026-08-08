@@ -10,6 +10,9 @@ from app.api.routes import (
     search,
     stats,
     system,
+    system_backups,
+    system_health,
+    system_logs,
     taxonomy,
     users,
     venues,
@@ -36,7 +39,9 @@ from app.auth.dependencies import get_current_user
 # integration is meant to call.
 #
 # /system's `/` and `/health` stay unprefixed — infrastructure, not
-# editorial or public content.
+# editorial or public content. `/system/health`, `/system/backups`, and
+# `/system/logs` (Studio's Operations dashboards) are the same kind of
+# route — no auth, consistent with the rest of /system.
 editor_router = APIRouter(prefix="/editor", dependencies=[Depends(get_current_user)])
 editor_router.include_router(destinations.router)
 editor_router.include_router(venues.router)
@@ -54,5 +59,8 @@ public_router.include_router(search.router)
 
 api_router = APIRouter()
 api_router.include_router(system.router)
+api_router.include_router(system_health.router)
+api_router.include_router(system_backups.router)
+api_router.include_router(system_logs.router)
 api_router.include_router(editor_router)
 api_router.include_router(public_router)

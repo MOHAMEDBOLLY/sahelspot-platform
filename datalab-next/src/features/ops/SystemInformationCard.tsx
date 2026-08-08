@@ -1,26 +1,26 @@
 import { Server } from 'lucide-react'
-import { useSystemVersion } from './useSystemVersion'
+import { useVersionInfo } from './useVersionInfo'
 
-const NOT_AVAILABLE = 'Not available'
+const UNAVAILABLE = 'Unavailable'
 
-/** System Information — pure display, no editing. Only Backend Version has
- * a real source today (`GET /`, unchanged). The other five fields have no
- * source anywhere in the codebase yet (no Consumer/Studio build-version
- * stamping, no environment field on any endpoint, no git-commit/deploy-time
- * metadata plumbed through) — shown as an explicit "Not available"
- * placeholder rather than inventing a value, per Sprint 1's scope: add the
- * dashboard shell only, no new instrumentation. */
+/** System Information — pure display, no editing. All eight fields come
+ * from `GET /version`, which returns `version.json` (the single, manually-
+ * updated source of truth) verbatim. A missing/unreachable endpoint falls
+ * back to "Unavailable" per field rather than crashing the card. */
 export function SystemInformationCard() {
-  const { data, isPending, isError } = useSystemVersion()
-  const backendVersion = isPending ? '…' : isError || !data ? NOT_AVAILABLE : data.version
+  const { data, isPending, isError } = useVersionInfo()
+  const field = (value: string | number | undefined) =>
+    isPending ? '…' : isError || value === undefined || value === '' ? UNAVAILABLE : String(value)
 
   const rows: Array<[label: string, value: string]> = [
-    ['Consumer Version', NOT_AVAILABLE],
-    ['Studio Version', NOT_AVAILABLE],
-    ['Backend Version', backendVersion],
-    ['Environment', NOT_AVAILABLE],
-    ['Git Commit', NOT_AVAILABLE],
-    ['Last Deployment', NOT_AVAILABLE],
+    ['Consumer Version', field(data?.consumer_version)],
+    ['Studio Version', field(data?.studio_version)],
+    ['Backend Version', field(data?.backend_version)],
+    ['Environment', field(data?.environment)],
+    ['Git Commit', field(data?.git_commit)],
+    ['Last Deployment', field(data?.last_deployment)],
+    ['Publish Revision', field(data?.publish_revision)],
+    ['Schema Revision', field(data?.schema_revision)],
   ]
 
   return (
