@@ -149,6 +149,14 @@ def _provision_viewer(db: Session, *, user_id: str, email: str | None) -> AppUse
     beyond this one bootstrap rule are a deferred feature (`PATCH
     /editor/users/{id}`, not built yet).
 
+    C1 — only reached at all when `Settings.auto_provision_users` is
+    `True`, *or* when this identity is the bootstrap admin (see
+    `get_current_user`'s gate immediately before this is called). The
+    bootstrap admin path is never gated: with auto-provisioning off and
+    no bootstrap exemption, a fresh deployment would have no `app_users`
+    rows and no way to create the first one, since every other write path
+    already requires an existing role to reach it.
+
     This *is* a role change (none -> a real role), so it's activity-logged
     the same way every other editorial action is — `actor` is the newly
     provisioned user themselves, since logging in is what triggered it.
@@ -191,13 +199,23 @@ def get_current_user(
     """FastAPI dependency: verifies the `Authorization: Bearer <token>`
     header against Supabase's JWT secret, then resolves the caller's role
     from `app_users` — auto-provisioning a `viewer` row on first login
-    rather than rejecting an otherwise-valid Supabase user. Raises `401`
+    rather than rejecting an otherwise-valid Supabase user, unless C1's
+    `Settings.auto_provision_users` is disabled (see below). Raises `401`
     for anything short of a valid, unexpired, correctly-signed
     Supabase-issued token — missing header, malformed header, bad
     signature, and expiry are all the same "not authenticated" outcome to
-    every caller of this dependency. Never raises `403` here — role
-    *sufficiency* for a given action is `require_permission()`'s job, not
-    this function's.
+    every caller of this dependency.
+
+    C1 — the one place this function *does* raise `403` rather than `401`:
+    an identity with no `app_users` row when auto-provisioning is off.
+    That's deliberately not a `401` — the token is valid and the caller is
+    genuinely who they say they are; authentication succeeded.
+    Authorization is what's missing, and `403` is the correct status for
+    that, same as `require_permission()`'s own 403 path. This is still the
+    *only* authorization decision this module makes, and only for this one
+    case (existing/provisioned users are unaffected either way) — role
+    *sufficiency* for a given action otherwise remains entirely
+    `require_permission()`'s job.
 
     Security hardening PR 5 — `request` is a new parameter, added only so
     each rejection path can log via `log_auth_failure`; it's not used for
@@ -237,6 +255,25 @@ def get_current_user(
 
     app_user = db.get(AppUser, user_id)
     if app_user is None:
+        # C1 — the bootstrap admin is exempt from this gate in either
+        # state of the flag: with auto-provisioning off and no exemption,
+        # a fresh deployment would have no `app_users` rows and no
+        # authenticated path to create the first one.
+        is_bootstrap_admin = user_id == settings.bootstrap_admin_user_id
+        if not settings.auto_provision_users and not is_bootstrap_admin:
+            log_auth_failure(
+                request,
+                event="unprovisioned_user",
+                reason="no app_users row exists and auto-provisioning is disabled",
+                user_id=user_id,
+            )
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "user_not_authorized",
+                    "message": "This account has not been provisioned.",
+                },
+            )
         app_user = _provision_viewer(db, user_id=user_id, email=email)
 
     return CurrentUser(id=user_id, email=email, role=app_user.role)

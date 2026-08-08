@@ -34,6 +34,18 @@ class Settings(BaseSettings):
     # per deployment. Optional: unset means no auto-promotion happens, and
     # the first admin row must be inserted manually.
     bootstrap_admin_user_id: str | None = None
+    # C1 — when `False`, an authenticated Supabase identity with no
+    # existing `app_users` row is rejected (403) instead of being
+    # auto-provisioned as `viewer` (see `_provision_viewer`). Defaults to
+    # `True`, preserving Sprint 24's original behavior exactly — this is
+    # opt-in hardening, not a breaking default. Production sets this to
+    # `False` once open Supabase signup is a real, accepted risk to close:
+    # any signed-up identity previously became a `viewer`, with read
+    # access to the whole `/editor/*` surface. `bootstrap_admin_user_id`
+    # is exempt from this gate in either state — see `_provision_viewer`'s
+    # docstring for why a bootstrap admin blocked by this flag would leave
+    # a fresh deployment with no way to ever grant its first admin role.
+    auto_provision_users: bool = True
     # Sprint 25 — Media Library Foundation. Optional: media upload returns a
     # clear 503 if unset rather than the app failing to start, since not
     # every environment needs media upload configured to run everything else.
