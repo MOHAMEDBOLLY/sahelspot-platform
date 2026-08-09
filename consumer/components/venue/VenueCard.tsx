@@ -19,6 +19,16 @@ type VenueCardOwnProps =
       event?: never;
       saved?: boolean;
       onToggleSaved?: (venueId: string) => void;
+      /** Location Context Label refinement — set only by a caller that
+       * knows the venue is shown in a Destination-related list (Venue
+       * Details' Similar Experiences, Search's `?destination=` results)
+       * and has already determined (via `lib/domain/destination.ts`'s
+       * `areaLabel`) that this venue belongs to a *different* destination
+       * in the same real-world area. `horizontal-row` only — see that
+       * variant's render for why. Never computed inside this component:
+       * `VenueCard` stays presentational and takes the answer, not the
+       * destination list needed to work it out. */
+      areaLabel?: string | null;
     }
   | {
       variant: "event";
@@ -26,6 +36,7 @@ type VenueCardOwnProps =
       venue?: never;
       saved?: never;
       onToggleSaved?: never;
+      areaLabel?: never;
     };
 
 type VenueCardProps = VenueCardOwnProps;
@@ -68,7 +79,7 @@ export function VenueCard(props: VenueCardProps) {
     return <EventVariant event={props.event} />;
   }
 
-  const { venue, variant = "vertical-lg", saved = false, onToggleSaved } = props;
+  const { venue, variant = "vertical-lg", saved = false, onToggleSaved, areaLabel = null } = props;
   const href = `/venues/${venue.id}`;
 
   if (variant === "horizontal-row") {
@@ -105,14 +116,19 @@ export function VenueCard(props: VenueCardProps) {
           <h3 className="truncate font-headline font-bold leading-tight text-primary">
             {venue.name}
           </h3>
-          {venue.distanceLabel ? (
-            <div className="flex items-center gap-1">
-              <Icon className="text-on-surface-variant" name="location_on" size={16} />
-              <span className="text-xs font-medium text-on-surface-variant">
-                {venue.distanceLabel}
-              </span>
-            </div>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
+            <Icon className="text-on-surface-variant" name="location_on" size={16} />
+            <span className="text-xs font-medium text-on-surface-variant">
+              {venue.distanceLabel ? `${venue.destinationName} · ${venue.distanceLabel}` : venue.destinationName}
+            </span>
+            {/* Location Context Label refinement — the venue's own
+              * destination name above is never overwritten; this is an
+              * additive, visually subordinate badge (small `Pill`, same
+              * treatment as `notableAccessType` below) explaining *why* a
+              * venue from a different destination is showing up here, not
+              * a replacement for its real location. */}
+            {areaLabel ? <Pill variant="tag">{areaLabel}</Pill> : null}
+          </div>
           {venue.rating !== null ? (
             <RatingBadge compact reviewCount={venue.reviewCount ?? undefined} value={venue.rating} />
           ) : null}

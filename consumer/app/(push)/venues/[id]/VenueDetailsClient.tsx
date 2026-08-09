@@ -16,11 +16,13 @@ import { ImageGallery } from "@/components/venue/ImageGallery";
 import { VenueCard } from "@/components/venue/VenueCard";
 import { useVenue } from "@/lib/hooks/useVenue";
 import { useVenues } from "@/lib/hooks/useVenues";
+import { useDestinations } from "@/lib/hooks/useDestinations";
 import { useSaved } from "@/lib/saved/useSaved";
 import { VENUE_CATEGORY_LABEL } from "@/lib/domain/venueCategoryLabel";
 import { formatOpenUntil } from "@/lib/domain/openingHours";
 import { distanceKm } from "@/lib/domain/geo";
 import { ACCESS_TYPE_ICON, type AccessType } from "@/lib/domain/accessType";
+import { areaLabel } from "@/lib/domain/destination";
 import type { Venue } from "@/lib/domain/venue";
 
 /** Same-destination venues ordered by real distance from `venue` — both
@@ -91,6 +93,7 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
   const router = useRouter();
   const venue = useVenue(venueId);
   const allVenues = useVenues();
+  const destinations = useDestinations();
   const { isSaved, toggle } = useSaved();
   const [shareState, setShareState] = useState<"idle" | "copied" | "error">("idle");
 
@@ -155,6 +158,14 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
     new Set([data.id, ...nearby.map((venue) => venue.id)]),
     6,
   );
+  // Location Context Label refinement — this venue's own destination is the
+  // implicit "Destination context" for both lists below. `nearbyVenues`
+  // already restricts candidates to the same `destinationId` (see its own
+  // docstring), so `areaLabel` always resolves `null` there — Case 1 is
+  // guaranteed by construction, not re-checked here. `similarVenues` has no
+  // such restriction (tag-based, catalog-wide), so it's the one place this
+  // can genuinely resolve to a real "X Area" badge.
+  const destinationContext = (destinations.data ?? []).find((d) => d.id === data.destinationId) ?? null;
   const hoursLabel = data.openingHours ? formatOpenUntil(data.openingHours, new Date()) : null;
   // Access Type/Reservation Policy — Category/Tags/Access Type/Badges/
   // Collections architecture (Phase 1). Rendered as info pills alongside
@@ -354,6 +365,7 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
             <div className="space-y-3">
               {nearby.map((nearbyVenue) => (
                 <VenueCard
+                  areaLabel={areaLabel(nearbyVenue.destinationId, destinationContext, destinations.data ?? [])}
                   key={nearbyVenue.id}
                   onToggleSaved={toggle}
                   saved={isSaved(nearbyVenue.id)}
@@ -371,6 +383,7 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
             <div className="space-y-3">
               {similar.map((similarVenue) => (
                 <VenueCard
+                  areaLabel={areaLabel(similarVenue.destinationId, destinationContext, destinations.data ?? [])}
                   key={similarVenue.id}
                   onToggleSaved={toggle}
                   saved={isSaved(similarVenue.id)}

@@ -271,8 +271,19 @@ function SearchPageContent() {
               * `category === "beach"`. This is a display rule, not a
               * taxonomy change: `accessType` state and the `searchVenues`
               * query param are untouched, so a value set while on Beaches
-              * still filters correctly if it survives a category change. */}
-            {category === "beach" ? (
+              * still filters correctly if it survives a category change.
+              *
+              * Exception (Explore Access Type Flow Fix): also shown when
+              * `accessType !== "all"`, regardless of category. Explore's
+              * "Browse by Access Type" links straight into `?accessType=`
+              * with no category — hiding the row there left an active,
+              * already-applied filter with no visible chip, no "why are
+              * these my results" explanation, and no way to change or
+              * clear it. `changeCategory` already preserves `accessType`
+              * across a category change back to "all" (see its own
+              * comment above) — that state was never the bug, only this
+              * row's visibility was. */}
+            {category === "beach" || accessType !== "all" ? (
               <section>
                 <div className="hide-scrollbar flex gap-2 overflow-x-auto">
                   <FilterChip
