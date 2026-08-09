@@ -229,7 +229,7 @@ export function HomeClient() {
         </section>
 
         <VenueRail
-          actionHref="/search?category=Beach%20Club"
+          actionHref="/search?category=beach"
           emptyDescription="Published beaches and beach clubs will appear here."
           emptyIcon="beach_access"
           emptyTitle="No beaches yet"
@@ -334,7 +334,7 @@ export function HomeClient() {
         </section>
 
         <VenueRail
-          actionHref="/search?category=Restaurant"
+          actionHref="/search?category=food"
           emptyDescription="Published restaurants will appear here."
           emptyIcon="restaurant"
           emptyTitle="No food picks yet"
@@ -348,7 +348,7 @@ export function HomeClient() {
         />
 
         <VenueRail
-          actionHref="/search?category=Nightlife"
+          actionHref="/search?category=nightlife"
           emptyDescription="Published nightlife spots will appear here."
           emptyIcon="nightlife"
           emptyTitle="No nightlife yet"
