@@ -47,9 +47,11 @@ export type HomeActivity = {
 export const HOME_ACTIVITIES: readonly HomeActivity[] = [
   { id: "beaches", icon: "beach_access", label: "Beaches", categories: ["beach"] },
   { id: "coffee", icon: "coffee", label: "Coffee", categories: ["coffee"] },
-  // No Bakery/Dessert/Ice Cream/Fast Food category exists in Studio; in this
-  // dataset those venues are filed under Cafe, which maps to "coffee".
-  { id: "quick-bites", icon: "fastfood", label: "Quick Bites", categories: ["coffee", "food"] },
+  // "Quick Bites" means fast/casual eating — Fast Food, Burgers, Pizza,
+  // Sandwiches — which are Restaurant-category tags (see api/alembic
+  // 0014_tags.py's Quick Bites tag set), not Cafe. Primary must be "food"
+  // so `activityHref` lands on Search's food taxonomy, not coffee's.
+  { id: "quick-bites", icon: "fastfood", label: "Quick Bites", categories: ["food", "coffee"] },
   { id: "restaurants", icon: "restaurant", label: "Restaurants", categories: ["food"] },
   { id: "events", icon: "confirmation_number", label: "Events", categories: [], href: "/events" },
   { id: "nightlife", icon: "nightlife", label: "Nightlife", categories: ["nightlife", "beach"] },

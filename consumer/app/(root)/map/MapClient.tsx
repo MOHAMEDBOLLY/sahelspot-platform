@@ -45,10 +45,20 @@ const MapView = dynamic(() => import("@/components/map/MapView").then((m) => m.M
  * but still never navigates anywhere on its own.
  *
  * Filter row order — Destination, Category, Category-scoped Tags, Access
- * Type, Reservation Policy — and the taxonomy-scoping logic itself
- * (`useCategoryTaxonomy`) match Search exactly (Category/Tags/Access
+ * Type, Reservation Policy — and the tag/reservation-policy scoping logic
+ * itself (`useCategoryTaxonomy`) match Search exactly (Category/Tags/Access
  * Type/Badges/Collections architecture, Phase 3): every taxonomy surface
- * in the app reads the same rules, not a screen-specific variant. */
+ * in the app reads the same rules, not a screen-specific variant.
+ *
+ * Access Type is the one deliberate exception (Consumer UX Final Polish,
+ * confirmed product decision): Search hides its Access Type row outside
+ * `category === "beach"`, since every other category's own taxonomy is
+ * tags, not access method. Map keeps Access Type visible for every
+ * category — it's a cross-category spatial filter (e.g. finding every
+ * QR-gated venue on the map, beach or not), not a per-category taxonomy
+ * browser, so narrowing it to Beaches-only would remove real functionality
+ * rather than reduce redundant choice. Do not "fix" this divergence to
+ * match Search without a new, explicit product decision. */
 export function MapClient() {
   const router = useRouter();
   const mapRef = useRef<MapViewHandle>(null);

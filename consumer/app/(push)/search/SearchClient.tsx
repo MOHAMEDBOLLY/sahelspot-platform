@@ -229,19 +229,32 @@ function SearchPageContent() {
           </>
         ) : (
           <>
-            <section>
-              <div className="hide-scrollbar flex gap-2 overflow-x-auto">
-                {CATEGORY_FILTERS.map((filter) => (
-                  <FilterChip
-                    active={category === filter.value}
-                    icon={filter.icon}
-                    key={filter.value}
-                    label={filter.label}
-                    onClick={() => changeCategory(filter.value)}
-                  />
-                ))}
-              </div>
-            </section>
+            {/* A category arriving pre-selected (Home's activity chips, a
+              * "See All" link, any `?category=` deep link) means the user
+              * already made this choice — re-showing the same row here
+              * would ask them to pick it again. Only Search's own default
+              * entry point (Bottom Nav, `category` still "all") shows it. */}
+            {category === "all" ? (
+              <section>
+                <div className="hide-scrollbar flex gap-2 overflow-x-auto">
+                  {CATEGORY_FILTERS.map((filter) => (
+                    <FilterChip
+                      active={category === filter.value}
+                      icon={filter.icon}
+                      key={filter.value}
+                      label={filter.label}
+                      onClick={() => changeCategory(filter.value)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <SectionHeader
+                actionLabel="Change"
+                onActionClick={() => changeCategory("all")}
+                title={CATEGORY_FILTERS.find((filter) => filter.value === category)?.label ?? ""}
+              />
+            )}
 
             {/* Category/Tags/Access Type/Badges/Collections architecture
               * (Phase 1/2) — one FilterChip row per taxonomy dimension,
@@ -250,26 +263,36 @@ function SearchPageContent() {
               * "sushi"). Tags use real slugs observed across the currently
               * loaded venue list (`lib/domain/tags.ts`), never hardcoded —
               * multi-select with OR semantics, matching
-              * `/public/search/venues`'s own `tags` param exactly. */}
-            <section>
-              <div className="hide-scrollbar flex gap-2 overflow-x-auto">
-                <FilterChip
-                  active={accessType === "all"}
-                  key="all"
-                  label="Any Access"
-                  onClick={() => setAccessType("all")}
-                />
-                {ACCESS_TYPES.map((value) => (
+              * `/public/search/venues`'s own `tags` param exactly.
+              *
+              * Access Type is presentation-restricted to Beaches only (Final
+              * Polish, Part 4) — every other category's taxonomy is tags,
+              * not access method, so the row is simply not rendered outside
+              * `category === "beach"`. This is a display rule, not a
+              * taxonomy change: `accessType` state and the `searchVenues`
+              * query param are untouched, so a value set while on Beaches
+              * still filters correctly if it survives a category change. */}
+            {category === "beach" ? (
+              <section>
+                <div className="hide-scrollbar flex gap-2 overflow-x-auto">
                   <FilterChip
-                    active={accessType === value}
-                    icon={ACCESS_TYPE_ICON[value]}
-                    key={value}
-                    label={value}
-                    onClick={() => setAccessType(value)}
+                    active={accessType === "all"}
+                    key="all"
+                    label="Any Access"
+                    onClick={() => setAccessType("all")}
                   />
-                ))}
-              </div>
-            </section>
+                  {ACCESS_TYPES.map((value) => (
+                    <FilterChip
+                      active={accessType === value}
+                      icon={ACCESS_TYPE_ICON[value]}
+                      key={value}
+                      label={value}
+                      onClick={() => setAccessType(value)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             {popularTags.length > 0 ? (
               <section>
