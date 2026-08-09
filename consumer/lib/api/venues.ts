@@ -11,7 +11,6 @@ export function fetchVenue(venueId: string): Promise<PublishedVenueDTO | null> {
 
 export type VenueSearchParams = {
   q?: string;
-  category?: string;
   destination?: string;
   /** Comma-joined tag slugs — OR semantics on the backend (a venue matches
    * if it carries any one of them), matching `/public/search/venues`'s own
@@ -24,11 +23,22 @@ export type VenueSearchParams = {
 };
 
 /** Calls the dedicated `/public/search/venues` endpoint — never
- * `/public/venues` filtered client-side. */
+ * `/public/venues` filtered client-side.
+ *
+ * Deliberately no `category` param here, unlike `q`/`destination`/`tags`/
+ * `accessType`: the backend's `category` filter matches the *raw* Studio
+ * string exactly (`"Beach Club"`, `"Restaurant"`, ...), but the Consumer's
+ * category chips are the simplified 9-value domain taxonomy
+ * (`lib/domain/categories.ts`'s `beach`/`food`/`coffee`/...) — sending
+ * `category=beach` against `"Beach Club"` never matches anything (verified
+ * live: 0 results for every domain bucket). There's also no clean 1:1
+ * mapping back to a single raw value — `hotel` alone covers both `"Hotel"`
+ * and `"Resort"`. `SearchClient` filters by the already-mapped domain
+ * `Venue.category` client-side instead, the same way it already has to for
+ * `reservationPolicy` (no server-side filter exists for that either). */
 export function searchVenues(params: VenueSearchParams): Promise<PublishedVenueDTO[]> {
   const query = new URLSearchParams();
   if (params.q) query.set("q", params.q);
-  if (params.category) query.set("category", params.category);
   if (params.destination) query.set("destination", params.destination);
   if (params.tags && params.tags.length > 0) query.set("tags", params.tags.join(","));
   if (params.accessType) query.set("accessType", params.accessType);

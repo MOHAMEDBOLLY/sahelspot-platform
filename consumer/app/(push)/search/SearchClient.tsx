@@ -14,6 +14,7 @@ import { VenueCard } from "@/components/venue/VenueCard";
 import { CATEGORY_FILTERS } from "@/lib/map/config";
 import { useSearchVenues } from "@/lib/hooks/useSearchVenues";
 import { useVenues } from "@/lib/hooks/useVenues";
+import { useCategoryTaxonomy } from "@/lib/hooks/useCategoryTaxonomy";
 import { useRecentSearches } from "@/lib/search/useRecentSearches";
 import { useSaved } from "@/lib/saved/useSaved";
 import {
@@ -23,7 +24,6 @@ import {
   type AccessType,
   type ReservationPolicy,
 } from "@/lib/domain/accessType";
-import { topTags } from "@/lib/domain/tags";
 import type { VenueCategory } from "@/lib/domain/venue";
 
 const SEARCH_TAG_COUNT = 10;
@@ -83,32 +83,82 @@ function SearchPageContent() {
       selectedTags.length > 0,
   );
 
-  // Popular Tags only renders once `hasQuery` is true (see the results
-  // view below) — gated the same way, so landing on Search's default
-  // "recent searches" screen never fetches the full venue catalog just to
-  // compute chips that aren't on screen yet.
+  // Tags only render once `hasQuery` is true (see the results view below)
+  // — gated the same way, so landing on Search's default "recent searches"
+  // screen never fetches the full venue catalog just to compute chips
+  // that aren't on screen yet.
   const venues = useVenues({ enabled: hasQuery });
-  const popularTags = useMemo(() => topTags(venues.data ?? [], SEARCH_TAG_COUNT), [venues.data]);
 
-  const results = useSearchVenues({
-    q: query,
-    category: category === "all" ? undefined : category,
-    destination,
-    accessType: accessType === "all" ? undefined : accessType,
-    tags: selectedTags,
-  });
-  const filteredResults = useMemo(
-    () =>
-      reservationPolicy === "all"
-        ? results.data
-        : results.data?.filter((venue) => venue.reservationPolicy === reservationPolicy),
-    [results.data, reservationPolicy],
+  // Tags are category-scoped, not global — a Beach venue and a Restaurant
+  // venue don't share a tag vocabulary in practice, so mixing "Pizza" into
+  // a Beaches search is noise, not discovery. With no category selected
+  // there's no scope to derive tags from, so the row stays empty rather
+  // than falling back to a global aggregate. Shared with Map — see
+  // `useCategoryTaxonomy`'s own docstring for why this one hook is the
+  // single source both screens read from.
+  const { popularTags, hasReservationPolicy: categoryHasReservationPolicy } = useCategoryTaxonomy(
+    venues.data ?? [],
+    category,
+    SEARCH_TAG_COUNT,
   );
+
+  // `category` isn't sent to `searchVenues` — see that function's own note
+  // on why the backend's raw-string category filter can't be driven by the
+  // Consumer's domain buckets. Driven with this page's own `hasQuery`
+  // instead of the hook's params-derived default, since category alone
+  // (with q/destination/accessType/tags all empty) is a valid reason to
+  // fetch here even though the hook itself no longer sees any param for it.
+  const results = useSearchVenues(
+    {
+      q: query,
+      destination,
+      accessType: accessType === "all" ? undefined : accessType,
+      tags: selectedTags,
+    },
+    { enabled: hasQuery },
+  );
+  // Category and Reservation Policy are both applied client-side, over
+  // whatever `results` already returned — category because the backend
+  // filter can't take a domain bucket (see `searchVenues`), reservation
+  // policy because no server-side filter for it exists at all. One filter
+  // pass, not two separate ones, so there's a single place this logic
+  // lives.
+  const filteredResults = useMemo(() => {
+    let matches = results.data;
+    if (category !== "all") {
+      matches = matches?.filter((venue) => venue.category === category);
+    }
+    if (reservationPolicy !== "all") {
+      matches = matches?.filter((venue) => venue.reservationPolicy === reservationPolicy);
+    }
+    return matches;
+  }, [results.data, category, reservationPolicy]);
 
   function toggleTag(slug: string) {
     setSelectedTags((current) =>
       current.includes(slug) ? current.filter((tag) => tag !== slug) : [...current, slug],
     );
+  }
+
+  // Tags/Reservation Policy are scoped to the selected category — a value
+  // picked under one category has no meaning under another, so switching
+  // category clears both rather than silently carrying an invisible,
+  // mismatched filter into the new results. Access Type stays (it's
+  // category-independent, see `useCategoryTaxonomy`), unless the specific
+  // combination would guarantee zero results, matching Map's identical
+  // reset logic (Category/Tags/Access Type/Badges/Collections
+  // architecture, Phase 3 — every taxonomy surface follows the same rule).
+  function changeCategory(next: VenueCategory | "all") {
+    setCategory(next);
+    setSelectedTags([]);
+    setReservationPolicy("all");
+    setAccessType((current) => {
+      if (current === "all" || next === "all") return current;
+      const stillPossible = (venues.data ?? []).some(
+        (venue) => venue.category === next && venue.accessType === current,
+      );
+      return stillPossible ? current : "all";
+    });
   }
 
   useEffect(() => {
@@ -171,7 +221,7 @@ function SearchPageContent() {
                     icon={item.icon}
                     key={item.category}
                     label={item.label}
-                    onClick={() => setCategory(item.category)}
+                    onClick={() => changeCategory(item.category)}
                   />
                 ))}
               </div>
@@ -187,7 +237,7 @@ function SearchPageContent() {
                     icon={filter.icon}
                     key={filter.value}
                     label={filter.label}
-                    onClick={() => setCategory(filter.value)}
+                    onClick={() => changeCategory(filter.value)}
                   />
                 ))}
               </div>
@@ -238,32 +288,42 @@ function SearchPageContent() {
             ) : null}
 
             {/* Client-side only — see `reservationPolicy` state above for
-              * why this can't be a `searchVenues` query param. */}
-            <section>
-              <div className="hide-scrollbar flex gap-2 overflow-x-auto">
-                <FilterChip
-                  active={reservationPolicy === "all"}
-                  key="all"
-                  label="Any Reservation"
-                  onClick={() => setReservationPolicy("all")}
-                />
-                {RESERVATION_POLICIES.map((value) => (
+              * why this can't be a `searchVenues` query param. Category-
+              * scoped like Tags: only rendered when a venue in the
+              * selected category actually carries a reservation policy. */}
+            {categoryHasReservationPolicy ? (
+              <section>
+                <div className="hide-scrollbar flex gap-2 overflow-x-auto">
                   <FilterChip
-                    active={reservationPolicy === value}
-                    icon="event_available"
-                    key={value}
-                    label={`Reservation ${value}`}
-                    onClick={() => setReservationPolicy(value)}
+                    active={reservationPolicy === "all"}
+                    key="all"
+                    label="Any Reservation"
+                    onClick={() => setReservationPolicy("all")}
                   />
-                ))}
-              </div>
-            </section>
+                  {RESERVATION_POLICIES.map((value) => (
+                    <FilterChip
+                      active={reservationPolicy === value}
+                      icon="event_available"
+                      key={value}
+                      label={`Reservation ${value}`}
+                      onClick={() => setReservationPolicy(value)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             <section>
               <SectionHeader
                 title={
                   results.isSuccess
-                    ? `Results — ${filteredResults?.length ?? 0}`
+                    ? // Arriving via a Destination card (`?destination=`) gave no
+                      // on-screen confirmation of which destination was active —
+                      // just a generic "Results — N" — so a first-time user had
+                      // no way to tell this list was filtered at all. Reuses the
+                      // destination name already present on each result
+                      // (`Venue.destinationName`), not a second fetch.
+                      `Results${destination && filteredResults?.[0] ? ` in ${filteredResults[0].destinationName}` : ""} — ${filteredResults?.length ?? 0}`
                     : "Results"
                 }
               />

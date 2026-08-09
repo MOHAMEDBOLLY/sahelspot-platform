@@ -327,7 +327,16 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
           </section>
         ) : null}
 
-        {images.length > 0 ? (
+        {/* Phase 1 — Gallery hasn't launched yet, so a venue with only a
+          * cover image and no real gallery isn't "a gallery of one photo,"
+          * it's no gallery at all: `images` (used above for the hero
+          * swiper) always includes the cover, so gating on it would show a
+          * "Gallery" section whose only content duplicates the hero.
+          * Gated on `galleryImageUrls` specifically instead — genuine
+          * gallery content, independent of whether a cover exists. Support
+          * for the section itself is unchanged; it simply doesn't render
+          * until real gallery images exist. */}
+        {data.galleryImageUrls.length > 0 ? (
           <section className="space-y-4">
             <SectionHeader size="lg" title="Gallery" />
             <GalleryThumbnails images={images} venueName={data.name} />

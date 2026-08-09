@@ -8,16 +8,25 @@ export const DEFAULT_CENTER: [number, number] = [28.7, 31.05];
 export const DEFAULT_ZOOM = 10;
 
 /** Screen-space chrome reserved over the map: the top search+filter overlay
- * (measured ~140px) and the right-edge FAB column (locate/layers, 48px each
- * + `right-4` = ~72px), plus a small margin on the other two edges so
- * markers/clusters never render flush against the viewport. Set once as the
- * map's native `padding` — every camera method (`flyTo`, `easeTo`,
- * `jumpTo`) falls back to this automatically when it doesn't specify its
- * own, so cluster-expansion and "locate me" both frame their target inside
- * the safe area without each call needing to know about it. Also used to
- * inset the viewport box `MapView` queries for visible markers, so a pin
- * is never *built* already clipped by an edge or the FAB column. */
-export const MAP_SAFE_PADDING = { top: 140, right: 72, bottom: 24, left: 24 };
+ * and the right-edge FAB column (locate/layers, 48px each + `right-4` =
+ * ~72px), plus a small margin on the other two edges so markers/clusters
+ * never render flush against the viewport. Set once as the map's native
+ * `padding` — every camera method (`flyTo`, `easeTo`, `jumpTo`) falls back
+ * to this automatically when it doesn't specify its own, so cluster-
+ * expansion and "locate me" both frame their target inside the safe area
+ * without each call needing to know about it. Also used to inset the
+ * viewport box `MapView` queries for visible markers, so a pin is never
+ * *built* already clipped by an edge or the filter overlay.
+ *
+ * `top` (~360px) is sized for the overlay's *tallest* combination —
+ * SearchField + Destination + Category + Tags + Access Type + Reservation
+ * Policy (Category/Tags/Access Type/Badges/Collections architecture,
+ * Phase 3) — not just whichever rows happen to be visible for the current
+ * filter selection. Reserving for the max means markers are never hidden
+ * under the overlay when a row appears, at the cost of some unused margin
+ * when fewer rows are showing — the safer direction for a value that
+ * can't react to the overlay's actual measured height. */
+export const MAP_SAFE_PADDING = { top: 360, right: 72, bottom: 24, left: 24 };
 
 /** The filter row now lives in the canonical taxonomy — see
  * `@/lib/domain/categories`. Re-exported here so existing Map/Search

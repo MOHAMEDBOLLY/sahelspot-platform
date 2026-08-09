@@ -6,6 +6,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { CATEGORY_BY_VALUE, type VenueCategory } from "@/lib/domain/categories";
 import type { Venue } from "@/lib/domain/venue";
 import { DEFAULT_CENTER, DEFAULT_ZOOM, MAP_SAFE_PADDING, MAPBOX_TOKEN } from "@/lib/map/config";
+import { spreadOverlappingVenues } from "@/lib/map/spreadMarkers";
 import { createClusterElement } from "./createClusterElement";
 import { createMarkerElement, createUserLocationElement } from "./createMarkerElement";
 import { createPreviewChipElement } from "./createPreviewChipElement";
@@ -13,7 +14,22 @@ import { createPreviewChipElement } from "./createPreviewChipElement";
 export type MapViewHandle = {
   flyToUser: () => void;
   toggleStyle: () => void;
+  /** Used by the Destination filter — centers the camera on a computed
+   * destination centroid at a close-enough zoom to see its venues spread
+   * out, without needing its own dedicated method per caller. */
+  flyTo: (center: [number, number], zoom: number) => void;
 };
+
+/** Tagged venues first, then featured, then everything else — z-index
+ * only, never a filter: nothing is hidden, a more relevant venue simply
+ * doesn't end up visually buried under a plain one when markers sit close
+ * together (see `spreadOverlappingVenues` for the separate, position-level
+ * fix for the same "markers on top of each other" problem). */
+function markerPriority(venue: Venue): number {
+  if (venue.tags.length > 0) return 3;
+  if (venue.isFeatured) return 2;
+  return 1;
+}
 
 type MapViewProps = {
   venues: Venue[];
@@ -30,8 +46,15 @@ const STYLES = ["mapbox://styles/mapbox/streets-v12", "mapbox://styles/mapbox/sa
 
 const SOURCE_ID = "venues-cluster";
 const CLUSTER_QUERY_LAYER = "venues-cluster-query-layer";
-const CLUSTER_RADIUS = 50;
-const CLUSTER_MAX_ZOOM = 14;
+// Reduced from the original 50/14: clustering was persisting well past the
+// zoom level anyone actually browses at, so nearby venues almost always
+// rendered as one crowded bubble instead of individually tappable pins.
+// Clusters should read as "zoomed far out, region view" only — a smaller
+// radius means less eager grouping at any given zoom, and a lower max zoom
+// means clusters dissolve into real markers as soon as the user zooms in
+// past the initial region-level view, not deep into street level.
+const CLUSTER_RADIUS = 30;
+const CLUSTER_MAX_ZOOM = 11;
 /** Screen-space footprint of the preview marker, in pixels — a fixed
  * estimate is enough to keep it fully inside the safe area without
  * measuring the real DOM element. It's anchored by its bottom edge (see the
@@ -47,16 +70,21 @@ const CHIP_NUDGE_DURATION_MS = 200;
 
 type VenueFeatureCollection = GeoJSON.FeatureCollection<GeoJSON.Point, { id: string }>;
 
+/** Feeds Mapbox's clustering engine the *spread* positions
+ * (`spreadOverlappingVenues`), not raw `venue.coordinates` — clustering and
+ * marker placement both need to agree on where a venue visually sits, or
+ * a venue could cluster with neighbors its own marker doesn't appear next
+ * to. `venuesByIdRef` (real domain objects, real coordinates) is what
+ * every other consumer of a venue's location reads; this collection only
+ * ever drives what's drawn. */
 function toFeatureCollection(venues: Venue[]): VenueFeatureCollection {
   return {
     type: "FeatureCollection",
-    features: venues
-      .filter((venue) => venue.coordinates !== null)
-      .map((venue) => ({
-        type: "Feature",
-        properties: { id: venue.id },
-        geometry: { type: "Point", coordinates: [venue.coordinates!.lng, venue.coordinates!.lat] },
-      })),
+    features: spreadOverlappingVenues(venues).map(({ venue, lng, lat }) => ({
+      type: "Feature",
+      properties: { id: venue.id },
+      geometry: { type: "Point", coordinates: [lng, lat] },
+    })),
   };
 }
 
@@ -105,6 +133,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       if (!mapRef.current) return;
       styleIndexRef.current = (styleIndexRef.current + 1) % STYLES.length;
       mapRef.current.setStyle(STYLES[styleIndexRef.current]);
+    },
+    flyTo(center, zoom) {
+      mapRef.current?.flyTo({ center, zoom });
     },
   }));
 
@@ -246,7 +277,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         if (isActive) ensureActiveVenueVisible([lng, lat]);
         const el = isActive
           ? createPreviewChipElement(venue, { onOpen: () => onSelectVenue(venue.id) })
-          : createMarkerElement(venue.category, { label: venue.name });
+          : createMarkerElement(venue.category, { label: venue.name, zIndex: markerPriority(venue) });
         el.dataset.renderKey = renderKeyFor(venue.id);
         // See the cluster click handler's comment — same reason this stops
         // propagation instead of letting it reach `map.on("click", ...)`.

@@ -9,7 +9,10 @@ import type { VenueCategory } from "@/lib/domain/venue";
  * markers are navy-only, never category-color-coded). The active venue
  * doesn't use an enlarged variant of this — it morphs into
  * `createPreviewChipElement` instead (see `MapView`). */
-export function createMarkerElement(category: VenueCategory, options: { label: string }): HTMLButtonElement {
+export function createMarkerElement(
+  category: VenueCategory,
+  options: { label: string; zIndex?: number },
+): HTMLButtonElement {
   const size = 32;
   const el = document.createElement("button");
   el.type = "button";
@@ -25,6 +28,10 @@ export function createMarkerElement(category: VenueCategory, options: { label: s
   el.style.justifyContent = "center";
   el.style.cursor = "pointer";
   el.style.padding = "0";
+  // Prioritize tagged/featured venues so a plain listing never visually
+  // buries a more relevant one when markers sit close together — see
+  // `MapView`'s `markerPriority` for how this is derived.
+  if (options.zIndex !== undefined) el.style.zIndex = String(options.zIndex);
 
   const icon = document.createElement("span");
   icon.className = "material-symbols-outlined";

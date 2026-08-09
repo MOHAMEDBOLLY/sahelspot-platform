@@ -62,7 +62,13 @@ export const CATEGORIES: readonly CategoryDefinition[] = [
   { value: "shopping", label: "Shopping", icon: "shopping_bag", color: "#16A34A", showInFilters: true },
   { value: "entertainment", label: "Entertainment", icon: "attractions", color: "#E64A6F", showInFilters: true },
   { value: "spa", label: "Spa", icon: "spa", color: "#2AA198", showInFilters: true },
-  { value: "services", label: "Services", icon: "miscellaneous_services", color: "#6B7280", showInFilters: true },
+  // "miscellaneous_services" (the original value here) isn't a real
+  // Material Symbols glyph — confirmed against Google's own icon
+  // codepoints list — so it rendered as raw fallback text instead of an
+  // icon everywhere this category appeared (Home, Search, Map, Explore).
+  // "home_repair_service" is the real icon Google Maps itself uses for
+  // this exact category.
+  { value: "services", label: "Services", icon: "home_repair_service", color: "#6B7280", showInFilters: true },
   { value: "general", label: "Place", icon: "place", color: "#0D3B66", showInFilters: false },
 ];
 
