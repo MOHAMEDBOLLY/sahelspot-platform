@@ -145,6 +145,11 @@ class VenueOut(BaseModel):
     # reservation_policy above.
     is_no_qr: bool = False
     parent_venue_id: str | None = None
+    # STUDIO — BEACHES + NO QR FOUNDATION (migration 0019, prepared/not
+    # applied) — a No QR parent's kind. See `Venue.no_qr_type`'s own
+    # docstring (app/db/models.py). `None` until an editor explicitly
+    # classifies the venue.
+    no_qr_type: str | None = None
     tags: list[str] = []
     collections: list[str] = []
     internal_notes: str | None = None
@@ -242,6 +247,10 @@ class VenueUpdate(BaseModel):
     # already give.
     is_no_qr: bool | None = None
     parent_venue_id: str | None = None
+    # STUDIO — BEACHES + NO QR FOUNDATION (migration 0019, prepared/not
+    # applied) — validated in the route against the venue's *resulting*
+    # `is_no_qr`, the same way `parent_venue_id` is, not here.
+    no_qr_type: str | None = None
     tag_ids: list[int] | None = None
     collection_ids: list[str] | None = None
 

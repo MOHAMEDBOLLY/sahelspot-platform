@@ -150,3 +150,101 @@ class TestDisableIsNoQr:
 
         assert response.status_code == 200
         assert response.json()["is_no_qr"] is False
+
+
+class TestNoQrType:
+    """STUDIO — BEACHES + NO QR FOUNDATION (migration 0019, prepared/not
+    applied) — `Venue.no_qr_type` (Walk/Mall) validation, same "value only
+    valid alongside its owning flag" pattern `validate_beach_details_shape`
+    already gives `beach_details`/`category`.
+    """
+
+    def test_walk_on_a_no_qr_venue_is_allowed(self, client, make_venue):
+        venue = make_venue(name="Zahra Walk", is_no_qr=True)
+
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"no_qr_type": "Walk"},
+            headers={"If-Match": str(venue.version)},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["no_qr_type"] == "Walk"
+
+    def test_mall_on_a_no_qr_venue_is_allowed(self, client, make_venue):
+        venue = make_venue(name="Some Mall", is_no_qr=True)
+
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"no_qr_type": "Mall"},
+            headers={"If-Match": str(venue.version)},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["no_qr_type"] == "Mall"
+
+    def test_no_qr_type_on_a_non_no_qr_venue_is_rejected(self, client, make_venue):
+        venue = make_venue(name="Ordinary Restaurant")
+
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"no_qr_type": "Walk"},
+            headers={"If-Match": str(venue.version)},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"]["error"] == "invalid_no_qr_type"
+
+    def test_invalid_no_qr_type_value_is_rejected(self, client, make_venue):
+        venue = make_venue(name="Zahra Walk", is_no_qr=True)
+
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"no_qr_type": "Not A Real Type"},
+            headers={"If-Match": str(venue.version)},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"]["error"] == "invalid_no_qr_type"
+
+    def test_disabling_is_no_qr_while_no_qr_type_still_set_is_rejected(self, client, make_venue):
+        """Mirrors the DB's `ck_venues_no_qr_type` invariant with a clean
+        422 rather than a raw IntegrityError — the editor must explicitly
+        clear `no_qr_type` in the same request, same "never silently
+        detached/cleared" philosophy `validate_no_qr_disable` already gives
+        parent/child."""
+        venue = make_venue(name="Zahra Walk", is_no_qr=True, no_qr_type="Walk")
+
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"is_no_qr": False},
+            headers={"If-Match": str(venue.version)},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"]["error"] == "invalid_no_qr_type"
+
+    def test_disabling_is_no_qr_and_clearing_no_qr_type_together_is_allowed(self, client, make_venue):
+        venue = make_venue(name="Zahra Walk", is_no_qr=True, no_qr_type="Walk")
+
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"is_no_qr": False, "no_qr_type": None},
+            headers={"If-Match": str(venue.version)},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["is_no_qr"] is False
+        assert response.json()["no_qr_type"] is None
+
+    def test_clearing_no_qr_type_to_null_is_always_allowed(self, client, make_venue):
+        venue = make_venue(name="Zahra Walk", is_no_qr=True, no_qr_type="Walk")
+
+        response = client.patch(
+            f"/editor/venues/{venue.id}",
+            json={"no_qr_type": None},
+            headers={"If-Match": str(venue.version)},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["no_qr_type"] is None

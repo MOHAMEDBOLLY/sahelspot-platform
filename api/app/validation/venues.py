@@ -3,7 +3,7 @@ from decimal import Decimal
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.db.models import ACCESS_TYPES, RESERVATION_POLICIES, VENUE_CATEGORIES, Tag, Venue
+from app.db.models import ACCESS_TYPES, NO_QR_TYPES, RESERVATION_POLICIES, VENUE_CATEGORIES, Tag, Venue
 
 from .schemas import FieldError, ValidationResult, build_validation_result
 
@@ -16,19 +16,25 @@ BEACH_PUBLIC_ACCESS_VALUES = ("yes", "no", "unknown")
 
 def validate_beach_details_shape(category: str, beach_details: dict | None) -> None:
     """Raises a structured 422 for either half of the invariant `ck_venues_
-    beach_details_shape` enforces at the DB level: a 'Beach' venue must
-    have both keys with a legal `publicAccess` value; a non-'Beach' venue
+    beach_details_shape` enforces at the DB level: a 'Beach Club' venue
+    must have both keys with a legal `publicAccess` value; any other venue
     must not have `beach_details` populated at all. Called by both
     `POST /editor/venues` and `PATCH /editor/venues/{id}` so a malformed
     payload fails cleanly here rather than as a raw `IntegrityError`.
+
+    'Beach Club' — not the separate 'Beach' VENUE_CATEGORIES value — per
+    migration 0018: production's 21 real beach venues are filed under
+    'Beach Club' ('Beach' has zero rows), and Studio's own '/beaches' nav
+    already filters on 'Beach Club'; this brings beach_details in line
+    with the category actually in use rather than one nothing uses.
     """
-    if category == "Beach":
+    if category == "Beach Club":
         if not isinstance(beach_details, dict) or "type" not in beach_details or "publicAccess" not in beach_details:
             raise HTTPException(
                 status_code=422,
                 detail={
                     "error": "invalid_beach_details",
-                    "message": "A Beach venue requires beach_details with 'type' and 'publicAccess'.",
+                    "message": "A Beach Club venue requires beach_details with 'type' and 'publicAccess'.",
                 },
             )
         if beach_details["publicAccess"] not in BEACH_PUBLIC_ACCESS_VALUES:
@@ -44,7 +50,7 @@ def validate_beach_details_shape(category: str, beach_details: dict | None) -> N
             status_code=422,
             detail={
                 "error": "invalid_beach_details",
-                "message": "beach_details may only be set when category is 'Beach'.",
+                "message": "beach_details may only be set when category is 'Beach Club'.",
             },
         )
 
@@ -106,6 +112,36 @@ def validate_parent_venue_id(db: Session, venue_id: str, parent_venue_id: str | 
             detail={
                 "error": "invalid_parent_venue",
                 "message": "Parent venue must itself be a designated No QR place (is_no_qr = true).",
+            },
+        )
+
+
+def validate_no_qr_type(is_no_qr: bool, no_qr_type: str | None) -> None:
+    """Mirrors `validate_beach_details_shape`'s own "value only valid
+    alongside its owning flag" pattern: `no_qr_type` (Walk/Mall) may only
+    be set on a venue that is itself a designated No QR place. Callers pass
+    the *resulting* `is_no_qr`/`no_qr_type` — whichever of current/incoming
+    is in effect after the update payload is applied — the same way
+    `update_venue` already resolves `resulting_category` for
+    `validate_beach_details_shape`. `None` is always legal (the default,
+    unclassified state); this never infers Walk vs Mall on its own.
+    """
+    if no_qr_type is None:
+        return
+    if no_qr_type not in NO_QR_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "invalid_no_qr_type",
+                "message": f"no_qr_type must be one of: {', '.join(NO_QR_TYPES)}.",
+            },
+        )
+    if not is_no_qr:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "invalid_no_qr_type",
+                "message": "no_qr_type may only be set when is_no_qr is true.",
             },
         )
 

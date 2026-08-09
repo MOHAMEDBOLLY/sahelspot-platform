@@ -424,7 +424,7 @@ export function VenueWorkspace({ venueId, onDirtyChange, onDeleted }: VenueWorks
       {validationResult && <ValidationSummary result={validationResult} />}
       <BasicInfoSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} errors={fieldErrors} />
       <TagsCollectionsSection venue={displayedVenue} onSaved={commitSave} onConflict={handleReloadAfterConflict} />
-      {displayedVenue.category === 'Beach' && (
+      {displayedVenue.category === 'Beach Club' && (
         <BeachDetailsSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} />
       )}
       <LocationSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} errors={fieldErrors} />

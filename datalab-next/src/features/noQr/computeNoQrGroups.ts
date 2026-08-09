@@ -25,6 +25,18 @@ export type NoQrGroups = {
   /** Designated No QR venues with no parent and no children — roadside/
    * independent places with no Walk/Mall context. */
   standalone: Venue[]
+  /** STUDIO — BEACHES + NO QR FOUNDATION (migration 0019, prepared/not
+   * applied) — `parents` split by `no_qr_type`. `unclassified` holds
+   * parents where an editor hasn't set Walk or Mall yet — deliberately its
+   * own bucket, not silently folded into either, since `no_qr_type` is
+   * never inferred. Every parent venue appears in exactly one of these
+   * three plus once in `parents` above (kept for backward compatibility
+   * with any existing caller that doesn't care about the split). */
+  parentsByType: {
+    walks: Venue[]
+    malls: Venue[]
+    unclassified: Venue[]
+  }
 }
 
 /** Pure grouping over an already-fetched venue list — no extra fetch, no
@@ -56,5 +68,11 @@ export function computeNoQrGroups(venues: readonly Venue[]): NoQrGroups {
   standalone.sort(byName)
   for (const siblings of childrenByParentId.values()) siblings.sort(byName)
 
-  return { parents, childrenByParentId, standalone }
+  const parentsByType = {
+    walks: parents.filter((v) => v.no_qr_type === 'Walk'),
+    malls: parents.filter((v) => v.no_qr_type === 'Mall'),
+    unclassified: parents.filter((v) => v.no_qr_type == null),
+  }
+
+  return { parents, childrenByParentId, standalone, parentsByType }
 }

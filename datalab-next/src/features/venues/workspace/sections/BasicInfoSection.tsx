@@ -7,7 +7,7 @@ import { TextAreaField } from '../../../../components/workspace/fields/TextAreaF
 import { SelectField } from '../../../../components/workspace/fields/SelectField'
 import { CheckboxField } from '../../../../components/workspace/fields/CheckboxField'
 import type { WorkspaceMode } from '../../../../components/workspace/types'
-import { ACCESS_TYPES, RESERVATION_POLICIES, VENUE_CATEGORIES } from '../../venueCategories'
+import { ACCESS_TYPES, NO_QR_TYPES, RESERVATION_POLICIES, VENUE_CATEGORIES } from '../../venueCategories'
 import type { FieldErrors } from '../../../../lib/validation'
 
 type BasicInfoSectionProps = {
@@ -48,22 +48,29 @@ export function BasicInfoSection({ venue, mode, onFieldChange, errors = {} }: Ba
         )}
 
         {/* Category/Tags/Access Type/Badges/Collections architecture
-            (Phase 1) — independent of category (see `Venue.access_type`'s
-            own docstring, api/app/db/models.py), so it lives here in Basic
-            Information alongside Category, not in a category-conditional
-            section the way BeachDetailsSection is. The leading '' option
-            maps to `null` ("not yet classified") — not the same as any of
-            the 5 real values. */}
-        {mode === 'view' ? (
-          <WorkspaceField label="Access Type" value={venue.access_type} />
-        ) : (
-          <SelectField
-            label="Access Type"
-            value={venue.access_type ?? ''}
-            onChange={(v) => onFieldChange('access_type', v === '' ? null : v)}
-            options={['', ...ACCESS_TYPES]}
-          />
-        )}
+            (Phase 1) — independent of category at the data layer (see
+            `Venue.access_type`'s own docstring, api/app/db/models.py), so
+            it still lives here for every non-Beach-Club category. For
+            Beach Club specifically, the product calls this concept "Beach
+            Access" and it moves into `BeachDetailsSection` below instead —
+            same underlying `access_type` column and value, just presented
+            once, in the Beach-specific place, not duplicated here. This is
+            a UI presentation choice only: existing non-Beach-Club
+            `access_type` values (18 rows as of the last inventory) are
+            untouched and remain visible/editable here exactly as before.
+            The leading '' option maps to `null` ("not yet classified") —
+            not the same as any of the 5 real values. */}
+        {venue.category !== 'Beach Club' &&
+          (mode === 'view' ? (
+            <WorkspaceField label="Access Type" value={venue.access_type} />
+          ) : (
+            <SelectField
+              label="Access Type"
+              value={venue.access_type ?? ''}
+              onChange={(v) => onFieldChange('access_type', v === '' ? null : v)}
+              options={['', ...ACCESS_TYPES]}
+            />
+          ))}
 
         {/* Badges, not a filter (see the architecture doc) — still a plain
             venue-level field, same reasoning as Access Type above. */}
@@ -127,6 +134,11 @@ export function BasicInfoSection({ venue, mode, onFieldChange, errors = {} }: Ba
                 different concepts. Same plain-boolean treatment as
                 Featured/Verified above. */}
             <WorkspaceField label="Is No QR Place" value={venue.is_no_qr ? 'Yes' : 'No'} />
+            {/* STUDIO — BEACHES + NO QR FOUNDATION (migration 0019,
+                prepared/not applied) — only shown once a venue is actually
+                a designated No QR place; `null` ("not yet classified") is
+                the default for every existing and new row, never guessed. */}
+            {venue.is_no_qr && <WorkspaceField label="No QR Type" value={venue.no_qr_type} />}
           </>
         ) : (
           <>
@@ -143,8 +155,21 @@ export function BasicInfoSection({ venue, mode, onFieldChange, errors = {} }: Ba
             <CheckboxField
               label="Is No QR Place"
               checked={venue.is_no_qr}
-              onChange={(v) => onFieldChange('is_no_qr', v)}
+              onChange={(v) => {
+                onFieldChange('is_no_qr', v)
+                // Mirrors the backend's own gate (validate_no_qr_type):
+                // no_qr_type may only be set when is_no_qr is true.
+                if (!v) onFieldChange('no_qr_type', null)
+              }}
             />
+            {venue.is_no_qr && (
+              <SelectField
+                label="No QR Type"
+                value={venue.no_qr_type ?? ''}
+                onChange={(v) => onFieldChange('no_qr_type', v === '' ? null : (v as 'Walk' | 'Mall'))}
+                options={['', ...NO_QR_TYPES]}
+              />
+            )}
           </>
         )}
       </dl>

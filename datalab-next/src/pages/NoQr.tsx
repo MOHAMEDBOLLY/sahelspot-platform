@@ -83,31 +83,32 @@ export function NoQr() {
         </p>
       </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold tracking-wide text-gray-500 uppercase">
-          Parent Areas ({groups.parents.length})
-        </h2>
-        {groups.parents.length === 0 ? (
-          <p className="text-sm text-gray-400">
-            No Parent Areas yet — assign a venue as another venue's parent below to create one.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {groups.parents.map((parent) => (
-              <div key={parent.id} className="rounded-xl border border-gray-200 bg-white">
-                <VenueRow venue={parent} />
-                <ul className="divide-y divide-gray-100 border-t border-gray-100 pl-6">
-                  {(groups.childrenByParentId.get(parent.id) ?? []).map((child) => (
-                    <li key={child.id}>
-                      <VenueRow venue={child} onClearParent={() => setParent({ venue: child, parentVenueId: null })} pending={pendingId === child.id} />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      {/* STUDIO — BEACHES + NO QR FOUNDATION (migration 0019, prepared/not
+          applied) — Parent Areas split by Walk/Mall/Unclassified. Grouping
+          only; the underlying parent/child integrity rules (parent must be
+          `is_no_qr`, no automatic detachment, ...) are unchanged. */}
+      <ParentAreaGroup
+        title="Walks"
+        parents={groups.parentsByType.walks}
+        childrenByParentId={groups.childrenByParentId}
+        pendingId={pendingId}
+        onClearParent={(child) => setParent({ venue: child, parentVenueId: null })}
+      />
+      <ParentAreaGroup
+        title="Malls"
+        parents={groups.parentsByType.malls}
+        childrenByParentId={groups.childrenByParentId}
+        pendingId={pendingId}
+        onClearParent={(child) => setParent({ venue: child, parentVenueId: null })}
+      />
+      <ParentAreaGroup
+        title="Unclassified Parent Areas"
+        emptyMessage="No Parent Areas yet — assign a venue as another venue's parent below to create one."
+        parents={groups.parentsByType.unclassified}
+        childrenByParentId={groups.childrenByParentId}
+        pendingId={pendingId}
+        onClearParent={(child) => setParent({ venue: child, parentVenueId: null })}
+      />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold tracking-wide text-gray-500 uppercase">
@@ -133,6 +134,52 @@ export function NoQr() {
         )}
       </section>
     </div>
+  )
+}
+
+/** STUDIO — BEACHES + NO QR FOUNDATION (migration 0019, prepared/not
+ * applied) — renders one Walk/Mall/Unclassified bucket of Parent Areas.
+ * Pure presentation split over `computeNoQrGroups`'s `parentsByType`; no
+ * new integrity behavior. */
+function ParentAreaGroup({
+  title,
+  parents,
+  childrenByParentId,
+  pendingId,
+  onClearParent,
+  emptyMessage = 'None yet.',
+}: {
+  title: string
+  parents: Venue[]
+  childrenByParentId: Map<string, Venue[]>
+  pendingId: string | null
+  onClearParent: (child: Venue) => void
+  emptyMessage?: string
+}) {
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold tracking-wide text-gray-500 uppercase">
+        {title} ({parents.length})
+      </h2>
+      {parents.length === 0 ? (
+        <p className="text-sm text-gray-400">{emptyMessage}</p>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {parents.map((parent) => (
+            <div key={parent.id} className="rounded-xl border border-gray-200 bg-white">
+              <VenueRow venue={parent} />
+              <ul className="divide-y divide-gray-100 border-t border-gray-100 pl-6">
+                {(childrenByParentId.get(parent.id) ?? []).map((child) => (
+                  <li key={child.id}>
+                    <VenueRow venue={child} onClearParent={() => onClearParent(child)} pending={pendingId === child.id} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 

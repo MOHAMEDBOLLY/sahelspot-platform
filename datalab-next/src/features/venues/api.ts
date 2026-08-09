@@ -76,6 +76,7 @@ export type VenuePatch = Pick<
   | 'reservation_policy'
   | 'is_no_qr'
   | 'parent_venue_id'
+  | 'no_qr_type'
 >
 
 /** Empty strings from cleared text inputs mean "no value" for these nullable
@@ -106,15 +107,21 @@ export function toVenuePatch(venue: Venue): VenuePatch {
     cover_image_url: venue.cover_image_url,
     gallery_image_urls: venue.gallery_image_urls,
     // Mirrors the backend's own gate (validate_beach_details_shape):
-    // beach_details may only be set when category is 'Beach' — cleared
-    // here so switching away from Beach in the editor can't submit a
-    // stale value the backend would reject with invalid_beach_details.
-    beach_details: venue.category === 'Beach' ? venue.beach_details : null,
+    // beach_details may only be set when category is 'Beach Club' — the
+    // category real beach venues are filed under — cleared here so
+    // switching away from Beach Club in the editor can't submit a stale
+    // value the backend would reject with invalid_beach_details.
+    beach_details: venue.category === 'Beach Club' ? venue.beach_details : null,
     translations: venue.translations,
     access_type: venue.access_type,
     reservation_policy: venue.reservation_policy,
     is_no_qr: venue.is_no_qr,
     parent_venue_id: venue.parent_venue_id,
+    // Mirrors the backend's own gate (validate_no_qr_type): no_qr_type may
+    // only be set when is_no_qr is true — cleared here so disabling No QR
+    // in the editor can't submit a stale Walk/Mall value the backend would
+    // reject with invalid_no_qr_type.
+    no_qr_type: venue.is_no_qr ? venue.no_qr_type : null,
   }
 }
 

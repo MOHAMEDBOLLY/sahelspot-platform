@@ -36,3 +36,11 @@ export const ACCESS_TYPES = [
 ] as const
 
 export const RESERVATION_POLICIES = ['Required', 'Recommended'] as const
+
+/**
+ * STUDIO — BEACHES + NO QR FOUNDATION (migration 0019, prepared/not
+ * applied). Mirrors the fixed set enforced by the API's CHECK constraint
+ * (api/app/db/models.py NO_QR_TYPES) — same "small, fixed, closed set, not
+ * fetched from the API" reasoning as above.
+ */
+export const NO_QR_TYPES = ['Walk', 'Mall'] as const

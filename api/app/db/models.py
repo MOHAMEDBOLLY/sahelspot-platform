@@ -79,6 +79,19 @@ ACCESS_TYPES = (
 )
 RESERVATION_POLICIES = ("Required", "Recommended")
 
+# Migration 0019 (STUDIO — BEACHES + NO QR FOUNDATION, prepared/not applied) —
+# distinguishes a No QR *parent*'s kind (a Walk vs a Mall). Deliberately NOT
+# a Tag: `Tag.category` is CHECK-constrained to one VENUE_CATEGORIES value,
+# but a No QR parent can legitimately sit under several different
+# categories (a mall might be 'Shopping', a walk might be 'Other'), so no
+# single tag category would fit every parent. Deliberately NOT `access_type`
+# or `category` (per product decision, never repurpose either for this).
+# A small, fixed, closed set, same CHECK-constraint treatment as
+# ACCESS_TYPES/RESERVATION_POLICIES above. `NULL` is the default and the
+# only value ever set automatically — Walk vs Mall is never inferred, only
+# an explicit editor choice, same as `is_no_qr` itself.
+NO_QR_TYPES = ("Walk", "Mall")
+
 
 class Destination(Base):
     """A named compound/resort/development along the North Coast."""
@@ -132,9 +145,15 @@ class Venue(Base):
         # value-shape validation (e.g. publicAccess's 3-value enum) remains
         # the application layer's job, the same practical limit that
         # already applies to opening_hours.
+        # Migration 0018 — retargeted from 'Beach' to 'Beach Club': production
+        # has zero 'Beach'-category venues and 21 real beach venues filed
+        # under 'Beach Club' (Studio's own '/beaches' nav already filters on
+        # it), so 'Beach' was the wrong literal for this constraint to begin
+        # with. beach_details had zero populated rows at migration time, so
+        # this is a constraint-definition change only, no data rewritten.
         CheckConstraint(
             "beach_details IS NULL OR "
-            "(category = 'Beach' AND beach_details ? 'type' AND beach_details ? 'publicAccess')",
+            "(category = 'Beach Club' AND beach_details ? 'type' AND beach_details ? 'publicAccess')",
             name="ck_venues_beach_details_shape",
         ),
         # Category/Tags/Access Type/Badges/Collections architecture (Phase 1)
@@ -145,6 +164,14 @@ class Venue(Base):
         CheckConstraint(
             f"reservation_policy IS NULL OR reservation_policy IN {RESERVATION_POLICIES}",
             name="ck_venues_reservation_policy",
+        ),
+        # Migration 0019 (prepared/not applied) — a No QR parent's kind is
+        # only meaningful on a venue that is itself a designated No QR place;
+        # mirrors ck_venues_beach_details_shape's own "value only valid
+        # alongside its owning flag" shape. See NO_QR_TYPES above.
+        CheckConstraint(
+            f"no_qr_type IS NULL OR (is_no_qr AND no_qr_type IN {NO_QR_TYPES})",
+            name="ck_venues_no_qr_type",
         ),
         # PLATFORM_SPEC_v1.0_FROZEN.md §3.1 — destination-scoped venue
         # lists and FK join performance; category/status filters; the
@@ -234,6 +261,17 @@ class Venue(Base):
     parent_venue_id: Mapped[str | None] = mapped_column(
         ForeignKey("venues.id", ondelete="SET NULL"), nullable=True
     )
+    # Migration 0019 (STUDIO — BEACHES + NO QR FOUNDATION, prepared/not
+    # applied) — distinguishes a designated No QR *parent*'s kind (Walk vs
+    # Mall). Only ever meaningful when `is_no_qr = true` (enforced by
+    # `ck_venues_no_qr_type` above and `validate_no_qr_type`,
+    # api/app/validation/venues.py). `NULL` is the default for every
+    # existing and newly-created row — never inferred, only an explicit
+    # editor choice, same treatment `is_no_qr` itself already gets. Plain
+    # ordinary (non-parent, non-No-QR) venues, and even standalone No QR
+    # places with no children, leave this `NULL` unless an editor
+    # deliberately classifies them.
+    no_qr_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     internal_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Brand Asset Propagation — free text, not a CHECK-constrained

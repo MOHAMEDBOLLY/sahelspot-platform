@@ -137,7 +137,7 @@ class TestCreateVenue:
                     "name": "New Beach",
                     "slug": f"new-beach-{venue_id}",
                     "destination_id": destination.id,
-                    "category": "Beach",
+                    "category": "Beach Club",
                     "beach_details": {"type": "public", "publicAccess": "yes"},
                 },
             )

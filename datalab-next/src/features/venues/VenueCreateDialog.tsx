@@ -19,11 +19,13 @@ type VenueCreateDialogProps = {
  * focus-trapping, an implicit backdrop, and Escape-to-close for free.
  *
  * EP19-T02 — conditional beach fields: `beachType`/`publicAccess` are
- * only sent as `beach_details` when `category === 'Beach'`, matching the
- * backend's own gate (`validate_beach_details_shape`,
- * api/app/validation/venues.py) rather than duplicating its rules — the
- * backend still rejects any shape it doesn't like; these fields just
- * avoid the round trip for the always-invalid case.
+ * only sent as `beach_details` when `category === 'Beach Club'` — the
+ * category actual beach venues are filed under in production (0 venues
+ * use the separate 'Beach' category), matching the backend's own gate
+ * (`validate_beach_details_shape`, api/app/validation/venues.py) rather
+ * than duplicating its rules — the backend still rejects any shape it
+ * doesn't like; these fields just avoid the round trip for the
+ * always-invalid case.
  */
 export function VenueCreateDialog({ onCreated }: VenueCreateDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -39,7 +41,7 @@ export function VenueCreateDialog({ onCreated }: VenueCreateDialogProps) {
   const { data: destinationsData } = useDestinations()
   const destinations = destinationsData?.items
 
-  const isBeach = category === 'Beach'
+  const isBeach = category === 'Beach Club'
 
   function openDialog() {
     setId('')

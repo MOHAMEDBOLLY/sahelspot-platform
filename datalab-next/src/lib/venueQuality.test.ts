@@ -32,6 +32,7 @@ function makeVenue(overrides: Partial<Venue> = {}): Venue {
     access_type: null,
     reservation_policy: null,
     is_no_qr: false,
+    no_qr_type: null,
     parent_venue_id: null,
     tags: [],
     collections: [],

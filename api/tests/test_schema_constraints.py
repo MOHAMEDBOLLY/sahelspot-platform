@@ -129,7 +129,7 @@ class TestBeachDetailsShape:
 
     def test_beach_with_both_keys_is_accepted(self, make_venue):
         venue = make_venue(
-            category="Beach", beach_details={"type": None, "publicAccess": "yes"}
+            category="Beach Club", beach_details={"type": None, "publicAccess": "yes"}
         )
         assert venue.beach_details == {"type": None, "publicAccess": "yes"}
 
@@ -144,7 +144,7 @@ class TestBeachDetailsShape:
             name="Incomplete Beach",
             slug="test-beach-missing-key",
             destination_id=destination.id,
-            category="Beach",
+            category="Beach Club",
             status="draft",
             beach_details={"type": None},
         )

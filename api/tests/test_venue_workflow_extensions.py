@@ -43,7 +43,7 @@ class TestRejectVenue:
 
 class TestBeachDetailsPatch:
     def test_sets_beach_details_when_category_is_beach(self, client, make_venue):
-        venue = make_venue(category="Beach", beach_details={"type": None, "publicAccess": "unknown"})
+        venue = make_venue(category="Beach Club", beach_details={"type": None, "publicAccess": "unknown"})
 
         response = client.patch(
             f"/editor/venues/{venue.id}",
@@ -55,7 +55,7 @@ class TestBeachDetailsPatch:
         assert response.json()["beach_details"] == {"type": "public", "publicAccess": "yes"}
 
     def test_rejects_missing_key(self, client, make_venue):
-        venue = make_venue(category="Beach", beach_details={"type": None, "publicAccess": "unknown"})
+        venue = make_venue(category="Beach Club", beach_details={"type": None, "publicAccess": "unknown"})
 
         response = client.patch(
             f"/editor/venues/{venue.id}",
@@ -85,12 +85,12 @@ class TestBeachDetailsPatch:
 
         response = client.patch(
             f"/editor/venues/{venue.id}",
-            json={"category": "Beach", "beach_details": {"type": "public", "publicAccess": "yes"}},
+            json={"category": "Beach Club", "beach_details": {"type": "public", "publicAccess": "yes"}},
             headers={"If-Match": str(venue.version)},
         )
 
         assert response.status_code == 200
-        assert response.json()["category"] == "Beach"
+        assert response.json()["category"] == "Beach Club"
         assert response.json()["beach_details"] == {"type": "public", "publicAccess": "yes"}
 
 

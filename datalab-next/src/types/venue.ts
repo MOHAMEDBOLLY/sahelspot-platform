@@ -74,6 +74,13 @@ export interface Venue {
    * derived client-side (`features/noQr`), not a second stored flag. See
    * api/app/db/models.py's `Venue.parent_venue_id` docstring. */
   parent_venue_id: string | null
+  /** STUDIO — BEACHES + NO QR FOUNDATION (migration 0019, prepared/not
+   * applied) — a designated No QR parent's kind. `null` until an editor
+   * explicitly classifies it; only ever meaningful when `is_no_qr` is
+   * `true` (enforced by the backend's `ck_venues_no_qr_type` constraint
+   * and `validate_no_qr_type`). See api/app/db/models.py's
+   * `Venue.no_qr_type` docstring. */
+  no_qr_type: 'Walk' | 'Mall' | null
   /** Read-only here — tag slugs currently assigned to this venue. Written
    * via `tag_ids` on `VenueUpdate`/`VenuePatch` (see features/venues/api.ts),
    * not through this field directly; the backend attaches it as a computed
