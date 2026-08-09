@@ -155,6 +155,9 @@ class Venue(Base):
         Index("ix_venues_status", "status"),
         Index("ix_venues_destination_id_status", "destination_id", "status"),
         Index("ix_venues_brand", "brand"),
+        # Studio Content Organization — finds a parent's children (No QR's
+        # "Parent Area" grouping) without a sequential scan.
+        Index("ix_venues_parent_venue_id", "parent_venue_id"),
     )
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)
@@ -204,6 +207,33 @@ class Venue(Base):
     # same "small, fixed, closed set" reasoning ACCESS_TYPES itself uses.
     access_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     reservation_policy: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Studio Content Organization (Beaches + No QR) — is this venue itself
+    # an explicitly designated No QR discovery place (a Walk, a Mall, a
+    # standalone roadside spot)? Same treatment as is_featured/is_verified
+    # below: a plain boolean, `false` by default, only ever set `true` by
+    # an explicit editor action — never inferred. Deliberately NOT derived
+    # from `access_type != 'QR Required'` — that's a different concept
+    # (the access *method* a venue requires), still correctly served
+    # as-is by `GET /public/discover/no-qr`
+    # (api/app/api/routes/public.py), which this column does not feed and
+    # is not derived from. A normal Restaurant/Coffee/Hotel venue that
+    # merely doesn't require a QR code is NOT a No QR discovery place by
+    # itself.
+    is_no_qr: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    # Optional, self-referential "this venue is inside/belongs to that
+    # other venue" relationship (e.g. individual shops inside "Zahra
+    # Walk"). Deliberately not a new Walk/Mall/Area entity: the parent is
+    # just another `Venue` row — and per product decision, specifically
+    # one with `is_no_qr = true` (enforced in `validate_parent_venue_id`,
+    # api/app/validation/venues.py, not a DB constraint — the same
+    # app-layer treatment `validate_beach_details_shape` already gives a
+    # comparable cross-field invariant). `NULL` is the common case (a
+    # standalone No QR venue, or a normal venue with no No QR context at
+    # all). `SET NULL` on delete: removing a parent must never
+    # cascade-delete the real venues inside it.
+    parent_venue_id: Mapped[str | None] = mapped_column(
+        ForeignKey("venues.id", ondelete="SET NULL"), nullable=True
+    )
     internal_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Brand Asset Propagation — free text, not a CHECK-constrained

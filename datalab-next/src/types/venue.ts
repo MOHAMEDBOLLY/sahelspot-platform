@@ -56,6 +56,24 @@ export interface Venue {
    * ACCESS_TYPES/RESERVATION_POLICIES for the fixed vocabularies. */
   access_type: string | null
   reservation_policy: string | null
+  /** Studio Content Organization (Beaches + No QR) — is this venue itself
+   * an explicitly designated No QR discovery place (a Walk, a Mall, a
+   * standalone roadside spot)? `false` by default, only ever set `true`
+   * by an explicit editor action. Deliberately NOT derived from
+   * `access_type !== 'QR Required'` — a different concept (the access
+   * method a venue requires), still correctly served as-is by
+   * `GET /public/discover/no-qr`. See api/app/db/models.py's
+   * `Venue.is_no_qr` docstring. */
+  is_no_qr: boolean
+  /** Optional self-referential parent (e.g. a shop inside "Zahra Walk").
+   * `null` is the common case. Per product decision, a venue may only be
+   * used as a parent if its own `is_no_qr` is `true` — enforced by the
+   * backend (`validate_parent_venue_id`), not just the Studio picker UI.
+   * A No QR venue with no `parent_venue_id` that nothing else points to
+   * is "Standalone"; one other venues point to is a "Parent Area" — both
+   * derived client-side (`features/noQr`), not a second stored flag. See
+   * api/app/db/models.py's `Venue.parent_venue_id` docstring. */
+  parent_venue_id: string | null
   /** Read-only here — tag slugs currently assigned to this venue. Written
    * via `tag_ids` on `VenueUpdate`/`VenuePatch` (see features/venues/api.ts),
    * not through this field directly; the backend attaches it as a computed

@@ -74,6 +74,8 @@ export type VenuePatch = Pick<
   | 'translations'
   | 'access_type'
   | 'reservation_policy'
+  | 'is_no_qr'
+  | 'parent_venue_id'
 >
 
 /** Empty strings from cleared text inputs mean "no value" for these nullable
@@ -111,6 +113,8 @@ export function toVenuePatch(venue: Venue): VenuePatch {
     translations: venue.translations,
     access_type: venue.access_type,
     reservation_policy: venue.reservation_policy,
+    is_no_qr: venue.is_no_qr,
+    parent_venue_id: venue.parent_venue_id,
   }
 }
 
@@ -144,6 +148,19 @@ export function updateVenueTaxonomy(
  * to offer a reload rather than silently overwriting or losing the edit. */
 export function updateVenue(id: string, version: number, patch: VenuePatch): Promise<Venue> {
   return apiPatch<Venue>(`/editor/venues/${encodeURIComponent(id)}`, patch, { 'If-Match': String(version) })
+}
+
+/** Studio Content Organization (Beaches + No QR) — a narrow patch of just
+ * `parent_venue_id`, same reasoning as `updateVenueTaxonomy` above: the No
+ * QR page assigns a parent inline, from a list it already has in memory,
+ * without loading the full `VenuePatch` shape for a venue it isn't
+ * otherwise editing. `null` clears the parent (back to Standalone). */
+export function updateVenueParent(id: string, version: number, parentVenueId: string | null): Promise<Venue> {
+  return apiPatch<Venue>(
+    `/editor/venues/${encodeURIComponent(id)}`,
+    { parent_venue_id: parentVenueId },
+    { 'If-Match': String(version) },
+  )
 }
 
 /** EP19-T01 — the one write path venues never had, `POST /editor/venues`.

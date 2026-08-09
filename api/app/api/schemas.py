@@ -136,6 +136,15 @@ class VenueOut(BaseModel):
     # excluded_venue_count` already uses for a computed, non-column value.
     access_type: str | None = None
     reservation_policy: str | None = None
+    # Studio Content Organization (Beaches + No QR) — is_no_qr is an
+    # explicit designation (Walk/Mall/standalone discovery place), NOT
+    # derived from access_type — see Venue.is_no_qr's own docstring
+    # (app/db/models.py) for why those are different concepts.
+    # parent_venue_id is the optional self-referential parent (e.g. a shop
+    # inside "Zahra Walk"). Both plain columns, same as access_type/
+    # reservation_policy above.
+    is_no_qr: bool = False
+    parent_venue_id: str | None = None
     tags: list[str] = []
     collections: list[str] = []
     internal_notes: str | None = None
@@ -225,6 +234,14 @@ class VenueUpdate(BaseModel):
     # endpoints.
     access_type: str | None = None
     reservation_policy: str | None = None
+    # Studio Content Organization (Beaches + No QR) — see `Venue.is_no_qr`/
+    # `Venue.parent_venue_id`'s own docstrings (app/db/models.py).
+    # `parent_venue_id` is validated in the route (self-reference,
+    # existence, and that the target has `is_no_qr = true`) the same way
+    # access_type/reservation_policy are, not here — same reasoning both
+    # already give.
+    is_no_qr: bool | None = None
+    parent_venue_id: str | None = None
     tag_ids: list[int] | None = None
     collection_ids: list[str] | None = None
 

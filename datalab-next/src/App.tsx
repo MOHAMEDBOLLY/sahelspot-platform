@@ -1,9 +1,10 @@
 import { lazy, Suspense } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './layouts/AppShell'
 import { Dashboard } from './pages/Dashboard'
 import { QualityCenter } from './pages/QualityCenter'
 import { Venues } from './pages/Venues'
+import { NoQr } from './pages/NoQr'
 import { Destinations } from './pages/Destinations'
 import { Events } from './pages/Events'
 import { Publishing } from './pages/Publishing'
@@ -31,6 +32,13 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/quality" element={<QualityCenter />} />
             <Route path="/venues" element={<Venues />} />
+            {/* Studio Content Organization — Beaches is a plain redirect
+              * into Venues' own existing category filter (real beach
+              * venues are filed under the existing "Beach Club" category,
+              * see api/app/db/models.py VENUE_CATEGORIES); no separate
+              * page or component exists for it, deliberately. */}
+            <Route path="/beaches" element={<Navigate to="/venues?category=Beach+Club" replace />} />
+            <Route path="/no-qr" element={<NoQr />} />
             <Route path="/destinations" element={<Destinations />} />
             <Route path="/events" element={<Events />} />
             <Route path="/publishing" element={<Publishing />} />

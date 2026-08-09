@@ -76,6 +76,63 @@ def validate_reservation_policy(reservation_policy: str | None) -> None:
         )
 
 
+def validate_parent_venue_id(db: Session, venue_id: str, parent_venue_id: str | None) -> None:
+    """Studio Content Organization (Beaches + No QR) — a structured 422 for
+    every half of the invariant the DB's self-referential FK alone can't
+    give a clean error for: a venue can't be its own parent (the FK
+    constraint wouldn't catch this — it's a valid row reference, just a
+    nonsensical one), an unknown parent id fails here rather than as a raw
+    `IntegrityError`, and — per product decision — only a venue that is
+    itself an explicitly designated No QR place (`is_no_qr = true`) may be
+    used as a parent (a normal Restaurant/Coffee/Hotel venue is never a
+    Walk/Mall). `None` is always legal — no No QR context.
+    """
+    if parent_venue_id is None:
+        return
+    if parent_venue_id == venue_id:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_parent_venue", "message": "A venue cannot be its own parent."},
+        )
+    parent = db.get(Venue, parent_venue_id)
+    if parent is None:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_parent_venue", "message": f"Parent venue '{parent_venue_id}' not found."},
+        )
+    if not parent.is_no_qr:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "invalid_parent_venue",
+                "message": "Parent venue must itself be a designated No QR place (is_no_qr = true).",
+            },
+        )
+
+
+def validate_no_qr_disable(db: Session, venue_id: str) -> None:
+    """Studio Content Organization (Beaches + No QR) — a venue can't stop
+    being a designated No QR place (`is_no_qr: true -> false`) while any
+    other venue still has `parent_venue_id` pointing at it. Same structured-
+    422 pattern as `validate_parent_venue_id` above, and deliberately the
+    mirror image of its "parent must be `is_no_qr`" rule: that one stops a
+    bad relationship from being *created*, this one stops a good
+    relationship from being silently left *dangling*. Not an automatic
+    cleanup — the editor must explicitly reassign or clear each child's
+    `parent_venue_id` first; this only raises, it never touches another
+    row.
+    """
+    has_children = db.query(Venue.id).filter(Venue.parent_venue_id == venue_id).first() is not None
+    if has_children:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "venue_has_no_qr_children",
+                "message": "Cannot disable No QR while this venue is assigned as a parent.",
+            },
+        )
+
+
 def validate_tag_ids(db: Session, category: str, tag_ids: list[int]) -> None:
     """Every assigned tag must exist and must be scoped to the venue's
     *resulting* category (mirrors `validate_beach_details_shape`'s own

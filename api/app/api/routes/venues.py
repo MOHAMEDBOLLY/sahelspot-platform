@@ -50,6 +50,8 @@ from app.validation.schemas import ValidationResult
 from app.validation.venues import (
     validate_access_type,
     validate_beach_details_shape,
+    validate_no_qr_disable,
+    validate_parent_venue_id,
     validate_reservation_policy,
     validate_tag_ids,
     validate_venue,
@@ -619,6 +621,10 @@ def update_venue(
         validate_access_type(updates["access_type"])
     if "reservation_policy" in updates:
         validate_reservation_policy(updates["reservation_policy"])
+    if "parent_venue_id" in updates:
+        validate_parent_venue_id(db, venue_id, updates["parent_venue_id"])
+    if "is_no_qr" in updates and venue.is_no_qr and not updates["is_no_qr"]:
+        validate_no_qr_disable(db, venue_id)
 
     # Category/Tags/Access Type/Badges/Collections architecture (Phase 1) —
     # `tag_ids`/`collection_ids` aren't real `Venue` columns (unlike every

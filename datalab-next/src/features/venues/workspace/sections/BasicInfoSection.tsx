@@ -120,6 +120,13 @@ export function BasicInfoSection({ venue, mode, onFieldChange, errors = {} }: Ba
           <>
             <WorkspaceField label="Featured" value={venue.is_featured ? 'Yes' : 'No'} />
             <WorkspaceField label="Verified" value={venue.is_verified ? 'Yes' : 'No'} />
+            {/* Studio Content Organization (Beaches + No QR) — an explicit
+                designation (Walk/Mall/standalone discovery place), NOT
+                derived from Access Type. See Venue.is_no_qr's own
+                docstring (api/app/db/models.py) for why those are
+                different concepts. Same plain-boolean treatment as
+                Featured/Verified above. */}
+            <WorkspaceField label="Is No QR Place" value={venue.is_no_qr ? 'Yes' : 'No'} />
           </>
         ) : (
           <>
@@ -132,6 +139,11 @@ export function BasicInfoSection({ venue, mode, onFieldChange, errors = {} }: Ba
               label="Verified"
               checked={venue.is_verified}
               onChange={(v) => onFieldChange('is_verified', v)}
+            />
+            <CheckboxField
+              label="Is No QR Place"
+              checked={venue.is_no_qr}
+              onChange={(v) => onFieldChange('is_no_qr', v)}
             />
           </>
         )}
