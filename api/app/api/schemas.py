@@ -720,6 +720,80 @@ class EventBulkOperationResponse(BaseModel):
     failed: int
 
 
+class NoQrPlaceOut(BaseModel):
+    """STUDIO — NO QR INDEPENDENT ENTITY. `venue` is populated (via
+    `VenueRef`, the same lightweight id+name shape Events already reuses)
+    when this place links an existing Venue; `name` is populated when it's
+    a standalone place. Exactly one of the two is ever non-null — mirrors
+    `ck_no_qr_places_identity` at the DB level, `validate_no_qr_place_
+    identity` at the request layer, and this at the response layer.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    area_id: int
+    venue_id: str | None = None
+    name: str | None = None
+    venue: VenueRef | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class NoQrAreaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    type: str
+    places: list[NoQrPlaceOut] = []
+    created_at: datetime
+    updated_at: datetime
+
+
+class NoQrAreaListOut(BaseModel):
+    items: list[NoQrAreaOut]
+
+
+class NoQrAreaCreate(BaseModel):
+    """"Add Walk"/"Add Mall" — name only, per the approved Phase 1 UX.
+    `type` is supplied here and never changes afterward (see `NoQrArea`'s
+    own docstring on why it's immutable)."""
+
+    name: str = Field(min_length=1, max_length=200)
+    type: str
+
+
+class NoQrAreaUpdate(BaseModel):
+    """Only `name` is editable after creation — `type` is deliberately
+    immutable (Phase 1 product decision, kept out of this schema entirely
+    rather than accepted-and-rejected, so a client can't even attempt it).
+    """
+
+    name: str = Field(min_length=1, max_length=200)
+
+
+class NoQrPlaceCreate(BaseModel):
+    """Exactly one of `venue_id`/`name` — enforced by `validate_no_qr_
+    place_identity`, not by Pydantic itself (a plain "one of two optional
+    fields" shape isn't naturally expressible as a field-level constraint,
+    same reasoning `VenueUpdate`'s beach_details fields don't self-validate
+    either)."""
+
+    venue_id: str | None = None
+    name: str | None = Field(default=None, max_length=200)
+
+
+class NoQrPlaceUpdate(BaseModel):
+    """Same shape as `NoQrPlaceCreate` — re-validated as a full identity
+    swap, not a partial patch of one field at a time, since venue_id/name
+    are mutually exclusive as a pair, not independently.
+    """
+
+    venue_id: str | None = None
+    name: str | None = Field(default=None, max_length=200)
+
+
 class PublishedEventOut(BaseModel):
     """The public read shape — same relationship to `EventOut` that
     `PublishedVenueOut` has to `VenueOut`: no `status` (everything here is

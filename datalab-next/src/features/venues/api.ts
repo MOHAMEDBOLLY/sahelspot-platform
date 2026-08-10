@@ -170,6 +170,27 @@ export function updateVenueParent(id: string, version: number, parentVenueId: st
   )
 }
 
+/** STUDIO — NO QR MANAGEMENT UX — same narrow-patch reasoning as
+ * `updateVenueParent` above: the "Add No QR Place" dialog designates an
+ * existing venue (picked from a list it already has in memory) without
+ * loading the full `VenuePatch` shape for a venue it isn't otherwise
+ * editing. Same `is_no_qr`/`no_qr_type` fields the Venue editor's Basic
+ * Information section already writes via `toVenuePatch` — this is not a
+ * second way of setting them, just a narrower payload through the same
+ * `PATCH /editor/venues/{id}` endpoint and the same backend validation. */
+export function updateVenueNoQr(
+  id: string,
+  version: number,
+  isNoQr: boolean,
+  noQrType: Venue['no_qr_type'],
+): Promise<Venue> {
+  return apiPatch<Venue>(
+    `/editor/venues/${encodeURIComponent(id)}`,
+    { is_no_qr: isNoQr, no_qr_type: noQrType },
+    { 'If-Match': String(version) },
+  )
+}
+
 /** EP19-T01 — the one write path venues never had, `POST /editor/venues`.
  * `id`/`slug` are caller-supplied (mirrors the backend's own reasoning,
  * see `VenueCreate`'s docstring) — every new venue starts `draft`, so

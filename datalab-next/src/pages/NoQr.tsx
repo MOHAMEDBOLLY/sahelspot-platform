@@ -1,242 +1,112 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { QrCode, ChevronRight } from 'lucide-react'
-import { useAllVenues } from '../features/stats/useAllVenues'
-import { computeNoQrGroups } from '../features/noQr/computeNoQrGroups'
-import { updateVenueParent } from '../features/venues/api'
+import { fetchNoQrAreas } from '../features/noQr/api'
+import { NoQrAreaCreateDialog } from '../features/noQr/NoQrAreaCreateDialog'
+import { NoQrAreaDetail } from '../features/noQr/NoQrAreaDetail'
 import { LoadingState } from '../components/LoadingState'
 import { ErrorState } from '../components/ErrorState'
-import type { Venue } from '../types/venue'
+import type { NoQrArea } from '../types/noQrArea'
 
-/** Studio Content Organization — "No QR" discovery content.
+/** STUDIO — NO QR INDEPENDENT ENTITY (Phase 1). A Walk or Mall is its own
+ * editorial entity (`NoQrArea`), NOT a `Venue` — see `api/app/db/
+ * models.py`'s `NoQrArea`/`NoQrPlace` docstrings for the full reasoning.
+ * Supersedes the Phase 0 approach (`Venue.is_no_qr`/`parent_venue_id`/
+ * `no_qr_type`) — those columns are kept, unused, for backward
+ * compatibility (see `features/venues/api.ts`'s `updateVenueNoQr`, now
+ * dead code, and `BasicInfoSection.tsx`'s "Is No QR Place"/"No QR Type"
+ * controls, left alone so the existing Venue editor doesn't break).
  *
- * "No QR" is `Venue.is_no_qr` — an explicit editor designation (Walk,
- * Mall, standalone roadside spot), set from the Basic Information
- * checkbox in the existing Venues workspace. It is deliberately NOT the
- * same thing as `access_type != 'QR Required'` (that's the *access
- * method* concept, still correctly served as-is by
- * `GET /public/discover/no-qr`) — see `features/noQr/computeNoQrGroups.ts`
- * and `Venue.is_no_qr`'s own docstring (api/app/db/models.py) for the
- * full reasoning. A normal Restaurant/Coffee/Hotel venue never appears
- * here just because it doesn't require a QR code.
- *
- * `Venue.parent_venue_id` (optional self-reference) groups this same
- * `is_no_qr` set into "Parent Area" (e.g. Zahra Walk, with its ordinary
- * child venues listed beneath it) vs "Standalone" — only a venue with
- * `is_no_qr = true` may be a parent (enforced by the backend).
- *
- * Editing itself (name, category, access type, ...) still happens in the
- * existing Venues workspace — this page's rows link there rather than
- * duplicating that editor. The one action unique to this page is
- * assigning/clearing a venue's parent. */
+ * List + detail within one page via local selection state — same
+ * established pattern `pages/Events.tsx` already uses for
+ * `EventWorkspace`, not a separate route per Area. */
 export function NoQr() {
-  const { data: venues, isPending, isError, error, refetch } = useAllVenues()
-  const queryClient = useQueryClient()
-  const [pendingId, setPendingId] = useState<string | null>(null)
-
-  const groups = useMemo(() => (venues ? computeNoQrGroups(venues) : null), [venues])
-
-  const { mutate: setParent } = useMutation({
-    mutationFn: ({ venue, parentVenueId }: { venue: Venue; parentVenueId: string | null }) =>
-      updateVenueParent(venue.id, venue.version, parentVenueId),
-    onMutate: ({ venue }) => setPendingId(venue.id),
-    onSettled: () => setPendingId(null),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(['venue', updated.id], updated)
-      queryClient.invalidateQueries({ queryKey: ['venues'] })
-    },
+  const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null)
+  const { data, isPending, isError, error, refetch } = useQuery({
+    queryKey: ['no-qr-areas'],
+    queryFn: fetchNoQrAreas,
   })
+
+  const { walks, malls } = useMemo(() => {
+    const areas = data?.items ?? []
+    return {
+      walks: areas.filter((a) => a.type === 'Walk'),
+      malls: areas.filter((a) => a.type === 'Mall'),
+    }
+  }, [data])
+
+  if (selectedAreaId !== null) {
+    return <NoQrAreaDetail areaId={selectedAreaId} onBack={() => setSelectedAreaId(null)} />
+  }
 
   if (isPending) return <LoadingState label="Loading No QR content…" />
   if (isError) {
     return (
-      <ErrorState
-        message={error instanceof Error ? error.message : 'Failed to load venues.'}
-        onRetry={refetch}
-      />
+      <ErrorState message={error instanceof Error ? error.message : 'Failed to load No QR areas.'} onRetry={refetch} />
     )
   }
-  if (!groups) return null
-
-  // Per product decision, only a venue with `is_no_qr = true` may be used
-  // as a parent — the backend enforces this too (`validate_parent_venue_id`),
-  // this is just keeping the picker from ever offering an invalid choice.
-  // Any `is_no_qr` venue not currently a parent is still a valid pick:
-  // choosing one is exactly how a new Parent Area (e.g. Zahra Walk) starts
-  // existing as one, with no separate "create area" action needed.
-  const parentOptions = venues
-    .filter((v) => v.is_no_qr)
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name))
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
-          <QrCode size={22} className="text-gray-500" />
-          No QR
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Explicitly designated discovery places — Walks, malls, and standalone spots.
-          Set "Is No QR Place" on a venue's Basic Information to add it here.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
+            <QrCode size={22} className="text-gray-500" />
+            No QR
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Independent discovery areas — Walks and Malls, each its own named container of Places.
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <NoQrAreaCreateDialog type="Walk" onCreated={(area) => setSelectedAreaId(area.id)} />
+          <NoQrAreaCreateDialog type="Mall" onCreated={(area) => setSelectedAreaId(area.id)} />
+        </div>
       </div>
 
-      {/* STUDIO — BEACHES + NO QR FOUNDATION (migration 0019, prepared/not
-          applied) — Parent Areas split by Walk/Mall/Unclassified. Grouping
-          only; the underlying parent/child integrity rules (parent must be
-          `is_no_qr`, no automatic detachment, ...) are unchanged. */}
-      <ParentAreaGroup
-        title="Walks"
-        parents={groups.parentsByType.walks}
-        childrenByParentId={groups.childrenByParentId}
-        pendingId={pendingId}
-        onClearParent={(child) => setParent({ venue: child, parentVenueId: null })}
-      />
-      <ParentAreaGroup
-        title="Malls"
-        parents={groups.parentsByType.malls}
-        childrenByParentId={groups.childrenByParentId}
-        pendingId={pendingId}
-        onClearParent={(child) => setParent({ venue: child, parentVenueId: null })}
-      />
-      <ParentAreaGroup
-        title="Unclassified Parent Areas"
-        emptyMessage="No Parent Areas yet — assign a venue as another venue's parent below to create one."
-        parents={groups.parentsByType.unclassified}
-        childrenByParentId={groups.childrenByParentId}
-        pendingId={pendingId}
-        onClearParent={(child) => setParent({ venue: child, parentVenueId: null })}
-      />
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold tracking-wide text-gray-500 uppercase">
-          Standalone ({groups.standalone.length})
-        </h2>
-        {groups.standalone.length === 0 ? (
-          <p className="text-sm text-gray-400">No standalone No QR venues.</p>
-        ) : (
-          <div className="rounded-xl border border-gray-200 bg-white">
-            <ul className="divide-y divide-gray-100">
-              {groups.standalone.map((venue) => (
-                <li key={venue.id}>
-                  <VenueRow
-                    venue={venue}
-                    parentOptions={parentOptions.filter((option) => option.id !== venue.id)}
-                    onAssignParent={(parentVenueId) => setParent({ venue, parentVenueId })}
-                    pending={pendingId === venue.id}
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
+      <AreaGroup title="Walks" areas={walks} emptyMessage="No Walks yet." onOpen={setSelectedAreaId} />
+      <AreaGroup title="Malls" areas={malls} emptyMessage="No Malls yet." onOpen={setSelectedAreaId} />
     </div>
   )
 }
 
-/** STUDIO — BEACHES + NO QR FOUNDATION (migration 0019, prepared/not
- * applied) — renders one Walk/Mall/Unclassified bucket of Parent Areas.
- * Pure presentation split over `computeNoQrGroups`'s `parentsByType`; no
- * new integrity behavior. */
-function ParentAreaGroup({
+function AreaGroup({
   title,
-  parents,
-  childrenByParentId,
-  pendingId,
-  onClearParent,
-  emptyMessage = 'None yet.',
+  areas,
+  emptyMessage,
+  onOpen,
 }: {
   title: string
-  parents: Venue[]
-  childrenByParentId: Map<string, Venue[]>
-  pendingId: string | null
-  onClearParent: (child: Venue) => void
-  emptyMessage?: string
+  areas: NoQrArea[]
+  emptyMessage: string
+  onOpen: (id: number) => void
 }) {
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-sm font-semibold tracking-wide text-gray-500 uppercase">
-        {title} ({parents.length})
+        {title} ({areas.length})
       </h2>
-      {parents.length === 0 ? (
+      {areas.length === 0 ? (
         <p className="text-sm text-gray-400">{emptyMessage}</p>
       ) : (
-        <div className="flex flex-col gap-4">
-          {parents.map((parent) => (
-            <div key={parent.id} className="rounded-xl border border-gray-200 bg-white">
-              <VenueRow venue={parent} />
-              <ul className="divide-y divide-gray-100 border-t border-gray-100 pl-6">
-                {(childrenByParentId.get(parent.id) ?? []).map((child) => (
-                  <li key={child.id}>
-                    <VenueRow venue={child} onClearParent={() => onClearParent(child)} pending={pendingId === child.id} />
-                  </li>
-                ))}
-              </ul>
-            </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {areas.map((area) => (
+            <button
+              key={area.id}
+              type="button"
+              onClick={() => onOpen(area.id)}
+              className="flex flex-col items-start gap-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left hover:border-gray-300 hover:bg-gray-50"
+            >
+              <span className="text-sm font-medium text-gray-900">{area.name}</span>
+              <span className="text-xs text-gray-400">{area.places.length} Places</span>
+              <span className="mt-1 flex items-center gap-1 text-xs font-medium text-blue-600">
+                Open
+                <ChevronRight size={12} />
+              </span>
+            </button>
           ))}
         </div>
       )}
     </section>
-  )
-}
-
-function VenueRow({
-  venue,
-  parentOptions,
-  onAssignParent,
-  onClearParent,
-  pending = false,
-}: {
-  venue: Venue
-  parentOptions?: Venue[]
-  onAssignParent?: (parentVenueId: string) => void
-  onClearParent?: () => void
-  pending?: boolean
-}) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <Link
-        to={`/venues?q=${encodeURIComponent(venue.name)}`}
-        className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-gray-900 hover:text-blue-600"
-      >
-        <span className="truncate">{venue.name}</span>
-        <span className="shrink-0 text-xs font-normal text-gray-400">
-          {venue.category} · {venue.destination.name}
-        </span>
-        <ChevronRight size={14} className="shrink-0 text-gray-300" />
-      </Link>
-
-      {onClearParent && (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={onClearParent}
-          className="shrink-0 rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 disabled:opacity-50"
-        >
-          Remove from parent
-        </button>
-      )}
-
-      {parentOptions && onAssignParent && (
-        <select
-          disabled={pending}
-          value=""
-          onChange={(event) => {
-            if (event.target.value) onAssignParent(event.target.value)
-          }}
-          className="shrink-0 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-50"
-        >
-          <option value="">Assign parent…</option>
-          {parentOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name}
-            </option>
-          ))}
-        </select>
-      )}
-    </div>
   )
 }

@@ -40,6 +40,7 @@ from app.db.models import (
     CollectionVenue,
     Destination,
     Event,
+    NoQrPlace,
     Tag,
     Venue,
     VenueTag,
@@ -1145,6 +1146,28 @@ def delete_venue(
                 "message": (
                     f"Cannot delete '{venue.name}' — {orphaned_event_count} event(s) have no other "
                     "location and would be left with none. Give them a destination first, or delete them."
+                ),
+            },
+        )
+
+    # No QR Independent Entity (Phase 1) — `NoQrPlace.venue_id` is `ON
+    # DELETE SET NULL`, but a place with no `name` has no fallback
+    # identity (unlike Event, which still has `destination_id`); nulling
+    # `venue_id` there would violate `ck_no_qr_places_identity`. Same
+    # pre-check pattern as the event count above, for the same reason —
+    # a clear 409 instead of a raw IntegrityError from the CHECK.
+    orphaned_no_qr_place_count = (
+        db.query(NoQrPlace).filter(NoQrPlace.venue_id == venue_id, NoQrPlace.name.is_(None)).count()
+    )
+    if orphaned_no_qr_place_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "venue_has_sole_no_qr_places",
+                "message": (
+                    f"Cannot delete '{venue.name}' — {orphaned_no_qr_place_count} No QR place(s) "
+                    "reference it with no standalone name and would be left with no identity. "
+                    "Remove them from their Walk/Mall first, or give them a name."
                 ),
             },
         )

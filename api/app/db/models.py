@@ -479,6 +479,109 @@ class Event(Base):
     )
 
 
+NO_QR_AREA_TYPES = ("Walk", "Mall")
+
+
+class NoQrArea(Base):
+    """No QR Independent Entity (Phase 1) — a Walk or a Mall, as its own
+    editorial entity, NOT a `Venue`. Supersedes the Phase 0 approach of
+    marking an existing `Venue` row `is_no_qr = true` (see `Venue.is_no_qr`/
+    `parent_venue_id`/`no_qr_type`'s own docstrings, kept temporarily as
+    legacy/unused columns — zero production rows ever used them, confirmed
+    by inventory before this migration, so there is nothing to migrate).
+    A Walk/Mall has no address, category, or opening hours of its own; it
+    is purely a named container for `NoQrPlace` rows below.
+
+    `id` is a plain auto-increment integer, not a caller-supplied text id
+    like `Venue`/`Event`/`Destination` — those all have an id *field* in
+    their creation form; the approved Studio UX for "Add Walk"/"Add Mall"
+    asks for a name only, so there is nothing for an editor to supply.
+    Same shape as `Tag.id` for exactly that reason.
+
+    `type` is intentionally immutable after creation (Phase 1 product
+    decision — see the No QR Independent Entity task) — no route accepts
+    changing it, only `name`.
+    """
+
+    __tablename__ = "no_qr_areas"
+    __table_args__ = (
+        CheckConstraint(f"type IN {NO_QR_AREA_TYPES}", name="ck_no_qr_areas_type"),
+        CheckConstraint("length(btrim(name)) > 0", name="ck_no_qr_areas_name_not_blank"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, Identity(always=True), primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    type: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    places: Mapped[list["NoQrPlace"]] = relationship(
+        back_populates="area", order_by="NoQrPlace.id", cascade="all, delete-orphan"
+    )
+
+
+class NoQrPlace(Base):
+    """One entry inside a `NoQrArea` — either an existing `Venue` (linked
+    by reference, never duplicated; the `Venue` row remains the sole
+    source of truth for its own data) or a standalone place that doesn't
+    exist in the Venue database yet. Exactly one of `venue_id`/`name`
+    identifies a place — enforced by `ck_no_qr_places_identity` at the DB
+    level (mirrors `ck_events_has_location`'s "at least one of two
+    nullable fields" shape, tightened to "exactly one" here since a
+    linked place's name always comes from the Venue, never both).
+
+    `venue_id` is `ON DELETE SET NULL`, matching `Event.venue_id`'s own
+    "an event/place outliving its venue link is a valid state" reasoning
+    — but unlike Event (which still has `destination_id` as a fallback),
+    a place with `name` already NULL has no fallback identity, so
+    `delete_venue` (api/app/api/routes/venues.py) pre-checks and blocks
+    deletion with a 409 if it would leave a place identity-less — the
+    same "clear 409 instead of a raw IntegrityError" pattern that route
+    already uses for `Event`.
+
+    `uq_no_qr_places_area_venue` prevents the same Venue being added
+    twice to the same Area (partial unique index, `venue_id IS NOT NULL`
+    only — standalone places may share a name; no fuzzy dedup).
+    """
+
+    __tablename__ = "no_qr_places"
+    __table_args__ = (
+        CheckConstraint(
+            "(venue_id IS NOT NULL AND name IS NULL) OR (venue_id IS NULL AND name IS NOT NULL)",
+            name="ck_no_qr_places_identity",
+        ),
+        CheckConstraint("name IS NULL OR length(btrim(name)) > 0", name="ck_no_qr_places_name_not_blank"),
+        Index("ix_no_qr_places_area_id", "area_id"),
+        Index("ix_no_qr_places_venue_id", "venue_id"),
+        Index(
+            "uq_no_qr_places_area_venue",
+            "area_id",
+            "venue_id",
+            unique=True,
+            postgresql_where=text("venue_id IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, Identity(always=True), primary_key=True)
+    area_id: Mapped[int] = mapped_column(ForeignKey("no_qr_areas.id", ondelete="CASCADE"), nullable=False)
+    area: Mapped["NoQrArea"] = relationship(back_populates="places")
+    venue_id: Mapped[str | None] = mapped_column(
+        ForeignKey("venues.id", ondelete="SET NULL"), nullable=True
+    )
+    venue: Mapped["Venue | None"] = relationship()
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
 class PublishRevision(Base):
     """An immutable, whole-dataset snapshot created each time content is published."""
 
