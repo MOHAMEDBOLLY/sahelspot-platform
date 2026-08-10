@@ -8,6 +8,7 @@ import { FilterChip } from "@/components/patterns/FilterChip";
 import { EmptyState } from "@/components/patterns/EmptyState";
 import { CATEGORIES } from "@/lib/domain/categories";
 import { ACCESS_TYPES, ACCESS_TYPE_ICON } from "@/lib/domain/accessType";
+import { ESSENTIALS_GROUPS } from "@/lib/home/activities";
 
 /** Explore — Category/Tags/Access Type/Badges/Collections architecture
  * (Phase 2/3). Two parallel entry points into the same `/search` screen —
@@ -36,14 +37,27 @@ export function ExploreClient() {
         <section>
           <SectionHeader title="Browse by Category" />
           <div className="grid grid-cols-4 gap-3">
-            {CATEGORIES.filter((category) => category.showInFilters).map((category) => (
-              <QuickBrowseChip
-                href={`/search?category=${encodeURIComponent(category.value)}`}
-                icon={category.icon}
-                key={category.value}
-                label={category.label}
-              />
-            ))}
+            {CATEGORIES.filter((category) => category.showInFilters).map((category) => {
+              // Essentials' Home tile (`lib/home/activities.ts`) lands here
+              // rather than a dedicated screen — Shopping/Services already
+              // have their own chip in this existing grid, so the only
+              // thing added is the `activity` param that lets Search apply
+              // their V1 tag allow-list (see `findAllowedTags`). Every
+              // other category chip is untouched.
+              const essentialsGroup = ESSENTIALS_GROUPS.find(
+                (group) => group.category === category.value,
+              );
+              const params = new URLSearchParams({ category: category.value });
+              if (essentialsGroup) params.set("activity", essentialsGroup.id);
+              return (
+                <QuickBrowseChip
+                  href={`/search?${params.toString()}`}
+                  icon={category.icon}
+                  key={category.value}
+                  label={category.label}
+                />
+              );
+            })}
           </div>
         </section>
 

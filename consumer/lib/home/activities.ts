@@ -42,25 +42,88 @@ export type HomeActivity = {
   /** Set when the activity isn't a venue-category search at all. Events are
    * their own published entity with their own route, not a venue category. */
   href?: string;
+  /** V1 Home taxonomy (approved product decision) — the tag *slugs* Search
+   * is allowed to surface for this activity, out of everything
+   * `topTags()` finds in the activity's backend category. This is what
+   * lets Quick Bites and Restaurants both resolve to the same `food`
+   * category yet show disjoint tag rows: Quick Bites allow-lists
+   * fast/casual slugs, Restaurants allow-lists sit-down slugs, and a slug
+   * outside both lists (`sushi`, `italian`) simply never surfaces under
+   * either. Consumer-side only — no Studio/backend concept, doesn't
+   * rename or reassign any tag. Omit for activities with no V1 allow-list
+   * (Search then falls back to showing every tag `topTags()` finds for
+   * the category, unrestricted). A slug with zero current venues still
+   * won't render — the allow-list narrows what's *eligible*, it doesn't
+   * force anything to appear (`SearchClient`'s existing zero-count
+   * behavior is unchanged). */
+  allowedTags?: readonly string[];
 };
 
 export const HOME_ACTIVITIES: readonly HomeActivity[] = [
   { id: "beaches", icon: "beach_access", label: "Beaches", categories: ["beach"] },
-  { id: "coffee", icon: "coffee", label: "Coffee", categories: ["coffee"] },
+  {
+    id: "coffee",
+    icon: "coffee",
+    label: "Coffee",
+    categories: ["coffee"],
+    allowedTags: ["specialty-coffee", "cafe-shop", "shisha", "bakery", "desserts"],
+  },
   // "Quick Bites" means fast/casual eating — Fast Food, Burgers, Pizza,
   // Sandwiches — which are Restaurant-category tags (see api/alembic
   // 0014_tags.py's Quick Bites tag set), not Cafe. Primary must be "food"
   // so `activityHref` lands on Search's food taxonomy, not coffee's.
-  { id: "quick-bites", icon: "fastfood", label: "Quick Bites", categories: ["food", "coffee"] },
-  { id: "restaurants", icon: "restaurant", label: "Restaurants", categories: ["food"] },
+  // `allowedTags` is what actually keeps Quick Bites and Restaurants
+  // disjoint despite sharing the same `food` category — see
+  // `allowedTags`'s own doc comment above.
+  {
+    id: "quick-bites",
+    icon: "fastfood",
+    label: "Quick Bites",
+    categories: ["food", "coffee"],
+    allowedTags: ["fast-food", "pizza", "burgers", "sandwiches", "feteer"],
+  },
+  {
+    id: "restaurants",
+    icon: "restaurant",
+    label: "Restaurants",
+    categories: ["food"],
+    allowedTags: ["fine-dining", "grill", "seafood", "mandi-kabsa"],
+  },
   { id: "events", icon: "confirmation_number", label: "Events", categories: [], href: "/events" },
-  { id: "nightlife", icon: "nightlife", label: "Nightlife", categories: ["nightlife", "beach"] },
+  // No QR Independent Entity (`no_qr_areas`/`no_qr_places`,
+  // api/app/db/models.py) — its own discovery entity, not a Venue
+  // category and not a tag, same architectural shape as Events. Reads
+  // `GET /public/discover/no-qr-areas` (`lib/api/noQr.ts`), never the
+  // legacy `is_no_qr`/`parent_venue_id`/`no_qr_type` Venue fields, which
+  // this model supersedes and which the public API still doesn't (and
+  // shouldn't) expose.
+  { id: "no-qr", icon: "directions_walk", label: "No QR", categories: [], href: "/no-qr" },
   // `Activity` is the family bucket in practice — aqua parks, kids' clubs,
   // football fields, public parks. Resolves to the domain's "entertainment"
   // bucket via `toVenueCategory`.
-  { id: "family", icon: "group", label: "Family", categories: ["entertainment"] },
-  { id: "date", icon: "favorite", label: "Date", categories: ["beach", "nightlife", "coffee"] },
-  { id: "shopping", icon: "shopping_bag", label: "Shopping", categories: ["shopping"] },
+  {
+    id: "family",
+    icon: "group",
+    label: "Family",
+    categories: ["entertainment"],
+    allowedTags: ["kids-area", "kids-activities", "pool", "aqua-park", "play-area"],
+  },
+  {
+    id: "nightlife",
+    icon: "nightlife",
+    label: "Nightlife",
+    categories: ["nightlife", "beach"],
+    allowedTags: ["dj", "lounge", "night-club", "beach-party"],
+  },
+  // Essentials is a Consumer-only umbrella over two backend categories
+  // (`shopping`, `services`) — no single `?category=` value covers both,
+  // and a `HomeActivity` navigates to one category via `activityHref`.
+  // Rather than inventing a new merged view (a Home/Search redesign this
+  // task explicitly rules out), this points at `/explore`'s existing
+  // "Browse by Category" grid, which already lists Shopping and Services
+  // as separate chips into their own `/search?category=` taxonomy — the
+  // smallest clean reuse of an existing screen, zero new code.
+  { id: "essentials", icon: "storefront", label: "Essentials", categories: [], href: "/explore" },
 ];
 
 /** Essential Services — the practical, non-leisure half of a trip.
@@ -91,9 +154,62 @@ export const ESSENTIAL_SERVICES: readonly EssentialService[] = [
 ];
 
 /** The one place an activity/service turns into a destination URL, so no
- * component builds a search query string by hand. */
-export function activityHref(item: { categories: readonly VenueCategory[]; href?: string }): string {
+ * component builds a search query string by hand.
+ *
+ * Appends `&activity=<id>` whenever the item carries an `id` and resolves
+ * to a category (not `href`-based, like Events) — that's how Search knows
+ * which `allowedTags` list to apply for a V1 tag row (see `HomeActivity`'s
+ * doc comment). Items without an `id` (none today) or without an
+ * `allowedTags` entry still work exactly as before: Search simply finds no
+ * matching allow-list and shows every tag `topTags()` returns. */
+export function activityHref(item: {
+  id?: string;
+  categories: readonly VenueCategory[];
+  href?: string;
+}): string {
   if (item.href) return item.href;
   const [primary] = item.categories;
-  return primary ? `/search?category=${encodeURIComponent(primary)}` : "/search";
+  if (!primary) return "/search";
+  const params = new URLSearchParams({ category: primary });
+  if (item.id) params.set("activity", item.id);
+  return `/search?${params.toString()}`;
+}
+
+/** Essentials' two V1 sub-groups (Shopping / Services) — not Home rail
+ * tiles themselves (Essentials is the one tile, at `/explore`), but each
+ * needs its own `allowedTags` the same way a `HomeActivity` does, since
+ * `shopping` and `services` are each a single backend category with their
+ * own approved V1 tag list. Kept here, not duplicated into
+ * `ExploreClient.tsx`, so this file stays the one place Home/Essentials
+ * taxonomy is defined — `ExploreClient` only reads `category`/`id` off
+ * this array to build its existing "Browse by Category" hrefs, it doesn't
+ * redefine the mapping. `findAllowedTags` below is what `SearchClient`
+ * actually queries — it checks `HOME_ACTIVITIES` first, then this list,
+ * so both activity kinds resolve through one function. */
+export const ESSENTIALS_GROUPS: readonly {
+  id: string;
+  category: VenueCategory;
+  allowedTags: readonly string[];
+}[] = [
+  {
+    id: "essentials-shopping",
+    category: "shopping",
+    allowedTags: ["fashion", "beauty", "beach-essentials", "home-decor"],
+  },
+  {
+    id: "essentials-services",
+    category: "services",
+    allowedTags: ["supermarket", "pharmacy", "clinics", "veterinary", "car-services"],
+  },
+];
+
+/** Resolves an `?activity=` id (from `activityHref`, or an
+ * `ESSENTIALS_GROUPS` link built by `ExploreClient`) to its V1 allow-list,
+ * across both sources — the single lookup `SearchClient` calls instead of
+ * reading `HOME_ACTIVITIES`/`ESSENTIALS_GROUPS` directly. */
+export function findAllowedTags(activityId: string | null): readonly string[] | undefined {
+  if (!activityId) return undefined;
+  const activity = HOME_ACTIVITIES.find((item) => item.id === activityId);
+  if (activity) return activity.allowedTags;
+  return ESSENTIALS_GROUPS.find((group) => group.id === activityId)?.allowedTags;
 }

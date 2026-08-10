@@ -1,7 +1,7 @@
 from datetime import date, time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.event_timing import compute_event_phase
 from app.api.public_cache import (
@@ -11,12 +11,15 @@ from app.api.public_cache import (
 )
 from app.api.schemas import (
     DestinationRef,
+    PublicNoQrAreaOut,
+    PublicNoQrPlaceOut,
     PublishedCollectionOut,
     PublishedDestinationOut,
     PublishedEventOut,
     PublishedVenueOut,
     VenueRef,
 )
+from app.db.models import NoQrArea, NoQrPlace
 from app.db.session import get_db
 from app.publishing.engine import get_current_revision, get_current_revision_id
 
@@ -302,3 +305,53 @@ def get_published_event(
     destinations_by_id = {d["id"]: d for d in revision.snapshot.get("destinations", [])}
     set_public_cache_headers(response, revision_id)
     return resolve_published_event(event, venues_by_id, destinations_by_id)
+
+
+@router.get("/discover/no-qr-areas", response_model=list[PublicNoQrAreaOut])
+def list_no_qr_areas(db: Session = Depends(get_db)):
+    """No QR Independent Entity (Phase 1) — the public read path for
+    `NoQrArea`/`NoQrPlace`, distinct from the legacy, Venue-`access_type`-
+    based `/discover/no-qr` above (unrelated model, kept as-is; not
+    reused, not removed).
+
+    Deliberately a live query against `no_qr_areas`/`no_qr_places`, not
+    the publish-revision snapshot every other route in this file reads —
+    `NoQrArea` has no `status` column at all (see its own docstring,
+    app/db/models.py): there is no draft/approve/publish workflow for it
+    to freeze a snapshot of, the same reason `GET /editor/tags` already
+    reads its table live rather than through a revision. A place's
+    `venue` ref is resolved from the live `Venue` table (not the
+    snapshot) for the same reason — the alternative would require
+    No QR to wait on a venue being published, which the product model
+    (`venue_id != NULL` alone identifies a linked place) never asked for.
+
+    Returns every Area regardless of place count — a zero-place Area is
+    real state (see `NoQrArea.places`' `cascade="all, delete-orphan"`
+    docstring), not something to filter out. Ordered by `id` (creation
+    order), the only ordering convention `no_qr_areas`/`no_qr_places`
+    define (see `NoQrArea.places`' own `order_by`).
+    """
+    areas = (
+        db.query(NoQrArea)
+        .options(selectinload(NoQrArea.places).selectinload(NoQrPlace.venue))
+        .order_by(NoQrArea.id)
+        .all()
+    )
+    return [
+        PublicNoQrAreaOut(
+            id=area.id,
+            name=area.name,
+            type=area.type,
+            places=[
+                PublicNoQrPlaceOut(
+                    id=place.id,
+                    name=place.name,
+                    venue=VenueRef(id=place.venue.id, name=place.venue.name)
+                    if place.venue is not None
+                    else None,
+                )
+                for place in area.places
+            ],
+        )
+        for area in areas
+    ]

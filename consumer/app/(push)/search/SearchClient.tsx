@@ -12,6 +12,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { VenueCard } from "@/components/venue/VenueCard";
 import { CATEGORY_FILTERS } from "@/lib/map/config";
+import { findAllowedTags } from "@/lib/home/activities";
 import { useSearchVenues } from "@/lib/hooks/useSearchVenues";
 import { useVenues } from "@/lib/hooks/useVenues";
 import { useCategoryTaxonomy } from "@/lib/hooks/useCategoryTaxonomy";
@@ -62,6 +63,14 @@ function SearchPageContent() {
   );
   const initialTag = searchParams.get("tags");
   const [selectedTags, setSelectedTags] = useState<string[]>(initialTag ? [initialTag] : []);
+  // V1 Home taxonomy — set only when arriving from a Home activity chip
+  // (`?activity=quick-bites`, see `activityHref` in `lib/home/activities.ts`).
+  // Cleared on `changeCategory` (below) since an allow-list scoped to one
+  // activity has no meaning once the user picks a different category —
+  // same reasoning already applied to `selectedTags`/`reservationPolicy`.
+  const [activityId, setActivityId] = useState<string | null>(
+    searchParams.get("activity"),
+  );
   // `reservation_policy` has no server-side filter on `/public/search/
   // venues` (api/app/api/routes/search.py) — applied client-side below,
   // over whatever the server-filtered result set already is, rather than
@@ -96,11 +105,23 @@ function SearchPageContent() {
   // than falling back to a global aggregate. Shared with Map — see
   // `useCategoryTaxonomy`'s own docstring for why this one hook is the
   // single source both screens read from.
-  const { popularTags, hasReservationPolicy: categoryHasReservationPolicy } = useCategoryTaxonomy(
-    venues.data ?? [],
-    category,
-    SEARCH_TAG_COUNT,
-  );
+  const { popularTags: categoryTags, hasReservationPolicy: categoryHasReservationPolicy } =
+    useCategoryTaxonomy(venues.data ?? [], category, SEARCH_TAG_COUNT);
+
+  // V1 Home taxonomy — when the current activity (a `HOME_ACTIVITIES`
+  // entry or an `ESSENTIALS_GROUPS` entry, see `findAllowedTags`) has an
+  // `allowedTags` list, narrow `topTags()`'s category-wide result down to
+  // just those slugs (still in `topTags()`'s own count-desc order). This
+  // is what separates Quick Bites from Restaurants despite both being
+  // `food`, and Essentials' Shopping from Services: a tag outside the
+  // active allow-list is filtered out here, never renamed or reassigned.
+  // No allow-list (Beaches, or Search reached without an `activity` param)
+  // falls back to every tag the category has, unrestricted — existing
+  // behavior.
+  const activityAllowedTags = findAllowedTags(activityId);
+  const popularTags = activityAllowedTags
+    ? categoryTags.filter((tag) => activityAllowedTags.includes(tag.slug))
+    : categoryTags;
 
   // `category` isn't sent to `searchVenues` — see that function's own note
   // on why the backend's raw-string category filter can't be driven by the
@@ -150,6 +171,7 @@ function SearchPageContent() {
   // architecture, Phase 3 — every taxonomy surface follows the same rule).
   function changeCategory(next: VenueCategory | "all") {
     setCategory(next);
+    setActivityId(null);
     setSelectedTags([]);
     setReservationPolicy("all");
     setAccessType((current) => {

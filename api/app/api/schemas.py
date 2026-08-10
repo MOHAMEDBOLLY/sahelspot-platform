@@ -755,6 +755,33 @@ class NoQrAreaListOut(BaseModel):
     items: list[NoQrAreaOut]
 
 
+class PublicNoQrPlaceOut(BaseModel):
+    """The public projection of `NoQrPlaceOut` — no `area_id` (redundant,
+    the place is already nested under its area), no `venue_id` (the
+    resolved `venue` ref already carries what a public caller needs), no
+    `created_at`/`updated_at` (editorial metadata, not Consumer-facing).
+    Same "exactly one of `name`/`venue`" shape as the editorial schema.
+    """
+
+    id: int
+    name: str | None = None
+    venue: VenueRef | None = None
+
+
+class PublicNoQrAreaOut(BaseModel):
+    """The public read shape for a No QR Area — mirrors `NoQrAreaOut`
+    minus editorial-only fields (`created_at`/`updated_at`), same
+    reasoning `PublishedVenueOut` already gives for being leaner than
+    `VenueOut`. `type` (`"Walk"`/`"Mall"`) is the authoritative
+    classification — Consumer must never re-derive Walk/Mall from a
+    Venue's own category or tags."""
+
+    id: int
+    name: str
+    type: str
+    places: list[PublicNoQrPlaceOut] = []
+
+
 class NoQrAreaCreate(BaseModel):
     """"Add Walk"/"Add Mall" — name only, per the approved Phase 1 UX.
     `type` is supplied here and never changes afterward (see `NoQrArea`'s

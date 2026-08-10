@@ -96,3 +96,30 @@ export interface PublishedEventDTO {
   external_event_id: string | null;
   phase: "upcoming" | "live" | "ended" | null;
 }
+
+/** Same lightweight id+name shape `VenueRefDTO` already gives Events —
+ * named separately per No QR's own type, but structurally identical, not
+ * duplicated by accident. */
+export type NoQrVenueRefDTO = VenueRefDTO;
+
+/** Mirrors `PublicNoQrPlaceOut` (api/app/api/schemas.py) — No QR
+ * Independent Entity. Exactly one of `name`/`venue` is ever non-null:
+ * `venue` set means this place links an existing Venue (by reference,
+ * never duplicated); `name` set means it's a standalone place with no
+ * Venue record at all. */
+export interface NoQrPlaceDTO {
+  id: number;
+  name: string | null;
+  venue: NoQrVenueRefDTO | null;
+}
+
+/** Mirrors `PublicNoQrAreaOut` (api/app/api/schemas.py) —
+ * `GET /public/discover/no-qr-areas`. `type` is the authoritative Walk/
+ * Mall classification; never re-derive it from a place's venue category
+ * or tags. */
+export interface NoQrAreaDTO {
+  id: number;
+  name: string;
+  type: "Walk" | "Mall";
+  places: NoQrPlaceDTO[];
+}
