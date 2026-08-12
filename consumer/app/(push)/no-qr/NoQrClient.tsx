@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/patterns/EmptyState";
+import { Reveal } from "@/components/patterns/Reveal";
 import { SectionHeader } from "@/components/patterns/SectionHeader";
+import { CardFrame, LBracketAccent } from "@/components/patterns/CardShell";
 import { CTAButton } from "@/components/ui/CTAButton";
 import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
@@ -11,20 +12,30 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { useNoQrAreas } from "@/lib/hooks/useNoQrAreas";
 import type { NoQrArea } from "@/lib/domain/noQr";
 
+/** Card System Redesign (SAHELSPOT CONSUMER — CARD SYSTEM REDESIGN ONLY):
+ * previously a plain bordered row outside the card family entirely (its own
+ * one-off construction). Now built on the same `CardFrame` horizontal
+ * anatomy as `VenueCard`'s horizontal-row card — image-slot (here an icon
+ * tile, since a No QR Area has no photo), small `LBracketAccent` on that
+ * tile's corner, title + metadata, trailing chevron — so it reads as part
+ * of the same system instead of a separate mini-app. Visual change only:
+ * route, data (`area.id`/`.name`/`.places`/`.type`), and business behavior
+ * are unchanged. */
 function AreaCard({ area }: { area: NoQrArea }) {
   return (
-    <Link
-      className="flex items-center justify-between rounded-lg border border-outline-variant bg-surface p-4"
-      href={`/no-qr/${area.id}`}
-    >
-      <div>
-        <p className="font-semibold text-primary">{area.name}</p>
-        <p className="text-sm text-on-surface-variant">
+    <CardFrame bracket={false} className="flex w-full items-center gap-3 p-3" href={`/no-qr/${area.id}`}>
+      <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl rounded-tr-none bg-cream">
+        <Icon className="text-primary" name={area.type === "Walk" ? "directions_walk" : "storefront"} size={28} />
+        <LBracketAccent size="sm" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <h3 className="truncate text-sm font-bold text-on-surface">{area.name}</h3>
+        <p className="text-xs text-on-surface-variant">
           {area.places.length} {area.places.length === 1 ? "place" : "places"}
         </p>
       </div>
-      <Icon className="text-on-surface-variant" name="chevron_right" />
-    </Link>
+      <Icon className="shrink-0 text-primary" name="chevron_right" size={20} />
+    </CardFrame>
   );
 }
 
@@ -71,17 +82,20 @@ export function NoQrClient() {
         ) : (
           <>
             {walks.length > 0 ? (
-              <section>
-                <SectionHeader title="Walks" />
-                <div className="space-y-3">
-                  {walks.map((area) => (
-                    <AreaCard area={area} key={area.id} />
-                  ))}
-                </div>
-              </section>
+              <Reveal>
+                <section>
+                  <SectionHeader title="Walks" />
+                  <div className="space-y-3">
+                    {walks.map((area) => (
+                      <AreaCard area={area} key={area.id} />
+                    ))}
+                  </div>
+                </section>
+              </Reveal>
             ) : null}
 
             {malls.length > 0 ? (
+              <Reveal>
               <section>
                 <SectionHeader title="Malls" />
                 <div className="space-y-3">
@@ -90,6 +104,7 @@ export function NoQrClient() {
                   ))}
                 </div>
               </section>
+              </Reveal>
             ) : null}
           </>
         )}

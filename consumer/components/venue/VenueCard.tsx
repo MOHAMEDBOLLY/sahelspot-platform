@@ -1,11 +1,10 @@
 import Image from "next/image";
-import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
 import { RatingBadge } from "@/components/ui/RatingBadge";
 import { StatusBadge } from "@/components/patterns/StatusBadge";
 import { Pill } from "@/components/ui/Pill";
-import { BookmarkTab, LBracketAccent, OverlapPanel, SignatureCard } from "@/components/patterns/CardShell";
+import { CardFrame, DateBadge, LBracketAccent, SaveButton } from "@/components/patterns/CardShell";
 import type { Venue } from "@/lib/domain/venue";
 import type { Event, EventPhase } from "@/lib/domain/event";
 import { formatEventDateRange } from "@/lib/domain/formatEventDate";
@@ -56,178 +55,178 @@ function notableAccessType(venue: Venue): string | null {
   return venue.accessType && venue.accessType !== "Public" ? venue.accessType : null;
 }
 
-/** The one card family in the product — one component, five variants, never
- * five components.
- *
- * `vertical-lg` (Home Trending Today, Saved list — and the visual reference
- * for the whole family, Best Beaches) is implemented pixel-faithfully
- * against the canonical Stitch export (`.signature-card` /
- * `.card-overlap-panel`, see docs/consumer/MOBILE_2027_DESIGN_FREEZE.md):
- * a sharp top-right corner, an L-shaped accent bracket in that corner (two
- * 4px accent lines, not a fill or a diagonal cut), a bookmark tab as a
- * right-rounded pill flush against the left edge, and an overlapping info
- * panel with its own sharp bottom-left corner. This is the canonical
- * construction — do not reinterpret it.
- *
- * `vertical-compact` (Map bottom sheet Popular Nearby), `horizontal-row`
- * (Venue Details Nearby Places, Search results), and `event` (Events
- * Module v1) keep the simpler pre-existing treatment pending their own
- * fidelity pass — they are explicitly out of scope for this change, not
- * finished in a different style on purpose. */
+type StandardSize = "lg" | "compact";
+
+const STANDARD_SIZE: Record<StandardSize, { width: string; image: string; title: string }> = {
+  lg: { width: "w-64", image: "h-40", title: "text-base" },
+  compact: { width: "w-48", image: "h-32", title: "text-sm" },
+};
+
+/** The one card family in the product — one component, four variants, never
+ * four components. Card System Redesign (SAHELSPOT CONSUMER — CARD SYSTEM
+ * REDESIGN ONLY): all four now share the same flat `CardFrame` construction
+ * (image, then content directly below it — no floating overlap panel), the
+ * same `SaveButton`/`DateBadge` top-left slot, and the same typography and
+ * metadata ordering (title → location → rating/distance), rather than three
+ * different pre-existing treatments each waiting on its own "fidelity
+ * pass." `vertical-lg` and `vertical-compact` are now one internal
+ * `StandardVenueCard`, sized by prop, instead of two parallel
+ * implementations — same data, same hierarchy, different scale only. */
 export function VenueCard(props: VenueCardProps) {
   if (props.variant === "event") {
     return <EventVariant event={props.event} />;
   }
 
   const { venue, variant = "vertical-lg", saved = false, onToggleSaved, areaLabel = null } = props;
-  const href = `/venues/${venue.id}`;
 
   if (variant === "horizontal-row") {
     return (
-      <Link
-        className="flex items-center gap-4 rounded-2xl border border-outline-variant/10 bg-surface-container-low p-3 shadow-sm transition-colors hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-        href={href}
-      >
-        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl rounded-tr-none bg-cream">
-          {venue.coverImageUrl ? (
-            <Image
-              alt={venue.name}
-              className="object-cover"
-              fill
-              sizes="80px"
-              src={venue.coverImageUrl}
-            />
-          ) : null}
-          <LBracketAccent size="sm" />
-          <button
-            aria-pressed={saved}
-            aria-label={saved ? "Remove from saved" : "Save this place"}
-            className="absolute top-1.5 left-0 z-10 flex items-center rounded-r-full bg-accent px-1.5 py-1 text-on-accent shadow-sm transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            onClick={(event) => {
-              event.preventDefault();
-              onToggleSaved?.(venue.id);
-            }}
-            type="button"
-          >
-            <Icon filled name="bookmark" size={12} />
-          </button>
-        </div>
-        <div className="min-w-0 flex-grow space-y-1">
-          <h3 className="truncate font-headline font-bold leading-tight text-primary">
-            {venue.name}
-          </h3>
-          <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
-            <Icon className="text-on-surface-variant" name="location_on" size={16} />
-            <span className="text-xs font-medium text-on-surface-variant">
-              {venue.distanceLabel ? `${venue.destinationName} · ${venue.distanceLabel}` : venue.destinationName}
-            </span>
-            {/* Location Context Label refinement — the venue's own
-              * destination name above is never overwritten; this is an
-              * additive, visually subordinate badge (small `Pill`, same
-              * treatment as `notableAccessType` below) explaining *why* a
-              * venue from a different destination is showing up here, not
-              * a replacement for its real location. */}
-            {areaLabel ? <Pill variant="tag">{areaLabel}</Pill> : null}
-          </div>
-          {venue.rating !== null ? (
-            <RatingBadge compact reviewCount={venue.reviewCount ?? undefined} value={venue.rating} />
-          ) : null}
-          {notableAccessType(venue) ? (
-            <Pill variant="tag">{notableAccessType(venue)}</Pill>
-          ) : null}
-        </div>
-        <Icon className="text-primary" name="chevron_right" size={20} />
-      </Link>
+      <HorizontalVenueCard
+        areaLabel={areaLabel}
+        onToggleSaved={onToggleSaved}
+        saved={saved}
+        venue={venue}
+      />
     );
   }
 
-  if (variant === "vertical-compact") {
-    return (
-      <Link
-        className="w-56 shrink-0 snap-start overflow-hidden rounded-3xl bg-surface-container-lowest shadow-md transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-        href={href}
-      >
-        <div className="relative h-32 bg-cream">
-          {venue.coverImageUrl ? (
-            <Image alt={venue.name} className="object-cover" fill sizes="224px" src={venue.coverImageUrl} />
-          ) : null}
-          <CornerAccent />
-          <span className="absolute top-3 left-3">
-            <SaveBadge onToggleSaved={onToggleSaved} saved={saved} venueId={venue.id} />
-          </span>
+  return (
+    <StandardVenueCard
+      onToggleSaved={onToggleSaved}
+      saved={saved}
+      size={variant === "vertical-compact" ? "compact" : "lg"}
+      venue={venue}
+    />
+  );
+}
+
+/** Standard card — Home's rails, Saved, Map's bottom sheet. Anatomy, in
+ * scan order: image → save action (top-left, over the image) → title +
+ * open/closed status → location → rating/distance/access-type. One primary
+ * accent (lime, via `LBracketAccent` and the save button's active state)
+ * per card, exactly as the brief's color-restraint section asks — no
+ * per-category color, no second accent competing for attention. Closed
+ * venues de-emphasize via opacity + a light grayscale on the photo, plus the
+ * "CLOSED" text already carried by `StatusBadge`, rather than a second
+ * "giant badge" ribbon stacked on top of the same information. */
+function StandardVenueCard({
+  venue,
+  size,
+  saved,
+  onToggleSaved,
+}: {
+  venue: Venue;
+  size: StandardSize;
+  saved: boolean;
+  onToggleSaved?: (venueId: string) => void;
+}) {
+  const isClosed = venue.isOpenNow === false;
+  const { width, image, title } = STANDARD_SIZE[size];
+
+  return (
+    <CardFrame className={`${width} ${isClosed ? "opacity-70" : ""}`} href={`/venues/${venue.id}`}>
+      <div className={`relative ${image} bg-cream ${isClosed ? "grayscale-[30%]" : ""}`}>
+        {venue.coverImageUrl ? (
+          <Image alt={venue.name} className="object-cover" fill sizes="256px" src={venue.coverImageUrl} />
+        ) : null}
+      </div>
+      <SaveButton onToggleSaved={onToggleSaved} saved={saved} venueId={venue.id} />
+      <div className="space-y-1 p-3">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className={`truncate font-bold leading-tight text-on-surface ${title}`}>{venue.name}</h3>
+          {venue.isOpenNow !== null ? <StatusBadge isOpen={venue.isOpenNow} /> : null}
         </div>
-        <div className="-mt-4 mx-3 space-y-2 rounded-2xl bg-surface-container-lowest p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h3 className="truncate font-headline text-lg leading-tight font-bold text-on-surface">
-                {venue.name}
-              </h3>
-              <p className="flex items-center gap-1 text-sm text-on-surface-variant">
-                <Icon className="shrink-0" name="location_on" size={16} />
-                <span className="truncate">{venue.destinationName}</span>
-              </p>
-            </div>
-            {venue.isOpenNow !== null ? <StatusBadge isOpen={venue.isOpenNow} /> : null}
-          </div>
-          <div className="flex items-center gap-1 pt-1">
+        <p className="flex items-center gap-1 text-xs text-on-surface-variant">
+          <Icon className="shrink-0" name="location_on" size={14} />
+          <span className="truncate">{venue.destinationName}</span>
+        </p>
+        {venue.rating !== null || venue.distanceLabel || notableAccessType(venue) ? (
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 pt-0.5">
             {venue.rating !== null ? (
-              <RatingBadge reviewCount={venue.reviewCount ?? undefined} value={venue.rating} />
+              <RatingBadge compact reviewCount={venue.reviewCount ?? undefined} value={venue.rating} />
             ) : null}
             {venue.distanceLabel ? (
               <span className="text-xs text-on-surface-variant">· {venue.distanceLabel}</span>
             ) : null}
-            {notableAccessType(venue) ? (
-              <Pill variant="tag">{notableAccessType(venue)}</Pill>
-            ) : null}
+            {notableAccessType(venue) ? <Pill variant="tag">{notableAccessType(venue)}</Pill> : null}
           </div>
-        </div>
-      </Link>
-    );
-  }
-
-  // vertical-lg — the canonical construction, matched to the Stitch export.
-  const isClosed = venue.isOpenNow === false;
-  return (
-    <SignatureCard className={`w-64 ${isClosed ? "opacity-70" : ""}`} href={href}>
-      <div className={`relative h-48 bg-cream ${isClosed ? "grayscale-[30%]" : ""}`}>
-        {isClosed ? (
-          <span className="absolute top-0 left-0 z-20 bg-error px-2 py-1 text-[10px] font-bold tracking-wider text-white uppercase">
-            Closed
-          </span>
-        ) : null}
-        {venue.coverImageUrl ? (
-          <Image alt={venue.name} className="object-cover" fill sizes="280px" src={venue.coverImageUrl} />
         ) : null}
       </div>
-      <BookmarkTab onToggleSaved={onToggleSaved} saved={saved} venueId={venue.id} />
-      <OverlapPanel border tone="light">
-        <div className="flex flex-col">
-          <h3 className="font-headline text-lg leading-tight font-bold text-on-surface">{venue.name}</h3>
-          <p className="mt-0.5 flex items-center gap-1 text-sm text-on-surface-variant">
-            <Icon size={14} name="location_on" />
-            {venue.destinationName}
-          </p>
-        </div>
-        {venue.isOpenNow !== null ? <StatusBadge isOpen={venue.isOpenNow} /> : null}
-      </OverlapPanel>
-      {(venue.rating !== null || venue.distanceLabel) ? (
-        <div className="mx-4 flex items-center gap-1 pb-1">
-          {venue.rating !== null ? (
-            <RatingBadge reviewCount={venue.reviewCount ?? undefined} value={venue.rating} />
-          ) : null}
-          {venue.distanceLabel ? (
-            <span className="text-xs text-on-surface-variant">· {venue.distanceLabel}</span>
-          ) : null}
-        </div>
-      ) : null}
-    </SignatureCard>
+    </CardFrame>
   );
 }
 
-/** Simple flat triangle corner mark — the pre-Coastal-Fold treatment, kept
- * for `vertical-compact`, `horizontal-row`, `event`, and (via
- * `CollectionCard`/`FeatureCard`) other card-family members still pending
- * their own fidelity pass against the canonical export. */
+/** Horizontal card — Search results, Venue Details' Nearby/Similar lists.
+ * Same title → location → rating hierarchy as the standard card, laid out
+ * as a row (compact photo on the left) for a dense, scannable list rather
+ * than a rail. Its own small `LBracketAccent` sits on the thumbnail corner
+ * (`CardFrame`'s full-card bracket is turned off via `bracket={false}` so
+ * the two don't stack), and the save action moves to a small trailing
+ * `IconButton` next to the chevron — a left-edge save button would sit
+ * awkwardly mid-row here, unlike the standard card's image-corner slot. */
+function HorizontalVenueCard({
+  venue,
+  saved,
+  onToggleSaved,
+  areaLabel,
+}: {
+  venue: Venue;
+  saved: boolean;
+  onToggleSaved?: (venueId: string) => void;
+  areaLabel: string | null;
+}) {
+  return (
+    <CardFrame bracket={false} className="flex w-full items-center gap-3 p-3" href={`/venues/${venue.id}`}>
+      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl rounded-tr-none bg-cream">
+        {venue.coverImageUrl ? (
+          <Image alt={venue.name} className="object-cover" fill sizes="64px" src={venue.coverImageUrl} />
+        ) : null}
+        <LBracketAccent size="sm" />
+      </div>
+      <div className="min-w-0 flex-1 space-y-1">
+        <h3 className="truncate text-sm font-bold text-on-surface">{venue.name}</h3>
+        <p className="flex items-center gap-1 text-xs text-on-surface-variant">
+          <Icon className="shrink-0" name="location_on" size={14} />
+          <span className="truncate">
+            {venue.distanceLabel ? `${venue.destinationName} · ${venue.distanceLabel}` : venue.destinationName}
+          </span>
+        </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {venue.rating !== null ? (
+            <RatingBadge compact reviewCount={venue.reviewCount ?? undefined} value={venue.rating} />
+          ) : null}
+          {/* Location Context Label refinement — the venue's own destination
+            * name above is never overwritten; this is an additive, visually
+            * subordinate badge explaining *why* a venue from a different
+            * destination is showing up here. */}
+          {areaLabel ? <Pill variant="tag">{areaLabel}</Pill> : null}
+          {notableAccessType(venue) ? <Pill variant="tag">{notableAccessType(venue)}</Pill> : null}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <IconButton
+          aria-pressed={saved}
+          className="h-9 w-9"
+          filled={saved}
+          icon="bookmark"
+          label={saved ? "Remove from saved" : "Save this place"}
+          onClick={(event) => {
+            event.preventDefault();
+            onToggleSaved?.(venue.id);
+          }}
+          variant={saved ? "accent" : "plain"}
+        />
+        <Icon className="text-primary" name="chevron_right" size={20} />
+      </div>
+    </CardFrame>
+  );
+}
+
+/** Simple flat triangle corner mark — kept only for
+ * `components/editorial/FeatureCard.tsx` (Explore's Editor's Picks /
+ * Weekend Planner), which is outside the Card System Redesign's scope and
+ * still imports this export directly. Not used anywhere in this file
+ * anymore — every variant here now uses `LBracketAccent` instead. */
 export function CornerAccent() {
   return (
     <div
@@ -238,76 +237,43 @@ export function CornerAccent() {
   );
 }
 
-function SaveBadge({
-  venueId,
-  saved,
-  onToggleSaved,
-  compact = false,
-}: {
-  venueId: string;
-  saved: boolean;
-  onToggleSaved?: (venueId: string) => void;
-  compact?: boolean;
-}) {
-  return (
-    <IconButton
-      aria-pressed={saved}
-      className={compact ? "h-6 w-6" : undefined}
-      icon="bookmark"
-      filled
-      label={saved ? "Remove from saved" : "Save this place"}
-      onClick={(event) => {
-        event.preventDefault();
-        onToggleSaved?.(venueId);
-      }}
-      variant="accent"
-    />
-  );
-}
-
-/** The `event` variant's body — matched to the canonical Stitch export's
- * Upcoming Events card: the same `SignatureCard`/`OverlapPanel` shell as
- * every other card, `layout="column"` because an event's panel stacks a
- * title+status row, a date row, and a location row rather than the
- * title/location pair every venue card panel holds. No bookmark tab —
- * events aren't saveable, so that affordance simply doesn't apply here,
- * per the frozen system's own rule that the bookmark tab appears "only
- * where save functionality exists." No standalone component; this is
- * inlined here because it is only ever reached through `VenueCard`'s
- * `event` variant. */
+/** Event card — Events list, Home's Upcoming Events rail (non-lead cards;
+ * the rail's lead card is `FeaturedSignatureCard` instead, per Home's
+ * existing "feature the first card" pattern). Coral appears in exactly one
+ * place — the `DateBadge` — per the brief's "small event accent, never the
+ * whole card" rule; everything else on this card (frame, bracket, typography)
+ * is identical to every other card in the family. No save action: events
+ * aren't saveable, so that top-left slot is free for the date instead. */
 function EventVariant({ event }: { event: Event }) {
   return (
-    <SignatureCard className="w-80" href={`/events/${event.slug}`}>
-      <div className="relative h-48 bg-cream">
+    <CardFrame className="w-72" href={`/events/${event.slug}`}>
+      <div className="relative h-36 bg-cream">
         {event.coverImageUrl ? (
-          <Image alt={event.title} className="object-cover" fill sizes="320px" src={event.coverImageUrl} />
+          <Image alt={event.title} className="object-cover" fill sizes="288px" src={event.coverImageUrl} />
         ) : null}
+        <DateBadge>{formatEventDateRange(event)}</DateBadge>
         {event.featured ? (
-          <span className="absolute top-0 left-0 z-20 bg-accent px-2 py-1 text-[10px] font-bold tracking-wider text-on-accent uppercase">
+          <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-black/40 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
             Featured
           </span>
         ) : null}
       </div>
-      <OverlapPanel border layout="column" tone="light">
+      <div className="space-y-1 p-3">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-headline text-lg leading-tight font-bold text-on-surface">{event.title}</h3>
+          <h3 className="truncate text-base leading-tight font-bold text-on-surface">{event.title}</h3>
           {event.phase ? (
             <span className="shrink-0 rounded-md bg-surface-container px-2 py-1 text-[10px] font-bold tracking-wider text-on-surface-variant uppercase">
               {EVENT_PHASE_LABEL[event.phase]}
             </span>
           ) : null}
         </div>
-        <p className="flex items-center gap-1 text-sm font-bold text-accent">
-          <Icon size={16} name="calendar_month" />
-          {formatEventDateRange(event)}
-        </p>
         {event.venue || event.destination ? (
-          <p className="flex items-center gap-1 text-sm text-on-surface-variant">
-            <Icon size={16} name="location_on" />
+          <p className="flex items-center gap-1 text-xs text-on-surface-variant">
+            <Icon className="shrink-0" name="location_on" size={14} />
             <span className="truncate">{event.venue?.name ?? event.destination?.name}</span>
           </p>
         ) : null}
-      </OverlapPanel>
-    </SignatureCard>
+      </div>
+    </CardFrame>
   );
 }

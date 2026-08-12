@@ -83,9 +83,16 @@ export function SearchField({
         // own filled-accent object, docked beside the search surface, same
         // shared corner radius as the rest of the card/search family. 48dp
         // touch target per the accessibility fix already in place.
+        // Motion & Micro-Interactions Upgrade, item 2 — this is the closest
+        // thing the Hero has to a "primary CTA" (no literal CTA button
+        // exists in this design; the filter button is the one prominent
+        // actionable element). Press: 1 -> 0.96 -> 1 with a quick ease-out
+        // return, plus a soft lime glow ring that swaps in for the resting
+        // `shadow-md` while pressed — the "optional soft lime glow during
+        // interaction" the brief describes.
         <button
           aria-label={filterLabel}
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-accent text-on-accent shadow-md transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-accent text-on-accent shadow-md transition-all duration-200 ease-out active:scale-[0.96] active:shadow-[0_0_0_6px_var(--color-accent-container)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           onClick={onFilterClick}
           type="button"
         >

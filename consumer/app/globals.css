@@ -1,22 +1,41 @@
 @import "tailwindcss";
 
-/* Design tokens — docs/consumer/MOBILE_2027_DESIGN_FREEZE.md (canonical,
- * supersedes docs/consumer/DESIGN_TOKENS.md's earlier navy/teal/orange
- * palette per the frozen SahelSpot Mobile 2027 Design System).
+/* Design tokens — Premium Light Mobile-First UI, navy-restored correction
+ * (SAHELSPOT CONSUMER — FINAL HERO / BACKGROUND CORRECTION). The prior pass
+ * tried #0249E1 ("brand blue") as primary; that read too bright/less premium,
+ * so this correction restores SahelSpot Navy (#0D3B66) as the dominant
+ * brand/accent color. Same structural rule as every pass before this one:
+ * literal hex only here, every component resolves color through a token,
+ * never a hard-coded value.
  *
- * Literal hex only, per the frozen system's own rule: no component may
- * contain a hard-coded visual color — every color must resolve through one
- * of these tokens. The palette is intentionally exactly three hues: white,
- * navy, and a single Summer Yellow accent. There is no second or third
- * brand accent color; `--color-accent` is used structurally — it marks only
- * the single actionable/active point of a component (save, filter, "See
- * All", active nav tab) and must never be used decoratively. */
+ *   --color-primary  (#0D3B66, navy) — the dominant brand/action color again:
+ *                     buttons, active states, icons, links, headline text,
+ *                     nav active state, hero graphic shapes.
+ *   --color-primary-light / --color-primary-container (#80B0EC, light blue)
+ *                     — demoted to a minor supporting token per this
+ *                     correction: subtle background tint / low-opacity
+ *                     hero shape / hover-state surface only, never a major
+ *                     fill. Not part of the brand/accent pair.
+ *   --color-accent   (#DAFB71, lime) — unchanged: the single structural
+ *                     highlight (save, filter, "See All", active nav tab,
+ *                     L-Bracket), never decorative, never spread across
+ *                     every card.
+ *   --color-coral    (#EE3D5A) — unchanged: reserved for small, sparse
+ *                     Events-only moments, not a general accent.
+ *
+ * Ratio target per this correction: ~80–90% white/light-neutral, ~10–15%
+ * navy, small lime/coral accents, light blue optional and extremely subtle. */
 @theme {
   /* Brand */
   --color-primary: #0d3b66;
-  --color-accent: #ffc94a;
-  --color-on-accent: #0d3b66;
-  --color-cream: #f5e6c8;
+  --color-primary-light: #80b0ec;
+  --color-accent: #dafb71;
+  --color-on-accent: #111111;
+  --color-coral: #ee3d5a;
+  /* Cool-tinted light neutral, not warm beige — still used everywhere the
+   * old cream was (image-placeholder backgrounds, mainly), same token name
+   * so no call site needed to change, only its value. */
+  --color-cream: #eef2fa;
 
   /* Surface — the page is *not* white. Cards are white on a slightly tinted
    * page; collapsing both to #FFFFFF flattens every card in the product. */
@@ -26,11 +45,17 @@
   --color-surface-container: #eceef5;
   --color-surface-container-high: #e5e8f0;
 
-  --color-primary-container: #9ec3f6;
-  --color-accent-container: #fff1cf;
+  /* Same value as `--color-primary-light` above — kept as its own token
+   * (rather than aliased) since Tailwind v4's `@theme` doesn't support
+   * referencing one theme color from another; the two must simply agree.
+   * Minor supporting surface only per this correction (see header comment),
+   * not a major fill — e.g. `CategoryChip`'s hover state, and the hero's
+   * own low-opacity secondary shape. */
+  --color-primary-container: #80b0ec;
+  --color-accent-container: #f2fbdb;
 
   /* Content */
-  --color-on-surface: #2e333a;
+  --color-on-surface: #111111;
   --color-on-surface-variant: #5b5f67;
   --color-outline: #767b83;
   --color-outline-variant: #aeb2bb;
@@ -51,7 +76,10 @@
   --color-whatsapp: #25d366;
 
   --font-sans: var(--font-inter), system-ui, sans-serif;
-  --font-headline: var(--font-space-grotesk), var(--font-inter), system-ui, sans-serif;
+  /* Editorial display serif (Fraunces) for headlines only — Premium Hybrid
+   * typography update. `--font-arabic` below is untouched: the RTL tagline
+   * never resolves through this token, so this swap cannot affect it. */
+  --font-headline: var(--font-fraunces), var(--font-inter), system-ui, serif;
   --font-arabic: var(--font-ibm-plex-arabic), sans-serif;
 
   --radius-sm: 8px;
@@ -93,6 +121,86 @@ body {
   );
 }
 
+/* Rail entrance stagger — Premium Hybrid micro-interaction pass (item 5).
+ * Applied by `CardCarousel` to every horizontal rail (Home's venue rails,
+ * Destinations, Events, Explore's Quick Browse, Map's Popular Nearby):
+ * each card fades and lifts 8px in on mount, staggered up to the 6th child,
+ * then all later cards share the last delay rather than growing unbounded.
+ * `animation-fill-mode: backwards` holds the 0%-frame styles during the
+ * delay so nothing flashes at full opacity before its turn. Duration (300ms)
+ * and stagger step (40ms) both sit inside the 150–300ms / 30–50ms restrained
+ * ranges from the implementation brief. Suppressed globally, along with
+ * every other animation on the page, by the `prefers-reduced-motion` block
+ * below. */
+.rail-stagger > * {
+  animation: rail-item-in 300ms ease-out backwards;
+}
+.rail-stagger > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.rail-stagger > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+.rail-stagger > *:nth-child(3) {
+  animation-delay: 80ms;
+}
+.rail-stagger > *:nth-child(4) {
+  animation-delay: 120ms;
+}
+.rail-stagger > *:nth-child(5) {
+  animation-delay: 160ms;
+}
+.rail-stagger > *:nth-child(n + 6) {
+  animation-delay: 200ms;
+}
+@keyframes rail-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Grain overlay — Visual Richness / Art Direction Pass, Hero. A tiled
+ * fractal-noise SVG data URI (no image asset, no dependency), meant to sit
+ * at very low opacity over a flat surface so it reads as material texture
+ * rather than a visible pattern — the same "background detail that should
+ * disappear into the surface" principle the Hero's dot-grid already uses.
+ * Reusable utility class rather than inlined once, in case a later pass
+ * wants the same texture on another flat surface — today only the Hero
+ * uses it. */
+.grain-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+/* Skeleton shimmer sweep — Motion & Micro-Interactions Upgrade, item 10.
+ * A soft diagonal light band travels left-to-right every 1.8s; layered over
+ * `Skeleton`'s existing `animate-pulse`, not replacing it. Caught by the
+ * same global `prefers-reduced-motion` override below as every other
+ * animation in this file — no separate handling needed. */
+.skeleton-shimmer {
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgb(255 255 255 / 0.35) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer-sweep 1.8s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer-sweep {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
 /* Material Symbols ships one variable font; FILL 1 is the "active" state
  * (selected nav tab, saved heart, rating stars). */
 /* font-family is declared here rather than relying on the class rule inside
@@ -111,6 +219,11 @@ body {
   direction: ltr;
   font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
   user-select: none;
+  /* Motion & Micro-Interactions Upgrade, item 11 — animates the outline ->
+   * filled swap (bottom nav active tab, saved heart, rating stars) instead
+   * of an instant glyph swap. Caught by the global `prefers-reduced-motion`
+   * override below like every other transition in this file. */
+  transition: font-variation-settings 200ms ease-out;
 }
 .material-symbols-outlined[data-filled="true"] {
   font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;

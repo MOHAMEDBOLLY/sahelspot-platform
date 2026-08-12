@@ -3,12 +3,18 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { TopAppBar } from "@/components/nav/TopAppBar";
-import { SearchField } from "@/components/patterns/SearchField";
+import { HomeHero } from "@/components/patterns/HomeHero";
+import { Reveal } from "@/components/patterns/Reveal";
 import { CategoryChip } from "@/components/patterns/CategoryChip";
+import { DockCategoryRail } from "@/components/patterns/DockCategoryRail";
+import { DestinationCoverflow } from "@/components/patterns/DestinationCoverflow";
 import { SectionHeader } from "@/components/patterns/SectionHeader";
 import { CardCarousel } from "@/components/patterns/CardCarousel";
+import { FeaturedSignatureCard } from "@/components/patterns/FeaturedSignatureCard";
 import { DestinationCard } from "@/components/destination/DestinationCard";
 import { VenueCard } from "@/components/venue/VenueCard";
+import { CATEGORY_BY_VALUE } from "@/lib/domain/categories";
+import { formatEventDateRange } from "@/lib/domain/formatEventDate";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/patterns/EmptyState";
 import { CTAButton } from "@/components/ui/CTAButton";
@@ -37,6 +43,21 @@ type VenueRailProps = {
   emptyDescription: string;
   isSaved: (id: string) => boolean;
   onToggleSaved: (id: string) => void;
+  /** Renders the rail's first venue as `FeaturedSignatureCard` instead of
+   * the standard `VenueCard` — Premium Hybrid item 4, used only for Best
+   * Beaches (per the implementation brief: "selectively, for Beaches and
+   * Events", not every rail). The remaining venues keep the standard card
+   * unchanged. */
+  featureFirst?: boolean;
+  /** Visual Richness / Art Direction Pass, item 5 (visual rhythm) — the
+   * space above this rail. `"lg"` (40px) for the one or two "impact"
+   * rails (Best Beaches), `"default"` (32px, the previous blanket
+   * `space-y-8` value) for the quieter standard rails — Trending, Food
+   * Picks, Nightlife. A prop rather than a wrapping `space-y-*` on `<main>`
+   * because a single uniform value can't express a rhythm; this is the
+   * "impact → breathing room → density" pattern the brief asks for,
+   * without changing what any rail contains. */
+  spacingBefore?: "default" | "lg";
 };
 
 /** Home now carries four venue rails (Best Beaches, Trending, Food Picks,
@@ -57,41 +78,59 @@ function VenueRail({
   emptyDescription,
   isSaved,
   onToggleSaved,
+  featureFirst = false,
+  spacingBefore = "default",
 }: VenueRailProps) {
   return (
-    <section>
-      <SectionHeader actionHref={actionHref} actionLabel="See All" title={title} />
-      {isLoading ? (
-        <CardCarousel>
-          <Skeleton className="h-72 w-[80%] min-w-[280px] shrink-0" />
-          <Skeleton className="h-72 w-[80%] min-w-[280px] shrink-0" />
-        </CardCarousel>
-      ) : isError ? (
-        <EmptyState
-          action={
-            <CTAButton onClick={onRetry} variant="secondary">
-              Retry
-            </CTAButton>
-          }
-          description="We couldn't reach SahelSpot Studio. Check your connection and try again."
-          icon="error_outline"
-          title="Something went wrong"
-        />
-      ) : venues.length === 0 ? (
-        <EmptyState description={emptyDescription} icon={emptyIcon} title={emptyTitle} />
-      ) : (
-        <CardCarousel>
-          {venues.map((venue) => (
-            <VenueCard
-              key={venue.id}
-              onToggleSaved={onToggleSaved}
-              saved={isSaved(venue.id)}
-              venue={venue}
-            />
-          ))}
-        </CardCarousel>
-      )}
-    </section>
+    <Reveal className={spacingBefore === "lg" ? "mt-10" : "mt-8"}>
+      <section>
+        <SectionHeader actionHref={actionHref} actionLabel="See All" title={title} />
+        {isLoading ? (
+          <CardCarousel>
+            <Skeleton className="h-72 w-[80%] min-w-[280px] shrink-0" />
+            <Skeleton className="h-72 w-[80%] min-w-[280px] shrink-0" />
+          </CardCarousel>
+        ) : isError ? (
+          <EmptyState
+            action={
+              <CTAButton onClick={onRetry} variant="secondary">
+                Retry
+              </CTAButton>
+            }
+            description="We couldn't reach SahelSpot Studio. Check your connection and try again."
+            icon="error_outline"
+            title="Something went wrong"
+          />
+        ) : venues.length === 0 ? (
+          <EmptyState description={emptyDescription} icon={emptyIcon} title={emptyTitle} />
+        ) : (
+          <CardCarousel>
+            {venues.map((venue, index) =>
+              featureFirst && index === 0 ? (
+                <FeaturedSignatureCard
+                  chipLabel={CATEGORY_BY_VALUE[venue.category]?.label ?? null}
+                  href={`/venues/${venue.id}`}
+                  imageUrl={venue.coverImageUrl}
+                  key={venue.id}
+                  locationLabel={venue.destinationName}
+                  rating={venue.rating}
+                  reviewCount={venue.reviewCount}
+                  saveable={{ id: venue.id, saved: isSaved(venue.id), onToggleSaved }}
+                  title={venue.name}
+                />
+              ) : (
+                <VenueCard
+                  key={venue.id}
+                  onToggleSaved={onToggleSaved}
+                  saved={isSaved(venue.id)}
+                  venue={venue}
+                />
+              ),
+            )}
+          </CardCarousel>
+        )}
+      </section>
+    </Reveal>
   );
 }
 
@@ -167,65 +206,47 @@ export function HomeClient() {
     <>
       <TopAppBar greeting="Good Morning" title="SahelSpot" variant="greeting" />
 
-      <main className="space-y-8 px-4 pt-2">
-        {/* `justify-between` on a single-child row today — reserved for the
-          * future Home Hero Weather Widget (temperature + Beach Flag status
-          * only, tap-through to the future Beach Weather screen; see
-          * docs/consumer/BEACH_WEATHER_SPEC.md §10 and
-          * docs/consumer/MOBILE_2027_DESIGN_FREEZE.md §10). Nothing renders
-          * in this slot yet — planning only, not implemented. */}
-        <section className="flex items-center justify-between gap-4">
-          <h1 className="font-headline text-4xl leading-tight font-bold tracking-tight text-primary whitespace-nowrap">
-            North Coast
-          </h1>
-          {/* The Stitch weather pill ("31°C Sunny") is live third-party data,
-            * not published editorial content — showing invented numbers here
-            * would be exactly the permanent mocking the architecture forbids.
-            * Omitted per API_REQUIREMENTS.md §5 pending a Studio weather
-            * proxy or an explicit decision to drop it for good. */}
-        </section>
-
-        <section>
-          <SearchField
-            onChange={(event) => setQuery(event.target.value)}
-            onFilterClick={() => router.push("/search")}
-            onKeyDown={(event) => {
+      {/* Visual Richness / Art Direction Pass, item 5 — `space-y-8` (a
+        * uniform 32px between every section) replaced with deliberate
+        * per-section spacing below: `VenueRail`'s `spacingBefore` prop and
+        * explicit `mt-*` on the sections defined inline here. A single
+        * value can't express a rhythm; this can. */}
+      <main className="px-4 pt-2">
+        {/* The Stitch weather pill ("31°C Sunny") is live third-party data,
+          * not published editorial content — showing invented numbers here
+          * would be exactly the permanent mocking the architecture forbids.
+          * Omitted per API_REQUIREMENTS.md §5 pending a Studio weather
+          * proxy or an explicit decision to drop it for good; unaffected by
+          * the imageless hero below, which carries no weather slot. */}
+        <HomeHero
+          destinationCount={orderedDestinations.length || null}
+          searchProps={{
+            onChange: (event) => setQuery(event.target.value),
+            onFilterClick: () => router.push("/search"),
+            onKeyDown: (event) => {
               if (event.key === "Enter") goToSearch();
-            }}
-            placeholder="Search destinations, venues & events..."
-            value={query}
-          />
-        </section>
+            },
+            placeholder: "Search destinations, venues & events...",
+            value: query,
+          }}
+        />
 
-        <section>
+        <section className="mt-8">
           <SectionHeader
             actionHref="/search"
             actionLabel="See All"
             title="What do you want to do?"
           />
-          {/* Plain scroll rail, deliberately not `CardCarousel`: activities
-            * are lightweight navigation chips, not featured content — no
-            * scroll-linked scaling/focus effect, just `overflow-x-auto` +
-            * scroll-snap + a hidden scrollbar, the same three CSS
-            * mechanisms `CardCarousel` itself sits on top of, without its
-            * JS or its visual treatment. */}
-          {/* `scroll-pl-4` matches the row's own `px-4`: without it, the
-            * browser's scroll-snap resting position for the first item
-            * lands 16px into the row (the padding width) instead of at
-            * true `scrollLeft: 0`, clipping the first tile against the
-            * screen edge on load instead of aligning it with the search
-            * bar and section title above. */}
-          <div className="hide-scrollbar -mx-4 flex snap-x scroll-pl-4 gap-3 overflow-x-auto px-4 pb-2">
-            {HOME_ACTIVITIES.map((activity) => (
-              <div className="w-16 shrink-0 snap-start" key={activity.id}>
-                <CategoryChip
-                  icon={activity.icon}
-                  label={activity.label}
-                  onClick={() => router.push(activityHref(activity))}
-                />
-              </div>
-            ))}
-          </div>
+          {/* Dock Interaction (Visual Richness pass) — same rail, same nine
+            * `HOME_ACTIVITIES`, same `activityHref` routing as before;
+            * `DockCategoryRail` only changed the wrapper around each
+            * existing `CategoryChip`. `scroll-pl-4`/bleed/snap behavior all
+            * live inside that component now, unchanged from what this
+            * `<div>` used to do directly. */}
+          <DockCategoryRail
+            activities={HOME_ACTIVITIES}
+            onSelect={(activity) => router.push(activityHref(activity))}
+          />
         </section>
 
         <VenueRail
@@ -233,22 +254,25 @@ export function HomeClient() {
           emptyDescription="Published beaches and beach clubs will appear here."
           emptyIcon="beach_access"
           emptyTitle="No beaches yet"
+          featureFirst
           isError={venues.isError}
           isLoading={venues.isLoading}
           isSaved={isSaved}
           onRetry={() => venues.refetch()}
           onToggleSaved={toggle}
+          spacingBefore="lg"
           title="Best Beaches"
           venues={beachVenues}
         />
 
+        <Reveal className="mt-12">
         <section>
-          <SectionHeader actionHref="/coming-soon?feature=destinations" actionLabel="See All" title="Explore Destinations" />
+          <SectionHeader actionHref="/coming-soon?feature=destinations" actionLabel="See All" size="lg" title="Explore Destinations" />
           {destinations.isLoading ? (
-            <CardCarousel>
-              <Skeleton className="h-64 w-[43%] min-w-[160px] shrink-0" />
-              <Skeleton className="h-64 w-[43%] min-w-[160px] shrink-0" />
-              <Skeleton className="h-64 w-[43%] min-w-[160px] shrink-0" />
+            <CardCarousel gap="lg">
+              <Skeleton className="h-60 w-64 shrink-0" />
+              <Skeleton className="h-60 w-64 shrink-0" />
+              <Skeleton className="h-60 w-64 shrink-0" />
             </CardCarousel>
           ) : destinations.isError ? (
             <EmptyState
@@ -268,21 +292,26 @@ export function HomeClient() {
               title="No destinations yet"
             />
           ) : (
-            <CardCarousel>
+            // 21st.dev Coverflow Carousel integration — same
+            // `DestinationCard` elements, same data, same routes as the
+            // plain `CardCarousel` this replaced; `DestinationCoverflow`
+            // only changes how they're arranged/transformed. Falls back to
+            // that exact plain-row behavior itself under reduced motion.
+            <DestinationCoverflow>
               {orderedDestinations.map((destination) => (
-                <div className="w-[43%] min-w-[160px] shrink-0 snap-start" key={destination.id}>
-                  <DestinationCard
-                    href={`/search?destination=${destination.id}`}
-                    imageUrl={destination.coverImageUrl}
-                    kilometerMarker={getDestinationGeoMetadata(destination.id)?.kilometerMarker ?? null}
-                    name={destination.name}
-                    placeCount={destination.venueCount}
-                  />
-                </div>
+                <DestinationCard
+                  href={`/search?destination=${destination.id}`}
+                  imageUrl={destination.coverImageUrl}
+                  key={destination.id}
+                  kilometerMarker={getDestinationGeoMetadata(destination.id)?.kilometerMarker ?? null}
+                  name={destination.name}
+                  placeCount={destination.venueCount}
+                />
               ))}
-            </CardCarousel>
+            </DestinationCoverflow>
           )}
         </section>
+        </Reveal>
 
         <VenueRail
           actionHref="/coming-soon?feature=trending"
@@ -298,6 +327,7 @@ export function HomeClient() {
           venues={featuredVenues}
         />
 
+        <Reveal className="mt-10">
         <section>
           <SectionHeader actionHref="/events" actionLabel="See All" title="Upcoming Events" />
           {events.isLoading ? (
@@ -324,14 +354,27 @@ export function HomeClient() {
             />
           ) : (
             <CardCarousel>
-              {upcomingEvents.map((event) => (
-                <div className="w-[80%] min-w-[280px] shrink-0 snap-start" key={event.id}>
-                  <VenueCard event={event} variant="event" />
-                </div>
-              ))}
+              {upcomingEvents.map((event, index) =>
+                index === 0 ? (
+                  <FeaturedSignatureCard
+                    chipLabel={formatEventDateRange(event)}
+                    chipTone="coral"
+                    href={`/events/${event.slug}`}
+                    imageUrl={event.coverImageUrl}
+                    key={event.id}
+                    locationLabel={event.venue?.name ?? event.destination?.name ?? null}
+                    title={event.title}
+                  />
+                ) : (
+                  <div className="w-[80%] min-w-[280px] shrink-0 snap-start" key={event.id}>
+                    <VenueCard event={event} variant="event" />
+                  </div>
+                ),
+              )}
             </CardCarousel>
           )}
         </section>
+        </Reveal>
 
         <VenueRail
           actionHref="/search?category=food"
@@ -362,7 +405,7 @@ export function HomeClient() {
         />
 
         {SHOW_ESSENTIAL_SERVICES && (
-          <section>
+          <section className="mt-8">
             <SectionHeader title="Essential Services" />
             <div className="grid grid-cols-3 gap-3">
               {ESSENTIAL_SERVICES.map((service) => (

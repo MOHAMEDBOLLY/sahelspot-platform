@@ -26,9 +26,15 @@ export function FilterChip({
     <button
       aria-label={label}
       aria-pressed={active}
-      className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 ${
+      // Motion & Micro-Interactions Upgrade, item 4 — a short (200ms)
+      // `transition-all` so the navy fill fades in rather than snapping,
+      // plus a small `scale-[1.02]` only while active: a resting-state
+      // "this is selected" cue, distinct from the family's press-scale
+      // (which still applies underneath via `active:` on tap, same as
+      // every other tappable chip/card).
+      className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 ${
         active
-          ? "bg-primary text-accent"
+          ? "scale-[1.02] bg-primary text-accent"
           : "border border-outline-variant/30 bg-white text-on-surface"
       } ${className}`}
       type="button"

@@ -16,8 +16,9 @@ export function RatingStars({ value, reviewCount }: RatingStarsProps) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-lg font-bold text-accent">{value.toFixed(1)}</span>
-      <div aria-hidden="true" className="flex text-accent">
+      {/* Navy, not lime — same light-surface contrast fix as `RatingBadge`. */}
+      <span className="text-lg font-bold text-primary">{value.toFixed(1)}</span>
+      <div aria-hidden="true" className="flex text-primary">
         {Array.from({ length: 5 }, (_, index) => {
           const isFull = index < fullStars;
           const isHalf = !isFull && index === fullStars && hasHalf;

@@ -13,7 +13,10 @@ type RatingBadgeProps = {
 export function RatingBadge({ value, reviewCount, compact = false }: RatingBadgeProps) {
   return (
     <div className="flex items-center gap-1">
-      <Icon className="text-accent" filled name="star" size={compact ? 16 : 18} />
+      {/* Navy, not lime — same light-surface contrast fix as `SectionHeader`
+        * ("See All"): lime reads at ~1.2:1 against this card's light
+        * background, effectively invisible. */}
+      <Icon className="text-primary" filled name="star" size={compact ? 16 : 18} />
       <span className="text-sm font-bold text-on-surface">{value.toFixed(1)}</span>
       {reviewCount !== undefined ? (
         <span

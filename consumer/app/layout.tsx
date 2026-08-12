@@ -1,23 +1,32 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans_Arabic, Inter, Space_Grotesk } from "next/font/google";
+import { Fraunces, IBM_Plex_Sans_Arabic, Inter } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 
-/** Inter for Latin body text, IBM Plex Sans Arabic for RTL content, Space
- * Grotesk for headlines — per the frozen SahelSpot Mobile 2027 Design System
- * (docs/consumer/MOBILE_2027_DESIGN_FREEZE.md §Typography). Space Grotesk
- * gives the brand a distinct geometric voice; it is not merely a heavier
- * weight of the body face. */
+/** Inter for Latin body text, IBM Plex Sans Arabic for RTL content, Fraunces
+ * for headlines — Premium Hybrid typography update (SAHELSPOT CONSUMER —
+ * PREMIUM HYBRID IMPLEMENTATION, item 2): Space Grotesk read as a geometric
+ * tech/SaaS voice, not a resort/editorial-travel one. Fraunces is an
+ * editorial display serif with a warmer, less formal presence than a
+ * headline serif like Playfair Display — it reads "premium coastal", not
+ * "black-tie", across the full taxonomy from Beach Clubs to Nightlife.
+ *
+ * Scoped to `--font-headline` only, same as before — Inter stays the body
+ * face and IBM Plex Sans Arabic stays the RTL face. Neither uses
+ * `--font-headline`, so this swap has no effect on Arabic rendering: the one
+ * RTL string in the product (LogoLockup's tagline) resolves through
+ * `--font-arabic` explicitly, never through the headline token. */
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800", "900"],
 });
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["500", "600", "700", "900"],
+  style: ["normal"],
 });
 
 const ibmPlexArabic = IBM_Plex_Sans_Arabic({
@@ -75,7 +84,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      className={`${inter.variable} ${spaceGrotesk.variable} ${ibmPlexArabic.variable}`}
+      className={`${inter.variable} ${fraunces.variable} ${ibmPlexArabic.variable}`}
       lang="en"
     >
       <head>

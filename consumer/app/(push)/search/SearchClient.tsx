@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, useReducedMotion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { CategoryChip } from "@/components/patterns/CategoryChip";
@@ -49,6 +50,7 @@ function SearchPageContent() {
   const searchParams = useSearchParams();
   const { isSaved, toggle } = useSaved();
   const { recentSearches, addRecentSearch, clearRecentSearches } = useRecentSearches();
+  const reduceMotion = useReducedMotion();
 
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const [category, setCategory] = useState<VenueCategory | "all">(
@@ -430,7 +432,21 @@ function SearchPageContent() {
                   title="No results found"
                 />
               ) : (
-                <div className="space-y-3">
+                // Motion & Micro-Interactions Upgrade, item 4 — "content
+                // should transition using a short fade + vertical movement"
+                // on a filter change, not a hard reload of the section.
+                // Keyed on the filter combination (not `query`, which
+                // changes per keystroke and would retrigger this on every
+                // character typed) — React remounts this `motion.div` when
+                // the key changes, replaying the enter animation for the
+                // new result set.
+                <motion.div
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-3"
+                  initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+                  key={`${category}:${accessType}:${reservationPolicy}:${selectedTags.join(",")}`}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                >
                   {filteredResults?.map((venue) => (
                     <VenueCard
                       key={venue.id}
@@ -440,7 +456,7 @@ function SearchPageContent() {
                       venue={venue}
                     />
                   ))}
-                </div>
+                </motion.div>
               )}
             </section>
           </>

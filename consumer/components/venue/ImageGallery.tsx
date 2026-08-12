@@ -54,8 +54,12 @@ export function ImageGallery({
       </div>
       <div className="absolute top-4 right-4 flex gap-2">
         <IconButton icon="share" label="Share this place" onClick={onShare} variant="solid" />
+        {/* Navy, not lime — `variant="solid"` is a white/90 circle, and lime
+          * has ~1.2:1 contrast against it (same fix as `RatingBadge`/
+          * `SectionHeader`). Navy also keeps coral reserved for Events only,
+          * per the brief. */}
         <IconButton
-          className={saved ? "text-accent" : undefined}
+          className={saved ? "text-primary" : undefined}
           filled={saved}
           icon="favorite"
           label={saved ? "Remove from saved" : "Save this place"}
