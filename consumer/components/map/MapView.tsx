@@ -12,6 +12,7 @@ import {
   MAP_PITCH,
   MAP_SAFE_PADDING,
   MAPBOX_TOKEN,
+  NORTH_COAST_BOUNDS,
 } from "@/lib/map/config";
 import { spreadOverlappingVenues } from "@/lib/map/spreadMarkers";
 import { createClusterElement } from "./createClusterElement";
@@ -50,6 +51,138 @@ type MapViewProps = {
 };
 
 const STYLES = ["mapbox://styles/mapbox/streets-v12", "mapbox://styles/mapbox/satellite-streets-v12"];
+
+/** Mapbox Label Language & Hierarchy — both Streets v12 and Satellite
+ * Streets v12 already give every label layer's `text-field` as
+ * `["coalesce", ["get", "name_en"], ["get", "name"]]` (confirmed by
+ * fetching the real styles from the Mapbox Styles API, not assumed) —
+ * Mapbox's own English-preferring pattern. The bilingual appearance this
+ * task is fixing isn't two lines from one layer; it's this `coalesce`
+ * falling back to the local `name` property (Arabic, for this region's
+ * OSM data) whenever a feature has no `name_en`.
+ *
+ * `stripLocalNameFallback` walks that expression tree and drops the
+ * `["get", "name"]` fallback, leaving `["get", "name_en"]` alone — when
+ * `name_en` is absent Mapbox then renders empty text (nothing), which is
+ * exactly "hide rather than fall back to Arabic," never a translation
+ * this app invents. Generic over the expression shape, not a hardcoded
+ * per-layer or per-place list — the same function handles `road-label`,
+ * `poi-label`, `settlement-major-label`, and every other layer sharing
+ * this pattern, including ones nested inside a `step`/`match` (e.g.
+ * `transit-label`, `airport-label`). */
+function stripLocalNameFallback(expression: unknown): unknown {
+  if (Array.isArray(expression)) {
+    if (
+      expression.length === 3 &&
+      expression[0] === "coalesce" &&
+      Array.isArray(expression[1]) &&
+      expression[1][0] === "get" &&
+      expression[1][1] === "name_en" &&
+      Array.isArray(expression[2]) &&
+      expression[2][0] === "get" &&
+      expression[2][1] === "name"
+    ) {
+      return expression[1];
+    }
+    return expression.map(stripLocalNameFallback);
+  }
+  return expression;
+}
+
+/** Scales every numeric *output* in a `text-size` expression by `factor`,
+ * preserving the expression's own structure exactly — required because
+ * Mapbox GL rejects a zoom-dependent expression (`["interpolate", ...,
+ * ["zoom"], ...]`) nested inside another expression like `["*", ...]`:
+ * confirmed live (`layers.settlement-major-label.layout.text-size:
+ * "zoom" expression may only be used as the root...`), not assumed.
+ * `interpolate`/`step`/`match` are the three expression types Mapbox's
+ * own style spec allows to carry a zoom or data-driven stop list; this
+ * recurses through exactly those three, multiplying only their *value*
+ * slots (never a stop position, zoom level, or symbolrank threshold —
+ * scaling one of those would change *which* stop applies, not how big
+ * the text is). Anything else (`["get", "symbolrank"]`, `["zoom"]`,
+ * `["cubic-bezier", ...]`, or a plain number) is a leaf: numbers scale,
+ * everything else is returned untouched rather than guessed at. */
+function scaleTextSize(expression: unknown, factor: number): unknown {
+  if (typeof expression === "number") return expression * factor;
+  if (!Array.isArray(expression)) return expression;
+
+  const [operator] = expression;
+  if (operator === "interpolate") {
+    const [, interpolation, input, ...pairs] = expression;
+    const scaled: unknown[] = [];
+    for (let i = 0; i < pairs.length; i += 2) {
+      scaled.push(pairs[i], scaleTextSize(pairs[i + 1], factor));
+    }
+    return ["interpolate", interpolation, input, ...scaled];
+  }
+  if (operator === "step") {
+    const [, input, defaultOutput, ...pairs] = expression;
+    const scaled: unknown[] = [];
+    for (let i = 0; i < pairs.length; i += 2) {
+      scaled.push(pairs[i], scaleTextSize(pairs[i + 1], factor));
+    }
+    return ["step", input, scaleTextSize(defaultOutput, factor), ...scaled];
+  }
+  if (operator === "match") {
+    const [, input, ...rest] = expression;
+    const fallback = rest[rest.length - 1];
+    const casesAndOutputs = rest.slice(0, -1);
+    const scaled: unknown[] = [];
+    for (let i = 0; i < casesAndOutputs.length; i += 2) {
+      scaled.push(casesAndOutputs[i], scaleTextSize(casesAndOutputs[i + 1], factor));
+    }
+    return ["match", input, ...scaled, scaleTextSize(fallback, factor)];
+  }
+  return expression;
+}
+
+/** Applied on every `style.load` (initial load *and* every `setStyle`
+ * call — `toggleStyle` below — so both Streets and Satellite Streets get
+ * the same treatment without duplicated logic).
+ *
+ * Only `settlement-major-label` gets the size bump — Mapbox's own "major
+ * settlement" tier, the real North Coast localities (Sidi Abdel Rahman,
+ * El Alamein, Marina, ...) this task calls "major area/destination"
+ * labels. `settlement-minor-label` (smaller towns) and
+ * `settlement-subdivision-label` (neighborhoods) are deliberately left
+ * alone per the task's own "do not enlarge minor locality labels."
+ * `scaleTextSize` (above) rewrites the layer's *existing* `text-size`
+ * expression in place, multiplying every stop's output by 1.18 while
+ * keeping Mapbox's whole zoom/symbolrank interpolation curve exactly as
+ * shipped — no hand-reconstruction of the curve itself, so it can't
+ * drift from whatever Mapbox ships next. Font, color, halo, weight:
+ * untouched. */
+function applyLabelPreferences(map: mapboxgl.Map) {
+  const style = map.getStyle();
+  if (!style?.layers) return;
+  for (const layer of style.layers) {
+    if (layer.type !== "symbol") continue;
+    const textField = map.getLayoutProperty(layer.id, "text-field");
+    if (textField === undefined) continue;
+    const next = stripLocalNameFallback(textField);
+    if (JSON.stringify(next) !== JSON.stringify(textField)) {
+      // The expression tree is walked generically (see
+      // `stripLocalNameFallback`'s own docstring) — its shape isn't
+      // known statically, so `setLayoutProperty`'s overloaded, per-
+      // property-name expression type can't be narrowed here any more
+      // precisely than `mapbox-gl` itself narrows it from a runtime
+      // `getLayoutProperty` read.
+      map.setLayoutProperty(layer.id, "text-field", next as never);
+    }
+  }
+
+  if (map.getLayer("settlement-major-label")) {
+    const currentSize = map.getLayoutProperty("settlement-major-label", "text-size");
+    if (currentSize !== undefined) {
+      map.setLayoutProperty(
+        "settlement-major-label",
+        "text-size",
+        scaleTextSize(currentSize, 1.18) as never,
+      );
+    }
+  }
+}
 
 const SOURCE_ID = "venues-cluster";
 const CLUSTER_QUERY_LAYER = "venues-cluster-query-layer";
@@ -93,6 +226,42 @@ function toFeatureCollection(venues: Venue[]): VenueFeatureCollection {
       geometry: { type: "Point", coordinates: [lng, lat] },
     })),
   };
+}
+
+/** Style Toggle Custom Layer Regression fix — `map.setStyle()` (the
+ * Layers FAB's `toggleStyle`) discards every custom source/layer along
+ * with the old style; Mapbox does not recreate them. This is the one
+ * place that (re)installs `SOURCE_ID`/`CLUSTER_QUERY_LAYER`, called both
+ * on the map's initial `"load"` and on every subsequent `"style.load"`
+ * (which also fires after `setStyle`) — see the two call sites below.
+ *
+ * Idempotent by construction (`getSource`/`getLayer` existence checks),
+ * so calling it twice back-to-back (initial `"style.load"` then `"load"`
+ * firing moments later, both on first mount) never double-adds anything
+ * — the second call is a no-op, not a duplicate. Configuration
+ * (`cluster`/`clusterRadius`/`clusterMaxZoom`, the invisible query
+ * layer's paint) is copied verbatim from the original one-time setup;
+ * nothing about the clustering behavior itself changed. */
+function installCustomMapLayers(map: mapboxgl.Map, venues: Venue[]) {
+  if (!map.getSource(SOURCE_ID)) {
+    map.addSource(SOURCE_ID, {
+      type: "geojson",
+      data: toFeatureCollection(venues) satisfies VenueFeatureCollection,
+      cluster: true,
+      clusterRadius: CLUSTER_RADIUS,
+      clusterMaxZoom: CLUSTER_MAX_ZOOM,
+    });
+  }
+  // Invisible on purpose — see the component docstring. This is the only
+  // GL layer clustering needs; every visible marker/cluster is DOM.
+  if (!map.getLayer(CLUSTER_QUERY_LAYER)) {
+    map.addLayer({
+      id: CLUSTER_QUERY_LAYER,
+      type: "circle",
+      source: SOURCE_ID,
+      paint: { "circle-radius": 1, "circle-opacity": 0 },
+    });
+  }
 }
 
 /** The only place `mapbox-gl` is imported in the app — isolated per
@@ -175,6 +344,12 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       zoom: DEFAULT_ZOOM,
       pitch: MAP_PITCH,
       bearing: MAP_BEARING,
+      // North Coast Bounds — native Mapbox camera constraint, not custom
+      // drag-blocking: Mapbox itself resists/stops the camera at this
+      // box for every interaction (drag, scroll-zoom, `flyTo`, `easeTo`)
+      // without this app touching any pointer/touch event. See
+      // `NORTH_COAST_BOUNDS`'s own doc comment for how it was derived.
+      maxBounds: NORTH_COAST_BOUNDS,
       attributionControl: false,
     });
     mapRef.current = map;
@@ -184,6 +359,13 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     // and "locate me" both frame their target inside the safe area
     // without those call sites needing to know about it.
     map.setPadding(MAP_SAFE_PADDING);
+
+    // Mapbox Label Language & Hierarchy — fires on the initial style load
+    // *and* every subsequent `setStyle` (see `toggleStyle` below), so
+    // both Streets and Satellite Streets get the English-only labels and
+    // major-label size bump without this effect needing to know which
+    // style is active.
+    map.on("style.load", () => applyLabelPreferences(map));
 
     // The preview chip is much wider (~220px) than an ordinary pin (32px),
     // so a venue whose anchor comfortably clears the plain-marker safe
@@ -213,6 +395,17 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     }
 
     function renderVisibleFeatures() {
+      // Style Toggle Custom Layer Regression fix — between `setStyle()`
+      // discarding the old style and `installCustomMapLayers` reinstalling
+      // on the following `"style.load"`, a `moveend`/`zoomend` could in
+      // principle fire (e.g. mid-drag when the style swap happens) and
+      // reach here before the layer exists again. Mapbox itself is what
+      // throws ("does not exist in the map's style") if this isn't
+      // guarded — a plain no-op here is correct: the reinstall's own
+      // explicit `scheduleRender()` call (below) re-runs this the moment
+      // the layer is back.
+      if (!map.getLayer(CLUSTER_QUERY_LAYER)) return;
+
       // CSS-pixel container size, inset by the same safe-area padding —
       // features projecting into that reserved margin simply don't get a
       // marker built this pass, rather than being built already clipped by
@@ -328,28 +521,39 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       });
     }
 
-    map.on("load", () => {
-      // Seeded with whatever venues are already known at this point, not an
-      // empty collection — the venues query can resolve before Mapbox's
-      // `load` fires, and the `[venues]` effect below only updates an
-      // already-mounted source, so without this the first real data could
-      // be silently dropped.
-      map.addSource(SOURCE_ID, {
-        type: "geojson",
-        data: toFeatureCollection(venuesRef.current) satisfies VenueFeatureCollection,
-        cluster: true,
-        clusterRadius: CLUSTER_RADIUS,
-        clusterMaxZoom: CLUSTER_MAX_ZOOM,
-      });
-      // Invisible on purpose — see the component docstring. This is the
-      // only GL layer clustering needs; every visible marker/cluster is DOM.
-      map.addLayer({
-        id: CLUSTER_QUERY_LAYER,
-        type: "circle",
-        source: SOURCE_ID,
-        paint: { "circle-radius": 1, "circle-opacity": 0 },
-      });
+    // Style Toggle Custom Layer Regression fix — `"style.load"` fires on
+    // the initial style load *and* every subsequent `setStyle()`
+    // (`toggleStyle`, the Layers FAB), unlike `"load"` (fires once,
+    // ever). Reinstalling here — via the same idempotent
+    // `installCustomMapLayers` the initial `"load"` handler below also
+    // calls — is what survives a style change; `setStyle` silently drops
+    // every custom source/layer and Mapbox never recreates them itself.
+    // The explicit `scheduleRender()` after reinstalling is what actually
+    // restores visible markers/clusters post-switch, rather than waiting
+    // for an incidental `moveend`/`zoomend` that may never come if the
+    // user isn't still interacting with the map. `venuesRef.current` (not
+    // the `venues` prop) so a style change never regresses to stale data
+    // — same reasoning `"load"`'s own seed comment already gives.
+    map.on("style.load", () => {
+      installCustomMapLayers(map, venuesRef.current);
+      scheduleRender();
+    });
 
+    map.on("load", () => {
+      // Belt-and-suspenders with the `"style.load"` handler above: on the
+      // very first load both fire (order isn't guaranteed to be
+      // `"style.load"` before `"load"` across all Mapbox GL versions),
+      // and `installCustomMapLayers`'s own existence checks make calling
+      // it twice here a no-op, not a duplicate add.
+      installCustomMapLayers(map, venuesRef.current);
+
+      // One-time registration — `"load"` only ever fires once per map
+      // instance, so these listeners are never re-registered on a style
+      // change (that would be the actual duplicate-handler bug this task
+      // warns against). They don't need the source/layer to exist at
+      // registration time, only when they eventually run, and
+      // `renderVisibleFeatures`/the click handler below both guard for
+      // that themselves.
       map.on("moveend", scheduleRender);
       map.on("zoomend", scheduleRender);
       map.on("sourcedata", (event) => {
@@ -357,6 +561,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       });
 
       map.on("click", (event) => {
+        if (!map.getLayer(CLUSTER_QUERY_LAYER)) return;
         const hits = map.queryRenderedFeatures(event.point, { layers: [CLUSTER_QUERY_LAYER] });
         if (hits.length === 0) setActiveVenueId(null);
       });

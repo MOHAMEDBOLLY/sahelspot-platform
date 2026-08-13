@@ -16,6 +16,27 @@ export const DEFAULT_ZOOM = 10;
 export const MAP_PITCH = 42;
 export const MAP_BEARING = 0;
 
+/** North Coast Bounds — restricts free panning to SahelSpot's actual
+ * product coverage, so the map can't be dragged into Cairo, deep desert,
+ * or open Mediterranean far past the last destination.
+ *
+ * Derived from real data, not invented: the envelope of every current
+ * destination's `boundary` polygon (`/public/destinations`) plus every
+ * published venue's coordinates (`/public/venues`), read live —
+ * min/max lng [28.599, 29.066], min/max lat [30.813, 31.019] — then
+ * padded with a ~0.15° lng (~14km) / ~0.09° lat (~9km) buffer so the
+ * boundary reads as "a bit more North Coast around the destinations,"
+ * not a wall built flush against the outermost venue. The buffer is
+ * intentionally asymmetric-feeling in practice (more room north, over
+ * the Mediterranean, than the tight destination cluster needs) because
+ * `MAP_PITCH = 42`'s forward tilt reveals more of what's "ahead" — north,
+ * with `MAP_BEARING = 0` — than a flat top-down camera would at the same
+ * position, so the same absolute buffer reads as smaller there. */
+export const NORTH_COAST_BOUNDS: [[number, number], [number, number]] = [
+  [28.449, 30.723],
+  [29.216, 31.109],
+];
+
 /** Screen-space chrome reserved over the map: the top search+filter overlay
  * and the right-edge FAB column (locate/layers, 48px each + `right-4` =
  * ~72px), plus a small margin on the other two edges so markers/clusters

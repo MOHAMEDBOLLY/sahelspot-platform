@@ -1,20 +1,26 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
+import { BottomSheet } from "@/components/patterns/BottomSheet";
 import { FilterChip } from "@/components/patterns/FilterChip";
 import { SearchField } from "@/components/patterns/SearchField";
+import { SectionHeader } from "@/components/patterns/SectionHeader";
 import type { MapViewHandle } from "@/components/map/MapView";
 import { MapControls } from "@/components/map/MapControls";
 import { CTAButton } from "@/components/ui/CTAButton";
 import { EmptyState } from "@/components/patterns/EmptyState";
-import { CATEGORY_FILTERS, DEFAULT_CENTER, DEFAULT_ZOOM } from "@/lib/map/config";
+import { Icon } from "@/components/ui/Icon";
+import { IconButton } from "@/components/ui/IconButton";
+import { DEFAULT_CENTER, DEFAULT_ZOOM } from "@/lib/map/config";
+import { ACCESS_TYPE_CATEGORY_ID, MAP_CATEGORIES } from "@/lib/home/mapCategories";
 import { useVenues } from "@/lib/hooks/useVenues";
 import { useDestinations } from "@/lib/hooks/useDestinations";
-import { useCategoryTaxonomy } from "@/lib/hooks/useCategoryTaxonomy";
-import { ACCESS_TYPES, ACCESS_TYPE_ICON, RESERVATION_POLICIES, type AccessType, type ReservationPolicy } from "@/lib/domain/accessType";
-import type { VenueCategory } from "@/lib/domain/venue";
+import { topTags } from "@/lib/domain/tags";
+import { ACCESS_TYPES, ACCESS_TYPE_ICON, type AccessType } from "@/lib/domain/accessType";
+import type { Venue } from "@/lib/domain/venue";
 
 const MAP_TAG_COUNT = 10;
 /** Close enough to see a destination's venues spread out, without
@@ -32,33 +38,27 @@ const MapView = dynamic(() => import("@/components/map/MapView").then((m) => m.M
   loading: () => <div className="h-full w-full bg-surface-container-low" />,
 });
 
-/** Interactive Map — the highest-risk screen (Stitch's own "map" is a static
- * illustration; this is a real Mapbox surface) and the first fully isolated
- * feature module. Reference: `interactive_map_1/code.html`.
+type SheetId = "destinations" | "categories" | "filters" | null;
+
+/** Interactive Map — Intent-Driven Filters & Markers (this task). Replaces
+ * the old permanent five-row filter wall with a compact Search + three
+ * trigger row, each opening the existing `BottomSheet` (already built for
+ * this screen, previously unused anywhere). The Mapbox camera/marker/
+ * clustering architecture below (`MapView`, `flyTo`/`easeTo`, pitch/
+ * bearing, `spreadOverlappingVenues`) is completely untouched — the only
+ * thing this task changes is *which* `venues` array `MapClient` computes
+ * and hands to `MapView`, and how the UI above the map collects that
+ * intent.
  *
- * Venue-centric, not destination-centric: the map's only navigation target
- * is a venue. Selecting a pin's second tap opens that venue's Details page
- * directly — the destination is contextual information shown *inside*
- * Venue Details (its name, and its "Nearby Places" list), never something
- * the map itself navigates to. The Destination *filter* is the one
- * exception: it re-centers the camera and narrows which markers are drawn,
- * but still never navigates anywhere on its own.
+ * Core rule: no destination/category/contextual selection ("intent") ->
+ * `visibleVenues` is `[]` -> `MapView` renders zero markers/clusters. This
+ * is deliberately not the same as the old default ("All" facets read as
+ * "show everything") — see `hasIntent` below.
  *
- * Filter row order — Destination, Category, Category-scoped Tags, Access
- * Type, Reservation Policy — and the tag/reservation-policy scoping logic
- * itself (`useCategoryTaxonomy`) match Search exactly (Category/Tags/Access
- * Type/Badges/Collections architecture, Phase 3): every taxonomy surface
- * in the app reads the same rules, not a screen-specific variant.
- *
- * Access Type is the one deliberate exception (Consumer UX Final Polish,
- * confirmed product decision): Search hides its Access Type row outside
- * `category === "beach"`, since every other category's own taxonomy is
- * tags, not access method. Map keeps Access Type visible for every
- * category — it's a cross-category spatial filter (e.g. finding every
- * QR-gated venue on the map, beach or not), not a per-category taxonomy
- * browser, so narrowing it to Beaches-only would remove real functionality
- * rather than reduce redundant choice. Do not "fix" this divergence to
- * match Search without a new, explicit product decision. */
+ * Categories reuse `MAP_CATEGORIES` (`lib/home/mapCategories.ts`), which
+ * itself derives from `HOME_ACTIVITIES`/`ESSENTIALS_GROUPS`
+ * (`lib/home/activities.ts`) — Home's own canonical category id/label/
+ * icon/tag-allowlist source. Nothing here redefines a category. */
 export function MapClient() {
   const router = useRouter();
   const mapRef = useRef<MapViewHandle>(null);
@@ -66,60 +66,121 @@ export function MapClient() {
   const destinations = useDestinations();
 
   const [destinationId, setDestinationId] = useState<string | "all">("all");
-  const [category, setCategory] = useState<VenueCategory | "all">("all");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [accessType, setAccessType] = useState<AccessType | "all">("all");
-  const [reservationPolicy, setReservationPolicy] = useState<ReservationPolicy | "all">("all");
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [selectedTagsByCategory, setSelectedTagsByCategory] = useState<Record<string, string[]>>({});
+  const [selectedAccessTypes, setSelectedAccessTypes] = useState<AccessType[]>([]);
+  const [openSheet, setOpenSheet] = useState<SheetId>(null);
+  // Unified Search & Filter Toolbar — Search is a control in the same row
+  // as the Adaptive FilterChips, not a screen of its own. It doesn't run a
+  // second search engine: submitting routes into the existing `/search`
+  // screen (`useSearchVenues`), exactly like Home's own `SearchField`
+  // already does via `goToSearch`/`router.push`.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const mappableVenues = useMemo(
     () => (venues.data ?? []).filter((venue) => venue.coordinates !== null),
     [venues.data],
   );
 
-  const { popularTags, hasReservationPolicy } = useCategoryTaxonomy(
-    mappableVenues,
-    category,
-    MAP_TAG_COUNT,
-  );
-
-  const visibleVenues = useMemo(
+  // Destination-scoped, but not category-scoped — the pool every
+  // category's own contextual tag options (and the destination list
+  // itself) are computed against, so switching Destination narrows what
+  // Categories/Filters offer without needing its own re-derivation.
+  const destinationVenues = useMemo(
     () =>
-      mappableVenues.filter((venue) => {
-        if (destinationId !== "all" && venue.destinationId !== destinationId) return false;
-        if (category !== "all" && venue.category !== category) return false;
-        if (accessType !== "all" && venue.accessType !== accessType) return false;
-        if (reservationPolicy !== "all" && venue.reservationPolicy !== reservationPolicy) return false;
-        if (selectedTags.length > 0 && !selectedTags.some((tag) => venue.tags.includes(tag))) return false;
-        return true;
-      }),
-    [mappableVenues, destinationId, category, accessType, reservationPolicy, selectedTags],
+      destinationId === "all"
+        ? mappableVenues
+        : mappableVenues.filter((venue) => venue.destinationId === destinationId),
+    [mappableVenues, destinationId],
   );
 
-  function toggleTag(slug: string) {
-    setSelectedTags((current) =>
-      current.includes(slug) ? current.filter((tag) => tag !== slug) : [...current, slug],
-    );
+  // Rule 9 — marker visibility follows intent, not facet defaults.
+  const hasIntent =
+    destinationId !== "all" ||
+    selectedCategoryIds.length > 0 ||
+    Object.values(selectedTagsByCategory).some((tags) => tags.length > 0) ||
+    selectedAccessTypes.length > 0;
+
+  const activeVenueCategories = useMemo(
+    () =>
+      new Set(
+        selectedCategoryIds.flatMap(
+          (id) => MAP_CATEGORIES.find((category) => category.id === id)?.categories ?? [],
+        ),
+      ),
+    [selectedCategoryIds],
+  );
+
+  const visibleVenues = useMemo((): Venue[] => {
+    if (!hasIntent) return [];
+    return destinationVenues.filter((venue) => {
+      if (selectedCategoryIds.length > 0 && !activeVenueCategories.has(venue.category)) return false;
+
+      // Each selected category's own contextual tags only ever constrain
+      // venues that actually belong to that category — Coffee's tag
+      // filter has no opinion on a Beach venue, even when both are
+      // selected at once (Rule 7's "another layer", scoped per category).
+      for (const categoryId of selectedCategoryIds) {
+        const mapCategory = MAP_CATEGORIES.find((candidate) => candidate.id === categoryId);
+        if (!mapCategory || !mapCategory.categories.includes(venue.category)) continue;
+        const tags = selectedTagsByCategory[categoryId] ?? [];
+        if (tags.length > 0 && !tags.some((tag) => venue.tags.includes(tag))) return false;
+      }
+
+      if (
+        selectedCategoryIds.includes(ACCESS_TYPE_CATEGORY_ID) &&
+        selectedAccessTypes.length > 0 &&
+        venue.category === "beach" &&
+        (!venue.accessType || !selectedAccessTypes.includes(venue.accessType as AccessType))
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [
+    destinationVenues,
+    hasIntent,
+    selectedCategoryIds,
+    activeVenueCategories,
+    selectedTagsByCategory,
+    selectedAccessTypes,
+  ]);
+
+  function toggleCategory(id: string) {
+    setSelectedCategoryIds((current) => {
+      const next = current.includes(id)
+        ? current.filter((candidate) => candidate !== id)
+        : [...current, id];
+      return next;
+    });
+    // Removing a category clears its own contextual state immediately —
+    // Rule 5/10: no invisible filter keeps affecting results once its
+    // category chip is gone.
+    setSelectedTagsByCategory((current) => {
+      if (!(id in current)) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+    if (id === ACCESS_TYPE_CATEGORY_ID) setSelectedAccessTypes([]);
   }
 
-  // Tags/Reservation Policy are scoped to the selected category — a value
-  // picked under one category has no meaning under another, so switching
-  // category clears both rather than silently carrying an invisible,
-  // mismatched filter into the new view. Access Type is a category-
-  // independent vocabulary (never scoped, see `useCategoryTaxonomy`'s own
-  // note), so it's kept — unless the specific combination would guarantee
-  // zero results, in which case it resets too rather than silently
-  // stranding the user on an empty map.
-  function changeCategory(next: VenueCategory | "all") {
-    setCategory(next);
-    setSelectedTags([]);
-    setReservationPolicy("all");
-    setAccessType((current) => {
-      if (current === "all" || next === "all") return current;
-      const stillPossible = mappableVenues.some(
-        (venue) => venue.category === next && venue.accessType === current,
-      );
-      return stillPossible ? current : "all";
+  function toggleTag(categoryId: string, slug: string) {
+    setSelectedTagsByCategory((current) => {
+      const existing = current[categoryId] ?? [];
+      const next = existing.includes(slug)
+        ? existing.filter((tag) => tag !== slug)
+        : [...existing, slug];
+      return { ...current, [categoryId]: next };
     });
+  }
+
+  function toggleAccessType(value: AccessType) {
+    setSelectedAccessTypes((current) =>
+      current.includes(value) ? current.filter((candidate) => candidate !== value) : [...current, value],
+    );
   }
 
   function changeDestination(next: string | "all") {
@@ -128,17 +189,67 @@ export function MapClient() {
       mapRef.current?.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM);
       return;
     }
-    const destinationVenues = mappableVenues.filter((venue) => venue.destinationId === next);
-    if (destinationVenues.length === 0) return;
+    const destinationVenuesForCenter = mappableVenues.filter((venue) => venue.destinationId === next);
+    if (destinationVenuesForCenter.length === 0) return;
     const center: [number, number] = [
-      destinationVenues.reduce((sum, venue) => sum + venue.coordinates!.lng, 0) / destinationVenues.length,
-      destinationVenues.reduce((sum, venue) => sum + venue.coordinates!.lat, 0) / destinationVenues.length,
+      destinationVenuesForCenter.reduce((sum, venue) => sum + venue.coordinates!.lng, 0) /
+        destinationVenuesForCenter.length,
+      destinationVenuesForCenter.reduce((sum, venue) => sum + venue.coordinates!.lat, 0) /
+        destinationVenuesForCenter.length,
     ];
     mapRef.current?.flyTo(center, DESTINATION_ZOOM);
   }
 
+  function clearAll() {
+    changeDestination("all");
+    setSelectedCategoryIds([]);
+    setSelectedTagsByCategory({});
+    setSelectedAccessTypes([]);
+    setOpenSheet(null);
+  }
+
+  function runSearch() {
+    const trimmed = searchQuery.trim();
+    router.push(trimmed ? `/search?q=${encodeURIComponent(trimmed)}` : "/search");
+  }
+
+  function closeSearchIfEmpty() {
+    // Same rule the Expanding Search Dock prototype validated: a query in
+    // progress must never be silently erased by losing focus.
+    if (searchQuery === "") setSearchOpen(false);
+  }
+
+  const selectedDestinationName =
+    destinationId === "all"
+      ? "Destinations"
+      : (destinations.data ?? []).find((destination) => destination.id === destinationId)?.name ??
+        "Destinations";
+  const categoriesLabel =
+    selectedCategoryIds.length === 0
+      ? "Categories"
+      : selectedCategoryIds.length === 1
+        ? (MAP_CATEGORIES.find((category) => category.id === selectedCategoryIds[0])?.label ?? "Categories")
+        : `${selectedCategoryIds.length} Categories`;
+  const contextualFilterCount =
+    Object.values(selectedTagsByCategory).reduce((sum, tags) => sum + tags.length, 0) +
+    selectedAccessTypes.length;
+
+  // Contextual Result Strip (Full-Bleed Tall Map task) — a compact "this is
+  // what the Map is showing" summary, not a venue-card carousel. Only
+  // rendered while there's intent, using the same `visibleVenues`/label
+  // derivations already computed above; no separate count is invented.
+  const resultSummary = hasIntent
+    ? `${visibleVenues.length} place${visibleVenues.length === 1 ? "" : "s"}`
+    : null;
+  const resultDetail = [
+    destinationId !== "all" ? selectedDestinationName : null,
+    selectedCategoryIds.length > 0 ? categoriesLabel : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <div className="relative h-dvh overflow-hidden pb-[max(6rem,calc(5rem+env(safe-area-inset-bottom)))]">
+    <div className="relative h-dvh overflow-hidden">
       <div className="absolute inset-0 z-0">
         {venues.isLoading ? (
           <div className="h-full w-full bg-surface-container-low" />
@@ -157,7 +268,7 @@ export function MapClient() {
           </div>
         ) : (
           <MapView
-            activeCategory={category}
+            activeCategory="all"
             onSelectVenue={(venueId) => router.push(`/venues/${venueId}`)}
             ref={mapRef}
             venues={visibleVenues}
@@ -165,10 +276,127 @@ export function MapClient() {
         )}
       </div>
 
-      <div className="absolute inset-x-0 top-0 z-20 space-y-3 p-4">
-        <SearchField placeholder="Search this area" variant="glass" />
+      {/* Unified Search & Filter Toolbar (Full-Bleed Tall Map task) — Search
+        * and the Adaptive FilterChips now share one horizontal rail instead
+        * of Search owning its own row above them. Idle Search is a compact
+        * icon control (same footprint as a collapsed FilterChip); tapping
+        * it grows the real `SearchField` in place via `flex-1`, and every
+        * FilterChip is forced to its icon-only `expanded={false}` state
+        * for the duration so the row never wraps — their own active/badge
+        * state is untouched underneath, restored the instant Search
+        * closes. `AnimatePresence`/`layout` reuse the same tween (0.18s
+        * easeOut) `FilterChip` already animates its own width change
+        * with, not a new easing curve. */}
+      <div className="absolute inset-x-0 top-0 z-20 p-4">
+        <motion.div
+          className="hide-scrollbar flex items-center gap-2 overflow-x-auto"
+          layout
+          transition={{ type: "tween", duration: 0.18, ease: "easeOut" }}
+        >
+          <AnimatePresence initial={false} mode="popLayout">
+            {searchOpen ? (
+              <motion.div
+                animate={{ opacity: 1 }}
+                className="min-w-0 flex-1"
+                exit={{ opacity: 0 }}
+                initial={{ opacity: 0 }}
+                key="search-field"
+                transition={{ duration: 0.12 }}
+              >
+                <SearchField
+                  autoFocus
+                  onBlur={closeSearchIfEmpty}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") runSearch();
+                  }}
+                  placeholder="Search SahelSpot"
+                  value={searchQuery}
+                  variant="glass"
+                />
+              </motion.div>
+            ) : (
+              <motion.button
+                animate={{ opacity: 1 }}
+                aria-label="Search SahelSpot"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container-lowest text-primary shadow-md transition-transform duration-200 ease-out active:scale-[0.96]"
+                exit={{ opacity: 0 }}
+                initial={{ opacity: 0 }}
+                key="search-button"
+                onClick={() => setSearchOpen(true)}
+                transition={{ duration: 0.12 }}
+                type="button"
+              >
+                <Icon name="search" size={20} />
+              </motion.button>
+            )}
+          </AnimatePresence>
 
-        <div className="hide-scrollbar flex gap-2 overflow-x-auto">
+          {searchOpen && searchQuery !== "" ? (
+            <IconButton
+              icon="close"
+              label="Clear search"
+              onClick={() => setSearchQuery("")}
+              variant="glass"
+            />
+          ) : null}
+
+          {/* Adaptive Map Toolbar — icon-only
+            * at rest, icon+label once a control has a selection, via
+            * `FilterChip`'s own `expanded`/`badge` props. `aria-label` is
+            * set explicitly here (via the prop-spread `FilterChip` already
+            * forwards) so the accessible name always names the control
+            * even when its visible text becomes just the selected value
+            * ("Marina", not "Destinations") — icon-only or expanded, a
+            * screen reader never loses which control this is. */}
+          <FilterChip
+            active={destinationId !== "all"}
+            aria-label={
+              destinationId !== "all" ? `Destinations: ${selectedDestinationName}` : "Destinations"
+            }
+            expanded={!searchOpen && destinationId !== "all"}
+            icon="location_on"
+            label={destinationId !== "all" ? selectedDestinationName : "Destinations"}
+            onClick={() => setOpenSheet("destinations")}
+          />
+          <FilterChip
+            active={selectedCategoryIds.length > 0}
+            aria-label={
+              selectedCategoryIds.length > 0 ? `Categories: ${categoriesLabel}` : "Categories"
+            }
+            expanded={!searchOpen && selectedCategoryIds.length > 0}
+            icon="sell"
+            label={selectedCategoryIds.length > 0 ? categoriesLabel : "Categories"}
+            onClick={() => setOpenSheet("categories")}
+          />
+          <FilterChip
+            active={contextualFilterCount > 0}
+            badge={contextualFilterCount > 0 ? contextualFilterCount : undefined}
+            expanded={false}
+            icon="tune"
+            label="Filters"
+            onClick={() => setOpenSheet("filters")}
+          />
+          {hasIntent && !searchOpen ? (
+            <FilterChip icon="close" label="Clear" onClick={clearAll} />
+          ) : null}
+        </motion.div>
+      </div>
+
+      <MapControls
+        onLocate={() => mapRef.current?.flyToUser()}
+        onToggleLayers={() => mapRef.current?.toggleStyle()}
+      />
+
+      {resultSummary ? (
+        <div className="absolute inset-x-4 bottom-24 z-20 rounded-2xl bg-surface-container-lowest/95 px-4 py-3 shadow-[var(--shadow-sheet)] backdrop-blur">
+          <p className="text-sm font-semibold text-on-surface">{resultSummary}</p>
+          {resultDetail ? <p className="text-xs text-on-surface-variant">{resultDetail}</p> : null}
+        </div>
+      ) : null}
+
+      <BottomSheet onClose={() => setOpenSheet(null)} open={openSheet === "destinations"} title="Destinations">
+        <div className="flex flex-wrap gap-2">
           <FilterChip
             active={destinationId === "all"}
             key="all"
@@ -184,76 +412,90 @@ export function MapClient() {
             />
           ))}
         </div>
+      </BottomSheet>
 
-        <div className="hide-scrollbar flex gap-2 overflow-x-auto">
-          {CATEGORY_FILTERS.map((filter) => (
+      <BottomSheet onClose={() => setOpenSheet(null)} open={openSheet === "categories"} title="Categories">
+        <div className="flex flex-wrap gap-2">
+          {MAP_CATEGORIES.map((category) => (
             <FilterChip
-              active={category === filter.value}
-              icon={filter.icon}
-              key={filter.value}
-              label={filter.label}
-              onClick={() => changeCategory(filter.value)}
+              active={selectedCategoryIds.includes(category.id)}
+              icon={category.icon}
+              key={category.id}
+              label={category.label}
+              onClick={() => toggleCategory(category.id)}
             />
           ))}
         </div>
+      </BottomSheet>
 
-        {popularTags.length > 0 ? (
-          <div className="hide-scrollbar flex gap-2 overflow-x-auto">
-            {popularTags.map((tag) => (
-              <FilterChip
-                active={selectedTags.includes(tag.slug)}
-                icon="sell"
-                key={tag.slug}
-                label={tag.label}
-                onClick={() => toggleTag(tag.slug)}
-              />
-            ))}
+      <BottomSheet onClose={() => setOpenSheet(null)} open={openSheet === "filters"} title="Filters">
+        {selectedCategoryIds.length === 0 ? (
+          <p className="text-sm text-on-surface-variant">
+            Select a category first to see its filters.
+          </p>
+        ) : (
+          <div className="space-y-6">
+            {selectedCategoryIds.map((categoryId) => {
+              const mapCategory = MAP_CATEGORIES.find((candidate) => candidate.id === categoryId);
+              if (!mapCategory) return null;
+
+              // Scoped to this category's own venues within the current
+              // destination — the same "tags are category-scoped, not
+              // global" rule Search/the old Map already followed
+              // (`useCategoryTaxonomy`), just computed once per selected
+              // category here instead of for a single active one.
+              const categoryVenues = destinationVenues.filter((venue) =>
+                mapCategory.categories.includes(venue.category),
+              );
+              const tagOptions = mapCategory.allowedTags
+                ? topTags(categoryVenues, MAP_TAG_COUNT).filter((tag) =>
+                    mapCategory.allowedTags!.includes(tag.slug),
+                  )
+                : [];
+              const showAccessType = categoryId === ACCESS_TYPE_CATEGORY_ID;
+
+              if (tagOptions.length === 0 && !showAccessType) return null;
+
+              return (
+                <div key={categoryId}>
+                  <SectionHeader size="lg" title={mapCategory.label} />
+                  {tagOptions.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {tagOptions.map((tag) => (
+                        <FilterChip
+                          active={(selectedTagsByCategory[categoryId] ?? []).includes(tag.slug)}
+                          icon="sell"
+                          key={tag.slug}
+                          label={tag.label}
+                          onClick={() => toggleTag(categoryId, tag.slug)}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  {showAccessType ? (
+                    <div className="mt-3">
+                      <p className="mb-2 text-xs font-semibold tracking-wide text-on-surface-variant uppercase">
+                        Access
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {ACCESS_TYPES.map((value) => (
+                          <FilterChip
+                            active={selectedAccessTypes.includes(value)}
+                            icon={ACCESS_TYPE_ICON[value]}
+                            key={value}
+                            label={value}
+                            onClick={() => toggleAccessType(value)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
-        ) : null}
-
-        <div className="hide-scrollbar flex gap-2 overflow-x-auto">
-          <FilterChip
-            active={accessType === "all"}
-            key="all"
-            label="Any Access"
-            onClick={() => setAccessType("all")}
-          />
-          {ACCESS_TYPES.map((value) => (
-            <FilterChip
-              active={accessType === value}
-              icon={ACCESS_TYPE_ICON[value]}
-              key={value}
-              label={value}
-              onClick={() => setAccessType(value)}
-            />
-          ))}
-        </div>
-
-        {hasReservationPolicy ? (
-          <div className="hide-scrollbar flex gap-2 overflow-x-auto">
-            <FilterChip
-              active={reservationPolicy === "all"}
-              key="all"
-              label="Any Reservation"
-              onClick={() => setReservationPolicy("all")}
-            />
-            {RESERVATION_POLICIES.map((value) => (
-              <FilterChip
-                active={reservationPolicy === value}
-                icon="event_available"
-                key={value}
-                label={`Reservation ${value}`}
-                onClick={() => setReservationPolicy(value)}
-              />
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      <MapControls
-        onLocate={() => mapRef.current?.flyToUser()}
-        onToggleLayers={() => mapRef.current?.toggleStyle()}
-      />
+        )}
+      </BottomSheet>
     </div>
   );
 }
