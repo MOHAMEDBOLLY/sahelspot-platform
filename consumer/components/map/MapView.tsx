@@ -5,7 +5,14 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { CATEGORY_BY_VALUE, type VenueCategory } from "@/lib/domain/categories";
 import type { Venue } from "@/lib/domain/venue";
-import { DEFAULT_CENTER, DEFAULT_ZOOM, MAP_SAFE_PADDING, MAPBOX_TOKEN } from "@/lib/map/config";
+import {
+  DEFAULT_CENTER,
+  DEFAULT_ZOOM,
+  MAP_BEARING,
+  MAP_PITCH,
+  MAP_SAFE_PADDING,
+  MAPBOX_TOKEN,
+} from "@/lib/map/config";
 import { spreadOverlappingVenues } from "@/lib/map/spreadMarkers";
 import { createClusterElement } from "./createClusterElement";
 import { createMarkerElement, createUserLocationElement } from "./createMarkerElement";
@@ -126,7 +133,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         } else {
           userMarkerRef.current.setLngLat([longitude, latitude]);
         }
-        mapRef.current?.flyTo({ center: [longitude, latitude], zoom: 14 });
+        mapRef.current?.flyTo({ center: [longitude, latitude], zoom: 14, pitch: MAP_PITCH, bearing: MAP_BEARING });
       });
     },
     toggleStyle() {
@@ -134,8 +141,13 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       styleIndexRef.current = (styleIndexRef.current + 1) % STYLES.length;
       mapRef.current.setStyle(STYLES[styleIndexRef.current]);
     },
+    // Single centralized entry point for every external `flyTo` caller
+    // (currently only `MapClient.changeDestination`) — callers pass just
+    // `center`/`zoom`, same as before; `pitch`/`bearing` are injected here
+    // once so the Angled Map View prototype's tilt is preserved on every
+    // camera move without each call site needing to know about it.
     flyTo(center, zoom) {
-      mapRef.current?.flyTo({ center, zoom });
+      mapRef.current?.flyTo({ center, zoom, pitch: MAP_PITCH, bearing: MAP_BEARING });
     },
   }));
 
@@ -161,6 +173,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       style: STYLES[0],
       center: DEFAULT_CENTER,
       zoom: DEFAULT_ZOOM,
+      pitch: MAP_PITCH,
+      bearing: MAP_BEARING,
       attributionControl: false,
     });
     mapRef.current = map;
@@ -195,7 +209,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       if (dx === 0 && dy === 0) return;
       const centerPoint = map.project(map.getCenter());
       const newCenter = map.unproject([centerPoint.x + dx, centerPoint.y + dy]);
-      map.easeTo({ center: newCenter, duration: CHIP_NUDGE_DURATION_MS });
+      map.easeTo({ center: newCenter, duration: CHIP_NUDGE_DURATION_MS, pitch: MAP_PITCH, bearing: MAP_BEARING });
     }
 
     function renderVisibleFeatures() {
@@ -250,7 +264,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
               const source = map.getSource(SOURCE_ID) as mapboxgl.GeoJSONSource;
               source.getClusterExpansionZoom(clusterId, (error, zoom) => {
                 if (error || zoom == null) return;
-                map.easeTo({ center: [lng, lat], zoom });
+                map.easeTo({ center: [lng, lat], zoom, pitch: MAP_PITCH, bearing: MAP_BEARING });
               });
             });
             const marker = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);

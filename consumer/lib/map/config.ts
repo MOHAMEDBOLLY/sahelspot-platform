@@ -7,6 +7,15 @@ export const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 export const DEFAULT_CENTER: [number, number] = [28.7, 31.05];
 export const DEFAULT_ZOOM = 10;
 
+/** Angled Map View prototype — a subtle, premium tilt applied to every
+ * camera position the map ever moves to, not just initialization. Kept
+ * here as the single source of truth so `MapView`'s camera calls
+ * (`easeTo`/`flyTo`) all read the same two values instead of each
+ * hardcoding its own. `bearing: 0` keeps North-up orientation unchanged —
+ * only `pitch` introduces the angle. */
+export const MAP_PITCH = 42;
+export const MAP_BEARING = 0;
+
 /** Screen-space chrome reserved over the map: the top search+filter overlay
  * and the right-edge FAB column (locate/layers, 48px each + `right-4` =
  * ~72px), plus a small margin on the other two edges so markers/clusters
