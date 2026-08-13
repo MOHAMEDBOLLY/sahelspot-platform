@@ -40,13 +40,11 @@ const DISTANCE = 90;
 function DockCategoryItem({
   activity,
   mouseX,
-  magnifyEnabled,
   reduceMotion,
   onSelect,
 }: {
   activity: HomeActivity;
   mouseX: MotionValue<number>;
-  magnifyEnabled: boolean;
   reduceMotion: boolean;
   onSelect: () => void;
 }) {
@@ -61,21 +59,38 @@ function DockCategoryItem({
     return value - rect.left - rect.width / 2;
   });
   const scaleTransform = useTransform(distance, [-DISTANCE, 0, DISTANCE], [1, MAGNIFY_SCALE, 1]);
-  const magnifySpring = useSpring(scaleTransform, SPRING);
+  // Press state lives in its own MotionValue and is *multiplied* into the
+  // same chain the proximity magnify feeds, rather than being applied via
+  // `whileTap`'s `scale` gesture target. `style.scale` below is already
+  // bound to an external MotionValue (`magnifySpring`) — layering a
+  // `whileTap={{ scale }}` animation on top of that same transform
+  // property on the same element makes Framer Motion's gesture-driven
+  // animation and the externally-bound style value fight over ownership of
+  // `scale`, which is what was breaking the dock interaction on desktop
+  // (the only place `style.scale` is actually bound). Routing press
+  // through `onTapStart`/`onTap`/`onTapCancel` — plain callbacks, not a
+  // competing animation controller — composes cleanly with magnify instead.
+  const pressed = useMotionValue(1);
+  const combinedScale = useTransform([scaleTransform, pressed], ([scale, press]: number[]) => scale * press);
+  const magnifySpring = useSpring(combinedScale, SPRING);
+
+  const onPressChange = reduceMotion ? undefined : (isPressed: boolean) => pressed.set(isPressed ? 0.94 : 1);
 
   return (
     <motion.div
       className="w-16 shrink-0 snap-start"
       ref={ref}
-      style={magnifyEnabled && !reduceMotion ? { scale: magnifySpring } : undefined}
-      // Mobile/touch: a restrained press spring on the whole tile —
-      // "tapped category gets a subtle scale/lift" — layered on top of
-      // (not replacing) `CategoryChip`'s own existing `group-active:
-      // scale-95` on its inner icon tile, which still runs unchanged.
-      // Disabled outright under reduced motion rather than shortened, per
-      // "remove large transforms... preserve only essential state
-      // transitions."
-      whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+      // "tapped category gets a subtle scale/lift" (mobile) and the tap
+      // feedback on desktop both flow through this one bound MotionValue —
+      // `magnifySpring` is always applied (not gated on `magnifyEnabled`)
+      // so press feedback still works on touch, where proximity magnify is
+      // never active. Disabled outright under reduced motion rather than
+      // shortened, per "remove large transforms... preserve only essential
+      // state transitions."
+      style={reduceMotion ? undefined : { scale: magnifySpring }}
+      onTapStart={onPressChange ? () => onPressChange(true) : undefined}
+      onTap={onPressChange ? () => onPressChange(false) : undefined}
+      onTapCancel={onPressChange ? () => onPressChange(false) : undefined}
     >
       <CategoryChip icon={activity.icon} label={activity.label} onClick={onSelect} />
     </motion.div>
@@ -119,7 +134,6 @@ export function DockCategoryRail({
         <DockCategoryItem
           activity={activity}
           key={activity.id}
-          magnifyEnabled={magnifyEnabled}
           mouseX={mouseX}
           onSelect={() => onSelect(activity)}
           reduceMotion={reduceMotion}
