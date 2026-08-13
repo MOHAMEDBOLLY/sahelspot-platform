@@ -205,7 +205,7 @@ export function DestinationCoverflow({ children }: { children: ReactNode }) {
     // other restraint value in this file, not a multi-card throw.
     const carried = spacing ? Math.max(-1, Math.min(1, (drag.v / spacing) * 0.15)) : 0;
     const target = clampPos(Math.round(pos.get() + carried));
-    animate(pos, target, { type: "spring", stiffness: 260, damping: 32 });
+    animate(pos, target, { type: "spring", stiffness: 500, damping: 40 });
     suppressClickRef.current = drag.moved > CLICK_SUPPRESS_PX;
   }
 
