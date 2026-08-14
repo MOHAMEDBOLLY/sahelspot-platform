@@ -4,11 +4,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
-import { BottomSheet } from "@/components/patterns/BottomSheet";
 import { FilterChip } from "@/components/patterns/FilterChip";
 import { SearchField } from "@/components/patterns/SearchField";
-import { SectionHeader } from "@/components/patterns/SectionHeader";
 import type { MapViewHandle } from "@/components/map/MapView";
+import { CategoryPopover } from "@/components/map/CategoryPopover";
+import { DestinationPopover } from "@/components/map/DestinationPopover";
+import { FilterPopover } from "@/components/map/FilterPopover";
 import { MapControls } from "@/components/map/MapControls";
 import { CTAButton } from "@/components/ui/CTAButton";
 import { EmptyState } from "@/components/patterns/EmptyState";
@@ -18,11 +19,9 @@ import { DEFAULT_CENTER, DEFAULT_ZOOM } from "@/lib/map/config";
 import { ACCESS_TYPE_CATEGORY_ID, MAP_CATEGORIES } from "@/lib/home/mapCategories";
 import { useVenues } from "@/lib/hooks/useVenues";
 import { useDestinations } from "@/lib/hooks/useDestinations";
-import { topTags } from "@/lib/domain/tags";
-import { ACCESS_TYPES, ACCESS_TYPE_ICON, type AccessType } from "@/lib/domain/accessType";
+import type { AccessType } from "@/lib/domain/accessType";
 import type { Venue } from "@/lib/domain/venue";
 
-const MAP_TAG_COUNT = 10;
 /** Close enough to see a destination's venues spread out, without
  * zooming so far in that a smaller compound only shows one or two pins —
  * the same reasoning `flyToUser`'s own `zoom: 14` documents for a
@@ -51,8 +50,8 @@ type SheetId = "destinations" | "categories" | "filters" | null;
  * intent.
  *
  * Core rule: no destination/category/contextual selection ("intent") ->
- * `visibleVenues` is `[]` -> `MapView` renders zero markers/clusters. This
- * is deliberately not the same as the old default ("All" facets read as
+ * `visibleVenues` is `[]` -> `MapView` renders zero markers. This is
+ * deliberately not the same as the old default ("All" facets read as
  * "show everything") — see `hasIntent` below.
  *
  * Categories reuse `MAP_CATEGORIES` (`lib/home/mapCategories.ts`), which
@@ -381,6 +380,39 @@ export function MapClient() {
             <FilterChip icon="close" label="Clear" onClick={clearAll} />
           ) : null}
         </motion.div>
+
+        {/* Remove All Map BottomSheets task — all three toolbar controls
+          * now open the same `ToolbarPopover`-based floating panel
+          * (sibling of the scrollable chip row above, not a child of it,
+          * so its own `overflow-x-auto` never clips any of them), never a
+          * `BottomSheet`. Only one of the three is ever `open` at a time
+          * (`openSheet`), so they can share the same anchor position
+          * without stacking. */}
+        <DestinationPopover
+          destinationId={destinationId}
+          destinations={destinations.data ?? []}
+          onClose={() => setOpenSheet(null)}
+          onSelect={changeDestination}
+          open={openSheet === "destinations"}
+        />
+        <CategoryPopover
+          categories={MAP_CATEGORIES}
+          onClose={() => setOpenSheet(null)}
+          onToggleCategory={toggleCategory}
+          open={openSheet === "categories"}
+          selectedCategoryIds={selectedCategoryIds}
+        />
+        <FilterPopover
+          categories={MAP_CATEGORIES}
+          destinationVenues={destinationVenues}
+          onClose={() => setOpenSheet(null)}
+          onToggleAccessType={toggleAccessType}
+          onToggleTag={toggleTag}
+          open={openSheet === "filters"}
+          selectedAccessTypes={selectedAccessTypes}
+          selectedCategoryIds={selectedCategoryIds}
+          selectedTagsByCategory={selectedTagsByCategory}
+        />
       </div>
 
       <MapControls
@@ -394,108 +426,6 @@ export function MapClient() {
           {resultDetail ? <p className="text-xs text-on-surface-variant">{resultDetail}</p> : null}
         </div>
       ) : null}
-
-      <BottomSheet onClose={() => setOpenSheet(null)} open={openSheet === "destinations"} title="Destinations">
-        <div className="flex flex-wrap gap-2">
-          <FilterChip
-            active={destinationId === "all"}
-            key="all"
-            label="All"
-            onClick={() => changeDestination("all")}
-          />
-          {(destinations.data ?? []).map((destination) => (
-            <FilterChip
-              active={destinationId === destination.id}
-              key={destination.id}
-              label={destination.name}
-              onClick={() => changeDestination(destination.id)}
-            />
-          ))}
-        </div>
-      </BottomSheet>
-
-      <BottomSheet onClose={() => setOpenSheet(null)} open={openSheet === "categories"} title="Categories">
-        <div className="flex flex-wrap gap-2">
-          {MAP_CATEGORIES.map((category) => (
-            <FilterChip
-              active={selectedCategoryIds.includes(category.id)}
-              icon={category.icon}
-              key={category.id}
-              label={category.label}
-              onClick={() => toggleCategory(category.id)}
-            />
-          ))}
-        </div>
-      </BottomSheet>
-
-      <BottomSheet onClose={() => setOpenSheet(null)} open={openSheet === "filters"} title="Filters">
-        {selectedCategoryIds.length === 0 ? (
-          <p className="text-sm text-on-surface-variant">
-            Select a category first to see its filters.
-          </p>
-        ) : (
-          <div className="space-y-6">
-            {selectedCategoryIds.map((categoryId) => {
-              const mapCategory = MAP_CATEGORIES.find((candidate) => candidate.id === categoryId);
-              if (!mapCategory) return null;
-
-              // Scoped to this category's own venues within the current
-              // destination — the same "tags are category-scoped, not
-              // global" rule Search/the old Map already followed
-              // (`useCategoryTaxonomy`), just computed once per selected
-              // category here instead of for a single active one.
-              const categoryVenues = destinationVenues.filter((venue) =>
-                mapCategory.categories.includes(venue.category),
-              );
-              const tagOptions = mapCategory.allowedTags
-                ? topTags(categoryVenues, MAP_TAG_COUNT).filter((tag) =>
-                    mapCategory.allowedTags!.includes(tag.slug),
-                  )
-                : [];
-              const showAccessType = categoryId === ACCESS_TYPE_CATEGORY_ID;
-
-              if (tagOptions.length === 0 && !showAccessType) return null;
-
-              return (
-                <div key={categoryId}>
-                  <SectionHeader size="lg" title={mapCategory.label} />
-                  {tagOptions.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {tagOptions.map((tag) => (
-                        <FilterChip
-                          active={(selectedTagsByCategory[categoryId] ?? []).includes(tag.slug)}
-                          icon="sell"
-                          key={tag.slug}
-                          label={tag.label}
-                          onClick={() => toggleTag(categoryId, tag.slug)}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
-                  {showAccessType ? (
-                    <div className="mt-3">
-                      <p className="mb-2 text-xs font-semibold tracking-wide text-on-surface-variant uppercase">
-                        Access
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {ACCESS_TYPES.map((value) => (
-                          <FilterChip
-                            active={selectedAccessTypes.includes(value)}
-                            icon={ACCESS_TYPE_ICON[value]}
-                            key={value}
-                            label={value}
-                            onClick={() => toggleAccessType(value)}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </BottomSheet>
     </div>
   );
 }

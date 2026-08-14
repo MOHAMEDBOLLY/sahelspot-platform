@@ -3,7 +3,7 @@
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { CATEGORY_BY_VALUE, type VenueCategory } from "@/lib/domain/categories";
+import type { VenueCategory } from "@/lib/domain/categories";
 import type { Venue } from "@/lib/domain/venue";
 import {
   DEFAULT_CENTER,
@@ -15,7 +15,6 @@ import {
   NORTH_COAST_BOUNDS,
 } from "@/lib/map/config";
 import { spreadOverlappingVenues } from "@/lib/map/spreadMarkers";
-import { createClusterElement } from "./createClusterElement";
 import { createMarkerElement, createUserLocationElement } from "./createMarkerElement";
 import { createPreviewChipElement } from "./createPreviewChipElement";
 
@@ -41,9 +40,10 @@ function markerPriority(venue: Venue): number {
 
 type MapViewProps = {
   venues: Venue[];
-  /** Drives which venues are visible/clustered — no longer drives cluster
-   * color, which is always Brand Navy per the frozen Mobile 2027 Design
-   * System's data-marker rule. */
+  /** Only used to re-trigger a marker render pass (see the `activeVenueId`/
+   * `activeCategory` effect below) — markers are always Brand Navy per the
+   * frozen Mobile 2027 Design System's data-marker rule, never colored by
+   * category. */
   activeCategory: VenueCategory | "all";
   /** Opens Venue Details for this venue directly — the map's marker/pin
    * flow always resolves to a venue, never a destination. */
@@ -184,17 +184,13 @@ function applyLabelPreferences(map: mapboxgl.Map) {
   }
 }
 
-const SOURCE_ID = "venues-cluster";
-const CLUSTER_QUERY_LAYER = "venues-cluster-query-layer";
-// Reduced from the original 50/14: clustering was persisting well past the
-// zoom level anyone actually browses at, so nearby venues almost always
-// rendered as one crowded bubble instead of individually tappable pins.
-// Clusters should read as "zoomed far out, region view" only — a smaller
-// radius means less eager grouping at any given zoom, and a lower max zoom
-// means clusters dissolve into real markers as soon as the user zooms in
-// past the initial region-level view, not deep into street level.
-const CLUSTER_RADIUS = 30;
-const CLUSTER_MAX_ZOOM = 11;
+const SOURCE_ID = "venues";
+// Invisible GL layer purely so `queryRenderedFeatures` has something to
+// query — every visible pixel is still a DOM marker, never this layer's
+// own render output. Predates cluster removal (Individual Map Markers
+// task) but the name no longer implies clustering, since the source
+// below isn't clustered anymore.
+const VENUE_QUERY_LAYER = "venues-query-layer";
 /** Screen-space footprint of the preview marker, in pixels — a fixed
  * estimate is enough to keep it fully inside the safe area without
  * measuring the real DOM element. It's anchored by its bottom edge (see the
@@ -210,13 +206,12 @@ const CHIP_NUDGE_DURATION_MS = 200;
 
 type VenueFeatureCollection = GeoJSON.FeatureCollection<GeoJSON.Point, { id: string }>;
 
-/** Feeds Mapbox's clustering engine the *spread* positions
- * (`spreadOverlappingVenues`), not raw `venue.coordinates` — clustering and
- * marker placement both need to agree on where a venue visually sits, or
- * a venue could cluster with neighbors its own marker doesn't appear next
- * to. `venuesByIdRef` (real domain objects, real coordinates) is what
- * every other consumer of a venue's location reads; this collection only
- * ever drives what's drawn. */
+/** Feeds the query-only GeoJSON source the *spread* positions
+ * (`spreadOverlappingVenues`), not raw `venue.coordinates` — so two venues
+ * geocoded a few meters apart render as visually distinguishable markers
+ * instead of stacking exactly on top of one another. `venuesByIdRef` (real
+ * domain objects, real coordinates) is what every other consumer of a
+ * venue's location reads; this collection only ever drives what's drawn. */
 function toFeatureCollection(venues: Venue[]): VenueFeatureCollection {
   return {
     type: "FeatureCollection",
@@ -231,32 +226,30 @@ function toFeatureCollection(venues: Venue[]): VenueFeatureCollection {
 /** Style Toggle Custom Layer Regression fix — `map.setStyle()` (the
  * Layers FAB's `toggleStyle`) discards every custom source/layer along
  * with the old style; Mapbox does not recreate them. This is the one
- * place that (re)installs `SOURCE_ID`/`CLUSTER_QUERY_LAYER`, called both
+ * place that (re)installs `SOURCE_ID`/`VENUE_QUERY_LAYER`, called both
  * on the map's initial `"load"` and on every subsequent `"style.load"`
  * (which also fires after `setStyle`) — see the two call sites below.
  *
  * Idempotent by construction (`getSource`/`getLayer` existence checks),
  * so calling it twice back-to-back (initial `"style.load"` then `"load"`
  * firing moments later, both on first mount) never double-adds anything
- * — the second call is a no-op, not a duplicate. Configuration
- * (`cluster`/`clusterRadius`/`clusterMaxZoom`, the invisible query
- * layer's paint) is copied verbatim from the original one-time setup;
- * nothing about the clustering behavior itself changed. */
+ * — the second call is a no-op, not a duplicate. Unclustered on purpose
+ * (Individual Map Markers task) — every visible venue gets its own DOM
+ * marker now; `spreadOverlappingVenues` (in `toFeatureCollection`) is
+ * what keeps near-identical coordinates visually distinguishable instead
+ * of grouping them into a cluster bubble. */
 function installCustomMapLayers(map: mapboxgl.Map, venues: Venue[]) {
   if (!map.getSource(SOURCE_ID)) {
     map.addSource(SOURCE_ID, {
       type: "geojson",
       data: toFeatureCollection(venues) satisfies VenueFeatureCollection,
-      cluster: true,
-      clusterRadius: CLUSTER_RADIUS,
-      clusterMaxZoom: CLUSTER_MAX_ZOOM,
     });
   }
   // Invisible on purpose — see the component docstring. This is the only
-  // GL layer clustering needs; every visible marker/cluster is DOM.
-  if (!map.getLayer(CLUSTER_QUERY_LAYER)) {
+  // GL layer venue rendering needs; every visible marker is DOM.
+  if (!map.getLayer(VENUE_QUERY_LAYER)) {
     map.addLayer({
-      id: CLUSTER_QUERY_LAYER,
+      id: VENUE_QUERY_LAYER,
       type: "circle",
       source: SOURCE_ID,
       paint: { "circle-radius": 1, "circle-opacity": 0 },
@@ -269,14 +262,15 @@ function installCustomMapLayers(map: mapboxgl.Map, venues: Venue[]) {
  * `ssr: false` at the call site so the GL bundle never enters any other
  * route's payload.
  *
- * Clustering reuses Mapbox GL's native clustering engine (a clustered
- * GeoJSON source + `getClusterExpansionZoom`) — the same primitive
- * `datalab-next`'s Studio map is built on — but never its GL circle-layer
- * *rendering*. The source's only GL layer here is a single invisible circle
- * layer (`circle-opacity: 0`) that exists purely so Mapbox tiles/renders the
- * source and `queryRenderedFeatures` has something to query; every pixel the
- * user sees — pins, clusters, the preview chip — is a plain DOM element, the
- * same approach `createMarkerElement` already used before clustering existed. */
+ * Individual Map Markers task — clustering was removed: the Map is now
+ * intent-driven (no venues visible without a Destination/Category/filter
+ * selection), so the dense "many venues at once" case clustering existed
+ * for no longer applies. The GeoJSON source is unclustered; its only GL
+ * layer is a single invisible circle layer (`circle-opacity: 0`) that
+ * exists purely so Mapbox tiles/renders the source and
+ * `queryRenderedFeatures` has something to query. Every pixel the user
+ * sees — pins, the preview chip — is a plain DOM element, the same
+ * approach `createMarkerElement` has always used. */
 export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   { venues, activeCategory, onSelectVenue },
   ref,
@@ -355,8 +349,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     mapRef.current = map;
     // Reserves the top search/filter overlay and the right FAB column —
     // every camera method (`flyTo`/`easeTo`/`jumpTo`) falls back to this
-    // padding when a call doesn't specify its own, so cluster expansion
-    // and "locate me" both frame their target inside the safe area
+    // padding when a call doesn't specify its own, so "locate me" and
+    // every other camera move frame their target inside the safe area
     // without those call sites needing to know about it.
     map.setPadding(MAP_SAFE_PADDING);
 
@@ -404,7 +398,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       // guarded — a plain no-op here is correct: the reinstall's own
       // explicit `scheduleRender()` call (below) re-runs this the moment
       // the layer is back.
-      if (!map.getLayer(CLUSTER_QUERY_LAYER)) return;
+      if (!map.getLayer(VENUE_QUERY_LAYER)) return;
 
       // CSS-pixel container size, inset by the same safe-area padding —
       // features projecting into that reserved margin simply don't get a
@@ -417,16 +411,12 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         [MAP_SAFE_PADDING.left, MAP_SAFE_PADDING.top],
         [width - MAP_SAFE_PADDING.right, height - MAP_SAFE_PADDING.bottom],
       ];
-      const rendered = map.queryRenderedFeatures(viewport, { layers: [CLUSTER_QUERY_LAYER] }) as
+      const rendered = map.queryRenderedFeatures(viewport, { layers: [VENUE_QUERY_LAYER] }) as
         | Array<mapboxgl.MapboxGeoJSONFeature & { properties: Record<string, unknown> }>
         | undefined;
       if (!rendered) return;
 
       const nextKeys = new Set<string>();
-
-      // Dedupe: `queryRenderedFeatures` can return the same feature more
-      // than once across tile boundaries.
-      const seenClusters = new Set<number>();
 
       function renderKeyFor(venueId: string) {
         return `${venueId}:${venueId === activeVenueIdRef.current ? "chip" : "pin"}`;
@@ -435,36 +425,6 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       for (const feature of rendered) {
         const geometry = feature.geometry as GeoJSON.Point;
         const [lng, lat] = geometry.coordinates;
-        const isCluster = Boolean(feature.properties?.cluster);
-
-        if (isCluster) {
-          const clusterId = feature.properties?.cluster_id as number;
-          if (seenClusters.has(clusterId)) continue;
-          seenClusters.add(clusterId);
-
-          const key = `cluster:${clusterId}`;
-          nextKeys.add(key);
-          if (!markersRef.current.has(key)) {
-            const count = feature.properties?.point_count as number;
-            const el = createClusterElement(count, CATEGORY_BY_VALUE.general.color);
-            el.addEventListener("click", (event) => {
-              // Marker elements sit inside the map's own container, so a
-              // click here also bubbles up to `map.on("click", ...)` below
-              // — without stopping it, the background-click deselect
-              // handler fires right after and undoes whatever this
-              // listener just did.
-              event.stopPropagation();
-              const source = map.getSource(SOURCE_ID) as mapboxgl.GeoJSONSource;
-              source.getClusterExpansionZoom(clusterId, (error, zoom) => {
-                if (error || zoom == null) return;
-                map.easeTo({ center: [lng, lat], zoom, pitch: MAP_PITCH, bearing: MAP_BEARING });
-              });
-            });
-            const marker = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
-            markersRef.current.set(key, marker);
-          }
-          continue;
-        }
 
         const venueId = feature.properties?.id as string;
         const venue = venuesByIdRef.current.get(venueId);
@@ -486,18 +446,21 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           ? createPreviewChipElement(venue, { onOpen: () => onSelectVenue(venue.id) })
           : createMarkerElement(venue.category, { label: venue.name, zIndex: markerPriority(venue) });
         el.dataset.renderKey = renderKeyFor(venue.id);
-        // See the cluster click handler's comment — same reason this stops
-        // propagation instead of letting it reach `map.on("click", ...)`.
+        // Marker elements sit inside the map's own container, so a click
+        // here also bubbles up to `map.on("click", ...)` below — without
+        // stopping it, the background-click deselect handler fires right
+        // after and undoes whatever this listener just did.
         el.addEventListener("click", (event) => {
           event.stopPropagation();
           if (!isActive) setActiveVenueId(venue.id);
         });
-        // The active marker's own bottom edge — not its center — is what
-        // stays on the coordinate, so it can grow upward in place (see
-        // `createPreviewChipElement`); the ordinary marker is a symmetric
-        // circle, so `center` (Mapbox's default) is correct for it
-        // unchanged.
-        const marker = new mapboxgl.Marker({ element: el, anchor: isActive ? "bottom" : "center" })
+        // Both states now anchor their own bottom edge to the coordinate:
+        // the active chip so it can grow upward in place (see
+        // `createPreviewChipElement`), the ordinary marker because it's a
+        // teardrop pin now (see `createMarkerElement`) whose coordinate is
+        // its point, not its visual center — `center` (Mapbox's default)
+        // was only correct for the symmetric circle this replaced.
+        const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
           .setLngLat([lng, lat])
           .addTo(map);
         markersRef.current.set(key, marker);
@@ -529,7 +492,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     // calls — is what survives a style change; `setStyle` silently drops
     // every custom source/layer and Mapbox never recreates them itself.
     // The explicit `scheduleRender()` after reinstalling is what actually
-    // restores visible markers/clusters post-switch, rather than waiting
+    // restores visible markers post-switch, rather than waiting
     // for an incidental `moveend`/`zoomend` that may never come if the
     // user isn't still interacting with the map. `venuesRef.current` (not
     // the `venues` prop) so a style change never regresses to stale data
@@ -561,8 +524,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       });
 
       map.on("click", (event) => {
-        if (!map.getLayer(CLUSTER_QUERY_LAYER)) return;
-        const hits = map.queryRenderedFeatures(event.point, { layers: [CLUSTER_QUERY_LAYER] });
+        if (!map.getLayer(VENUE_QUERY_LAYER)) return;
+        const hits = map.queryRenderedFeatures(event.point, { layers: [VENUE_QUERY_LAYER] });
         if (hits.length === 0) setActiveVenueId(null);
       });
     });
