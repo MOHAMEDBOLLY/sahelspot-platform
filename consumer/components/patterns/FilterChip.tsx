@@ -64,7 +64,7 @@ export function FilterChip({
       // only governs the icon-only <-> icon+label width change — a
       // separate, deliberately non-bouncy tween (Adaptive Map Toolbar
       // prototype's validated values), not the color/scale fade above.
-      className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 ${
+      className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 ${
         active
           ? "scale-[1.02] bg-primary text-accent"
           : "border border-outline-variant/30 bg-white text-on-surface"
@@ -73,7 +73,7 @@ export function FilterChip({
       type="button"
       {...props}
     >
-      {icon ? <Icon size={20} name={icon} /> : null}
+      {icon ? <Icon size={17} name={icon} /> : null}
       <AnimatePresence initial={false}>
         {expanded ? (
           <motion.span
