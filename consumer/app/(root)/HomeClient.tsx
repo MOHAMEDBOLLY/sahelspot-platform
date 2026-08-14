@@ -11,6 +11,8 @@ import { DestinationCoverflow } from "@/components/patterns/DestinationCoverflow
 import { SectionHeader } from "@/components/patterns/SectionHeader";
 import { CardCarousel } from "@/components/patterns/CardCarousel";
 import { FeaturedSignatureCard } from "@/components/patterns/FeaturedSignatureCard";
+import { FoodPickCard } from "@/components/patterns/FoodPickCard";
+import { NightlifeCard } from "@/components/patterns/NightlifeCard";
 import { DestinationCard } from "@/components/destination/DestinationCard";
 import { VenueCard } from "@/components/venue/VenueCard";
 import { CATEGORY_BY_VALUE } from "@/lib/domain/categories";
@@ -87,8 +89,8 @@ function VenueRail({
         <SectionHeader actionHref={actionHref} actionLabel="See All" title={title} />
         {isLoading ? (
           <CardCarousel>
-            <Skeleton className="h-72 w-[80%] min-w-[280px] shrink-0" />
-            <Skeleton className="h-72 w-[80%] min-w-[280px] shrink-0" />
+            <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
+            <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
           </CardCarousel>
         ) : isError ? (
           <EmptyState
@@ -219,7 +221,6 @@ export function HomeClient() {
           * proxy or an explicit decision to drop it for good; unaffected by
           * the imageless hero below, which carries no weather slot. */}
         <HomeHero
-          destinationCount={orderedDestinations.length || null}
           searchProps={{
             onChange: (event) => setQuery(event.target.value),
             onFilterClick: () => router.push("/search"),
@@ -376,33 +377,99 @@ export function HomeClient() {
         </section>
         </Reveal>
 
-        <VenueRail
-          actionHref="/search?category=food"
-          emptyDescription="Published restaurants will appear here."
-          emptyIcon="restaurant"
-          emptyTitle="No food picks yet"
-          isError={venues.isError}
-          isLoading={venues.isLoading}
-          isSaved={isSaved}
-          onRetry={() => venues.refetch()}
-          onToggleSaved={toggle}
-          title="Food Picks"
-          venues={foodVenues}
-        />
+        {/* Food Picks — logo/brand discovery. A dedicated compact square
+          * card (`FoodPickCard`, Home-only), not `VenueRail`'s standard
+          * `VenueCard`: food content here is overwhelmingly a logo with a
+          * name/destination underneath, not a photo with rating/status, so
+          * the standard card's taller stack left dead white space below the
+          * logo. Written inline rather than through `VenueRail` because the
+          * card component itself differs, not just its size. */}
+        <Reveal className="mt-8">
+          <section>
+            <SectionHeader actionHref="/search?category=food" actionLabel="See All" title="Food Picks" />
+            {venues.isLoading ? (
+              <CardCarousel>
+                <Skeleton className="h-40 w-28 shrink-0" />
+                <Skeleton className="h-40 w-28 shrink-0" />
+                <Skeleton className="h-40 w-28 shrink-0" />
+              </CardCarousel>
+            ) : venues.isError ? (
+              <EmptyState
+                action={
+                  <CTAButton onClick={() => venues.refetch()} variant="secondary">
+                    Retry
+                  </CTAButton>
+                }
+                description="We couldn't reach SahelSpot Studio. Check your connection and try again."
+                icon="error_outline"
+                title="Something went wrong"
+              />
+            ) : foodVenues.length === 0 ? (
+              <EmptyState
+                description="Published restaurants will appear here."
+                icon="restaurant"
+                title="No food picks yet"
+              />
+            ) : (
+              <CardCarousel>
+                {foodVenues.map((venue) => (
+                  <FoodPickCard
+                    key={venue.id}
+                    onToggleSaved={toggle}
+                    saved={isSaved(venue.id)}
+                    venue={venue}
+                  />
+                ))}
+              </CardCarousel>
+            )}
+          </section>
+        </Reveal>
 
-        <VenueRail
-          actionHref="/search?category=nightlife"
-          emptyDescription="Published nightlife spots will appear here."
-          emptyIcon="nightlife"
-          emptyTitle="No nightlife yet"
-          isError={venues.isError}
-          isLoading={venues.isLoading}
-          isSaved={isSaved}
-          onRetry={() => venues.refetch()}
-          onToggleSaved={toggle}
-          title="Nightlife"
-          venues={nightlifeVenues}
-        />
+        {/* Nightlife — atmosphere/photo discovery, deliberately the visual
+          * opposite of Food Picks right above it. A dedicated moderately
+          * wide, image-first card (`NightlifeCard`, Home-only) — one card
+          * per venue, ~230px (≈64% of the mobile carousel width), with a
+          * cinematic photo dominating the card and only name/destination
+          * underneath. */}
+        <Reveal className="mt-8">
+          <section>
+            <SectionHeader actionHref="/search?category=nightlife" actionLabel="See All" title="Nightlife" />
+            {venues.isLoading ? (
+              <CardCarousel>
+                <Skeleton className="h-52 w-[230px] shrink-0" />
+                <Skeleton className="h-52 w-[230px] shrink-0" />
+              </CardCarousel>
+            ) : venues.isError ? (
+              <EmptyState
+                action={
+                  <CTAButton onClick={() => venues.refetch()} variant="secondary">
+                    Retry
+                  </CTAButton>
+                }
+                description="We couldn't reach SahelSpot Studio. Check your connection and try again."
+                icon="error_outline"
+                title="Something went wrong"
+              />
+            ) : nightlifeVenues.length === 0 ? (
+              <EmptyState
+                description="Published nightlife spots will appear here."
+                icon="nightlife"
+                title="No nightlife yet"
+              />
+            ) : (
+              <CardCarousel>
+                {nightlifeVenues.map((venue) => (
+                  <NightlifeCard
+                    key={venue.id}
+                    onToggleSaved={toggle}
+                    saved={isSaved(venue.id)}
+                    venue={venue}
+                  />
+                ))}
+              </CardCarousel>
+            )}
+          </section>
+        </Reveal>
 
         {SHOW_ESSENTIAL_SERVICES && (
           <section className="mt-8">

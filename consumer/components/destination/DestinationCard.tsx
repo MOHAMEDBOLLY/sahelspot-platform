@@ -41,8 +41,8 @@ type DestinationCardProps = {
  * unchanged by this redesign. */
 export function DestinationCard({ href, name, imageUrl, placeCount, kilometerMarker }: DestinationCardProps) {
   return (
-    <CardFrame className="group w-64" href={href}>
-      <div className="relative h-44 overflow-hidden bg-cream">
+    <CardFrame className="group w-52" href={href}>
+      <div className="relative h-32 overflow-hidden bg-cream">
         {imageUrl ? (
           <Image
             alt={name}
@@ -56,10 +56,10 @@ export function DestinationCard({ href, name, imageUrl, placeCount, kilometerMar
         )}
       </div>
       <div
-        className="space-y-1 p-4"
+        className="space-y-1 p-3"
         style={{ background: "linear-gradient(165deg, var(--color-primary) 0%, #08263f 100%)" }}
       >
-        <h3 className="truncate text-lg leading-tight font-bold tracking-tight text-white">{name}</h3>
+        <h3 className="truncate text-sm leading-tight font-bold tracking-tight text-white">{name}</h3>
         <div className="flex items-center gap-1.5">
           {kilometerMarker != null ? (
             <span className="text-xs font-medium text-accent">{kilometerMarker} km</span>

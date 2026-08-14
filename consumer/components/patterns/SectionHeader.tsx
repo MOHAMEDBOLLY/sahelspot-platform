@@ -43,7 +43,7 @@ export function SectionHeader({
       <div>
         <h2
           className={`font-headline font-bold tracking-tight text-primary ${
-            size === "lg" ? "text-2xl leading-[1.05]" : "text-lg leading-tight"
+            size === "lg" ? "text-xl leading-[1.1]" : "text-base leading-tight"
           }`}
         >
           {title}

@@ -58,8 +58,8 @@ function notableAccessType(venue: Venue): string | null {
 type StandardSize = "lg" | "compact";
 
 const STANDARD_SIZE: Record<StandardSize, { width: string; image: string; title: string }> = {
-  lg: { width: "w-64", image: "h-40", title: "text-base" },
-  compact: { width: "w-48", image: "h-32", title: "text-sm" },
+  lg: { width: "w-52", image: "h-32", title: "text-sm" },
+  compact: { width: "w-40", image: "h-24", title: "text-xs" },
 };
 
 /** The one card family in the product — one component, four variants, never

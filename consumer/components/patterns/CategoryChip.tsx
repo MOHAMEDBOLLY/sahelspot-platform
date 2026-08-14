@@ -50,8 +50,8 @@ export function CategoryChip({
       type="button"
       {...props}
     >
-      <span className="flex aspect-square w-full items-center justify-center rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm transition-all group-hover:bg-primary-container group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-primary/20">
-        <Icon className="text-primary" name={icon} size={28} />
+      <span className="flex aspect-square w-full items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm transition-all group-hover:bg-primary-container group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-primary/20">
+        <Icon className="text-primary" name={icon} size={22} />
       </span>
       {/* `min-h-[26px]` reserves room for two lines at this size/leading —
        * a one-word label (one line) and a two-word label that wraps (two

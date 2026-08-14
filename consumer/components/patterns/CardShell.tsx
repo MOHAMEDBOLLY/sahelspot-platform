@@ -15,7 +15,7 @@ export function LBracketAccent({ size = "lg" }: { size?: "lg" | "sm" }) {
     <div
       aria-hidden="true"
       className={`pointer-events-none absolute top-0 right-0 z-10 border-accent ${
-        size === "sm" ? "h-3.5 w-3.5 border-t-2 border-r-2" : "h-8 w-8 border-t-4 border-r-4"
+        size === "sm" ? "h-3 w-3 border-t-2 border-r-2" : "h-6 w-6 border-t-2 border-r-2"
       }`}
     />
   );
@@ -77,7 +77,7 @@ export function CardFrame({
       // believable, not more visible. Border bumped 10% → 14% opacity for a
       // touch more definition against the light background, still a
       // hairline, not a stroke.
-      className={`relative block shrink-0 snap-start overflow-hidden rounded-3xl rounded-tr-none border border-outline-variant/[0.14] bg-surface-container-lowest shadow-[0_2px_10px_-2px_rgb(13_59_102_/_0.08)] transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] active:scale-[0.98] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 md:hover:-translate-y-0.5 md:hover:shadow-[0_10px_28px_-6px_rgb(13_59_102_/_0.18)] ${className}`}
+      className={`relative block shrink-0 snap-start overflow-hidden rounded-2xl rounded-tr-none border border-outline-variant/[0.16] bg-surface-container-lowest shadow-[0_1px_6px_-1px_rgb(13_59_102_/_0.08)] transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] active:scale-[0.98] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 md:hover:-translate-y-0.5 md:hover:shadow-[0_8px_20px_-6px_rgb(13_59_102_/_0.16)] ${className}`}
       href={href}
     >
       {bracket ? <LBracketAccent size="lg" /> : null}
@@ -98,7 +98,7 @@ export function SaveButton({
   venueId,
   saved,
   onToggleSaved,
-  className = "absolute top-3 left-3",
+  className = "absolute top-2 left-2",
 }: {
   venueId: string;
   saved: boolean;
@@ -109,7 +109,7 @@ export function SaveButton({
     <button
       aria-pressed={saved}
       aria-label={saved ? "Remove from saved" : "Save this place"}
-      className={`z-10 flex h-10 w-10 items-center justify-center rounded-full shadow-sm transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+      className={`z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
         saved ? "bg-accent text-on-accent" : "bg-white/90 text-primary backdrop-blur-sm"
       } ${className}`}
       onClick={(event) => {
@@ -118,7 +118,7 @@ export function SaveButton({
       }}
       type="button"
     >
-      <Icon filled={saved} name="bookmark" size={18} />
+      <Icon filled={saved} name="bookmark" size={15} />
     </button>
   );
 }

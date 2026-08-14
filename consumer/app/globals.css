@@ -1,64 +1,61 @@
 @import "tailwindcss";
 
-/* Design tokens — Premium Light Mobile-First UI, navy-restored correction
- * (SAHELSPOT CONSUMER — FINAL HERO / BACKGROUND CORRECTION). The prior pass
- * tried #0249E1 ("brand blue") as primary; that read too bright/less premium,
- * so this correction restores SahelSpot Navy (#0D3B66) as the dominant
- * brand/accent color. Same structural rule as every pass before this one:
+/* Design tokens — Coastal Premium palette (SAHELSPOT CONSUMER — HOME UI
+ * REFINEMENT). Replaces the prior cool-tinted / lime-accented palette with a
+ * warm, restrained coastal set: ivory/sand surfaces, deep navy as the
+ * dominant brand/content color, and a muted clay/terracotta accent in place
+ * of the old neon lime. Same structural rule as every pass before this one:
  * literal hex only here, every component resolves color through a token,
  * never a hard-coded value.
  *
- *   --color-primary  (#0D3B66, navy) — the dominant brand/action color again:
+ *   --color-primary  (#0D3B66, navy) — the dominant brand/action color:
  *                     buttons, active states, icons, links, headline text,
- *                     nav active state, hero graphic shapes.
- *   --color-primary-light / --color-primary-container (#80B0EC, light blue)
- *                     — demoted to a minor supporting token per this
- *                     correction: subtle background tint / low-opacity
- *                     hero shape / hover-state surface only, never a major
- *                     fill. Not part of the brand/accent pair.
- *   --color-accent   (#DAFB71, lime) — unchanged: the single structural
- *                     highlight (save, filter, "See All", active nav tab,
- *                     L-Bracket), never decorative, never spread across
- *                     every card.
- *   --color-coral    (#EE3D5A) — unchanged: reserved for small, sparse
- *                     Events-only moments, not a general accent.
+ *                     nav active state.
+ *   --color-primary-light / --color-primary-container — a muted, desaturated
+ *                     slate-blue, not a bright sky blue. Minor supporting
+ *                     token only (chip hover state, subtle tints) — never a
+ *                     major fill, never a "beach blue" theme.
+ *   --color-accent   (#B9764A, clay/terracotta) — the single structural
+ *                     highlight (save, filter, "See All" underline, active
+ *                     nav tab), replacing the old lime. Warm and restrained,
+ *                     never decorative, never spread across every card.
+ *   --color-coral    (#C0503F, muted coral) — reserved for small, sparse
+ *                     Events-only moments, softened to sit with the warm
+ *                     palette rather than reading as a bright pop color.
  *
- * Ratio target per this correction: ~80–90% white/light-neutral, ~10–15%
- * navy, small lime/coral accents, light blue optional and extremely subtle. */
+ * Ratio target: ~80–90% warm ivory/sand/white, ~10–15% navy, small clay/
+ * coral accents. */
 @theme {
   /* Brand */
   --color-primary: #0d3b66;
-  --color-primary-light: #80b0ec;
-  --color-accent: #dafb71;
-  --color-on-accent: #111111;
-  --color-coral: #ee3d5a;
-  /* Cool-tinted light neutral, not warm beige — still used everywhere the
-   * old cream was (image-placeholder backgrounds, mainly), same token name
-   * so no call site needed to change, only its value. */
-  --color-cream: #eef2fa;
+  --color-primary-light: #9fb0bf;
+  --color-accent: #b9764a;
+  --color-on-accent: #ffffff;
+  --color-coral: #c0503f;
+  /* Warm sand — image-placeholder backgrounds and any "natural" fill. */
+  --color-cream: #f1ead9;
 
-  /* Surface — the page is *not* white. Cards are white on a slightly tinted
-   * page; collapsing both to #FFFFFF flattens every card in the product. */
-  --color-surface: #f9f9fe;
+  /* Surface — warm ivory, not cool-tinted white. Cards sit as white on a
+   * slightly warm-tinted page; collapsing both to #FFFFFF flattens every
+   * card in the product. */
+  --color-surface: #faf7f1;
   --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f2f3fa;
-  --color-surface-container: #eceef5;
-  --color-surface-container-high: #e5e8f0;
+  --color-surface-container-low: #f5efe5;
+  --color-surface-container: #efe6d6;
+  --color-surface-container-high: #e6d9c4;
 
   /* Same value as `--color-primary-light` above — kept as its own token
    * (rather than aliased) since Tailwind v4's `@theme` doesn't support
    * referencing one theme color from another; the two must simply agree.
-   * Minor supporting surface only per this correction (see header comment),
-   * not a major fill — e.g. `CategoryChip`'s hover state, and the hero's
-   * own low-opacity secondary shape. */
-  --color-primary-container: #80b0ec;
-  --color-accent-container: #f2fbdb;
+   * Minor supporting surface only — e.g. `CategoryChip`'s hover state. */
+  --color-primary-container: #dde3e8;
+  --color-accent-container: #f2e2d3;
 
   /* Content */
-  --color-on-surface: #111111;
-  --color-on-surface-variant: #5b5f67;
-  --color-outline: #767b83;
-  --color-outline-variant: #aeb2bb;
+  --color-on-surface: #221c14;
+  --color-on-surface-variant: #6b6157;
+  --color-outline: #8f8477;
+  --color-outline-variant: #cabfae;
   --color-error: #a83836;
 
   /* Map marker categories — data encodings, not brand colours. Slated for

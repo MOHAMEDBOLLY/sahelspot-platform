@@ -60,8 +60,8 @@ export function FeaturedSignatureCard({
   className = "",
 }: FeaturedSignatureCardProps) {
   return (
-    <CardFrame className={`group w-72 ${className}`} href={href}>
-      <div className="relative h-64 overflow-hidden bg-cream">
+    <CardFrame className={`group w-64 ${className}`} href={href}>
+      <div className="relative h-48 overflow-hidden bg-cream">
         {imageUrl ? (
           // Same approved `hover-scale` token `DestinationCard` already uses
           // (400ms, group-hover) — reused, not a new motion invented for
@@ -93,13 +93,13 @@ export function FeaturedSignatureCard({
             )}
           </span>
         ) : null}
-        <div className="absolute inset-x-4 bottom-4">
-          <h3 className="font-headline text-2xl leading-tight font-bold text-white drop-shadow-sm">
+        <div className="absolute inset-x-3 bottom-3">
+          <h3 className="font-headline text-lg leading-tight font-bold text-white drop-shadow-sm">
             {title}
           </h3>
           {locationLabel ? (
-            <p className="mt-0.5 flex items-center gap-1 text-sm font-medium text-white/85">
-              <Icon size={16} name="location_on" />
+            <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-white/85">
+              <Icon size={14} name="location_on" />
               {locationLabel}
             </p>
           ) : null}
@@ -110,7 +110,7 @@ export function FeaturedSignatureCard({
         * rating (an event), matching `VenueCard`'s "omit what has no data"
         * pattern rather than rendering an empty row. */}
       {rating != null ? (
-        <div className="p-3">
+        <div className="p-2.5">
           <RatingBadge reviewCount={reviewCount ?? undefined} value={rating} />
         </div>
       ) : null}
