@@ -73,7 +73,7 @@ export function FilterChip({
       type="button"
       {...props}
     >
-      {icon ? <Icon size={17} name={icon} /> : null}
+      {icon ? <Icon size={18} name={icon} /> : null}
       <AnimatePresence initial={false}>
         {expanded ? (
           <motion.span

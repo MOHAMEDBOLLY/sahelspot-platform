@@ -326,7 +326,7 @@ export function MapClient() {
                 transition={{ duration: 0.12 }}
                 type="button"
               >
-                <Icon name="search" size={20} />
+                <Icon name="search" size={18} />
               </motion.button>
             )}
           </AnimatePresence>

@@ -137,7 +137,7 @@ function StandardVenueCard({
           {venue.isOpenNow !== null ? <StatusBadge isOpen={venue.isOpenNow} /> : null}
         </div>
         <p className="flex items-center gap-1 text-xs text-on-surface-variant">
-          <Icon className="shrink-0" name="location_on" size={14} />
+          <Icon className="shrink-0" name="location_on" size={16} />
           <span className="truncate">{venue.destinationName}</span>
         </p>
         {venue.rating !== null || venue.distanceLabel || notableAccessType(venue) ? (
@@ -186,7 +186,7 @@ function HorizontalVenueCard({
       <div className="min-w-0 flex-1 space-y-1">
         <h3 className="truncate text-sm font-bold text-on-surface">{venue.name}</h3>
         <p className="flex items-center gap-1 text-xs text-on-surface-variant">
-          <Icon className="shrink-0" name="location_on" size={14} />
+          <Icon className="shrink-0" name="location_on" size={16} />
           <span className="truncate">
             {venue.distanceLabel ? `${venue.destinationName} · ${venue.distanceLabel}` : venue.destinationName}
           </span>
@@ -269,7 +269,7 @@ function EventVariant({ event }: { event: Event }) {
         </div>
         {event.venue || event.destination ? (
           <p className="flex items-center gap-1 text-xs text-on-surface-variant">
-            <Icon className="shrink-0" name="location_on" size={14} />
+            <Icon className="shrink-0" name="location_on" size={16} />
             <span className="truncate">{event.venue?.name ?? event.destination?.name}</span>
           </p>
         ) : null}

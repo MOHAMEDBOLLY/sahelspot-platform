@@ -99,7 +99,7 @@ export function FeaturedSignatureCard({
           </h3>
           {locationLabel ? (
             <p className="mt-0.5 flex items-center gap-1 text-sm font-medium text-white/85">
-              <Icon size={14} name="location_on" />
+              <Icon size={16} name="location_on" />
               {locationLabel}
             </p>
           ) : null}
