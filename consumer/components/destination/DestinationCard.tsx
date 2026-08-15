@@ -18,27 +18,24 @@ type DestinationCardProps = {
   kilometerMarker?: number | null;
 };
 
-/** Home's Explore Destinations row. Card System Redesign (SAHELSPOT
- * CONSUMER — CARD SYSTEM REDESIGN ONLY): shares the same flat `CardFrame`
- * construction as `VenueCard`'s standard card — image, then content
- * directly below it, no floating overlap panel — with one deliberate
- * difference kept from the previous design: the content block is a navy
- * fill instead of white. That's the one place a whole content area is
- * navy, and it's a cheap, legible way to tell "this is a destination, not a
- * venue" apart at a glance without introducing a second accent color or a
- * different card shape. No save action: destinations aren't saveable.
- *
- * Visual Richness / Art Direction Pass, item 3 (Destination Carousel) —
- * scaled up from the standard venue card (`w-56`/`h-36` → `w-64`/`h-44`) so
- * this rail reads as the showcase moment the brief asks for, not a smaller
- * version of every other rail; same data, same card family, same `CardFrame`
- * shell, just given more presence. The flat navy fill becomes a subtle
- * top-to-bottom gradient (navy → a touch darker) for surface depth instead
- * of a single flat tone — still reads as "navy," just less poster-flat.
+/** Home's Explore Destinations row. NIGHTLIFE + DESTINATIONS — CORRECT
+ * SECTION COLORS: adapted from the prior "photo + solid navy content panel
+ * below it" construction to the Best Beaches full-image architecture — the
+ * photo now fills the *entire* card, a navy gradient overlays it directly
+ * (transparent near the top, strong/opaque at the bottom), and the name/
+ * km-marker/place-count content that used to live in the separate navy
+ * panel now sits absolutely positioned over the darkest part of the overlay
+ * instead — no separate content block remains. Same stop shape/alphas as
+ * Best Beaches' terracotta overlay, only the hue changes: this reuses the
+ * app's existing `--color-primary` navy (`#0d3b66` / `rgb(13,59,102)`,
+ * `app/globals.css`) — the same navy the old content panel and every other
+ * navy surface in this app already use — not a new or sampled color. `href`
+ * and all existing content (name, kilometer marker, place count) are
+ * preserved unchanged; no save action, destinations still aren't saveable.
  *
  * The image hover-zoom (`group-hover:scale-110`, 400ms) is the approved
  * `hover-scale` system token (docs/consumer/DESIGN_SYSTEM.md §Motion) —
- * unchanged by this redesign. */
+ * unchanged by this pass. */
 export function DestinationCard({ href, name, imageUrl, placeCount, kilometerMarker }: DestinationCardProps) {
   return (
     <CardFrame className="group w-52" href={href}>
@@ -54,22 +51,25 @@ export function DestinationCard({ href, name, imageUrl, placeCount, kilometerMar
         ) : (
           <div className="h-full w-full bg-primary-container" />
         )}
-      </div>
-      <div
-        className="space-y-1 p-3"
-        style={{ background: "linear-gradient(165deg, var(--color-primary) 0%, #08263f 100%)" }}
-      >
-        <h3 className="truncate text-sm leading-tight font-bold tracking-tight text-white">{name}</h3>
-        <div className="flex items-center gap-1.5">
-          {kilometerMarker != null ? (
-            <span className="text-xs font-medium text-accent">{kilometerMarker} km</span>
-          ) : null}
-          {placeCount != null ? (
-            <span className="text-xs font-medium text-white/70">
-              {kilometerMarker != null ? "· " : ""}
-              {placeCount} Places
-            </span>
-          ) : null}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(13,59,102,0)_20%,rgba(13,59,102,0.02)_35%,rgba(13,59,102,0.12)_48%,rgba(13,59,102,0.38)_62%,rgba(13,59,102,0.82)_78%,rgba(13,59,102,1)_100%)]"
+        />
+        <div className="absolute inset-x-3 bottom-3 z-10">
+          <h3 className="truncate text-sm leading-tight font-bold tracking-tight text-white drop-shadow-sm">
+            {name}
+          </h3>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            {kilometerMarker != null ? (
+              <span className="text-xs font-medium text-accent">{kilometerMarker} km</span>
+            ) : null}
+            {placeCount != null ? (
+              <span className="text-xs font-medium text-white/85">
+                {kilometerMarker != null ? "· " : ""}
+                {placeCount} Places
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
     </CardFrame>

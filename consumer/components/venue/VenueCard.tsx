@@ -5,6 +5,7 @@ import { RatingBadge } from "@/components/ui/RatingBadge";
 import { StatusBadge } from "@/components/patterns/StatusBadge";
 import { Pill } from "@/components/ui/Pill";
 import { CardFrame, DateBadge, LBracketAccent, SaveButton } from "@/components/patterns/CardShell";
+import { CATEGORY_BY_VALUE } from "@/lib/domain/categories";
 import type { Venue } from "@/lib/domain/venue";
 import type { Event, EventPhase } from "@/lib/domain/event";
 import { formatEventDateRange } from "@/lib/domain/formatEventDate";
@@ -28,6 +29,24 @@ type VenueCardOwnProps =
        * `VenueCard` stays presentational and takes the answer, not the
        * destination list needed to work it out. */
       areaLabel?: string | null;
+      /** Best Beaches QR Removal task — Home's Best Beaches rail only.
+       * `false` (default) is every other caller's existing behavior,
+       * unchanged: `notableAccessType(venue)` ("QR Required", "Paid
+       * Entry", ...) renders as a `Pill` alongside rating/distance.
+       * `true` drops just that pill from consideration — including from
+       * whether the metadata row renders at all, so a venue with no
+       * rating/distance and only an access-type badge gets no row (and
+       * no reserved space for one) instead of a pill-only row. */
+      hideAccessType?: boolean;
+      /** Best Beaches Gradient Frame task — Home's Best Beaches rail
+       * only. `false` (default) is every other caller's existing flat
+       * `bg-surface-container-lowest` content strip, unchanged. `true`
+       * swaps that strip's background for the bottom-dark/top-light
+       * terracotta gradient and switches its title/location text to
+       * white (the flat navy/gray pairing has no reliable contrast
+       * against a gradient that's dark terracotta at one end) — image
+       * area, card frame, radius, and spacing are untouched either way. */
+      gradientFrame?: boolean;
     }
   | {
       variant: "event";
@@ -36,6 +55,8 @@ type VenueCardOwnProps =
       saved?: never;
       onToggleSaved?: never;
       areaLabel?: never;
+      hideAccessType?: never;
+      gradientFrame?: never;
     };
 
 type VenueCardProps = VenueCardOwnProps;
@@ -77,7 +98,15 @@ export function VenueCard(props: VenueCardProps) {
     return <EventVariant event={props.event} />;
   }
 
-  const { venue, variant = "vertical-lg", saved = false, onToggleSaved, areaLabel = null } = props;
+  const {
+    venue,
+    variant = "vertical-lg",
+    saved = false,
+    onToggleSaved,
+    areaLabel = null,
+    hideAccessType = false,
+    gradientFrame = false,
+  } = props;
 
   if (variant === "horizontal-row") {
     return (
@@ -92,6 +121,8 @@ export function VenueCard(props: VenueCardProps) {
 
   return (
     <StandardVenueCard
+      gradientFrame={gradientFrame}
+      hideAccessType={hideAccessType}
       onToggleSaved={onToggleSaved}
       saved={saved}
       size={variant === "vertical-compact" ? "compact" : "lg"}
@@ -114,14 +145,73 @@ function StandardVenueCard({
   size,
   saved,
   onToggleSaved,
+  hideAccessType = false,
+  gradientFrame = false,
 }: {
   venue: Venue;
   size: StandardSize;
   saved: boolean;
   onToggleSaved?: (venueId: string) => void;
+  hideAccessType?: boolean;
+  gradientFrame?: boolean;
 }) {
   const isClosed = venue.isOpenNow === false;
   const { width, image, title } = STANDARD_SIZE[size];
+
+  // Full Image Card task — a genuinely different structure, not a themed
+  // version of the flat card: the image fills the *entire* card (no
+  // separate content strip underneath at all — "the image is the card"),
+  // a terracotta gradient overlays it directly, and title/location sit
+  // absolutely positioned in the lower portion, over the darkest part of
+  // the overlay. Early-returns instead of branching inline throughout the
+  // flat-card markup below, so the flat-card path (every other caller)
+  // stays byte-for-byte untouched rather than threaded through with
+  // conditionals it doesn't need.
+  if (gradientFrame) {
+    const categoryLabel = CATEGORY_BY_VALUE[venue.category]?.label ?? null;
+    return (
+      <CardFrame className={`${width} ${isClosed ? "opacity-70" : ""}`} href={`/venues/${venue.id}`}>
+        <div className={`relative h-48 bg-cream ${isClosed ? "grayscale-[30%]" : ""}`}>
+          {venue.coverImageUrl ? (
+            <Image alt={venue.name} className="object-cover" fill sizes="256px" src={venue.coverImageUrl} />
+          ) : null}
+          {/* Transparent until 20% (the image reads clearly on its own
+            * across the top half) then builds gradually to a strong,
+            * fully-opaque `#C8633B` at the bottom — an overlay on the
+            * photo, never a separate colored block: there is no second
+            * background/div below this one. Alpha-only adjustment — the
+            * top/middle stops (20%/35%/48%) are untouched; only the
+            * bottom two stops (78%/100%) got a higher alpha so the base
+            * of the card reads richer/denser, same `rgb(200,99,59)`
+            * throughout, no new color or hue introduced. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(200,99,59,0)_20%,rgba(200,99,59,0.02)_35%,rgba(200,99,59,0.12)_48%,rgba(200,99,59,0.38)_62%,rgba(200,99,59,0.82)_78%,rgba(200,99,59,1)_100%)]"
+          />
+          {categoryLabel ? (
+            <Pill className="absolute top-3 left-3 z-10" variant="counter">
+              {categoryLabel}
+            </Pill>
+          ) : null}
+          <SaveButton
+            className="absolute top-3 right-3"
+            onToggleSaved={onToggleSaved}
+            saved={saved}
+            venueId={venue.id}
+          />
+          <div className="absolute inset-x-3 bottom-3 z-10">
+            <h3 className={`truncate font-bold leading-tight text-white drop-shadow-sm ${title}`}>
+              {venue.name}
+            </h3>
+            <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-white/85">
+              <Icon className="shrink-0" name="location_on" size={14} />
+              <span className="truncate">{venue.destinationName}</span>
+            </p>
+          </div>
+        </div>
+      </CardFrame>
+    );
+  }
 
   return (
     <CardFrame className={`${width} ${isClosed ? "opacity-70" : ""}`} href={`/venues/${venue.id}`}>
@@ -140,7 +230,7 @@ function StandardVenueCard({
           <Icon className="shrink-0" name="location_on" size={16} />
           <span className="truncate">{venue.destinationName}</span>
         </p>
-        {venue.rating !== null || venue.distanceLabel || notableAccessType(venue) ? (
+        {venue.rating !== null || venue.distanceLabel || (!hideAccessType && notableAccessType(venue)) ? (
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 pt-0.5">
             {venue.rating !== null ? (
               <RatingBadge compact reviewCount={venue.reviewCount ?? undefined} value={venue.rating} />
@@ -148,7 +238,7 @@ function StandardVenueCard({
             {venue.distanceLabel ? (
               <span className="text-xs text-on-surface-variant">· {venue.distanceLabel}</span>
             ) : null}
-            {notableAccessType(venue) ? <Pill variant="tag">{notableAccessType(venue)}</Pill> : null}
+            {!hideAccessType && notableAccessType(venue) ? <Pill variant="tag">{notableAccessType(venue)}</Pill> : null}
           </div>
         ) : null}
       </div>

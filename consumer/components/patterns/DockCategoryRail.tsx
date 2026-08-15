@@ -92,7 +92,7 @@ function DockCategoryItem({
       onTap={onPressChange ? () => onPressChange(false) : undefined}
       onTapCancel={onPressChange ? () => onPressChange(false) : undefined}
     >
-      <CategoryChip icon={activity.icon} label={activity.label} onClick={onSelect} />
+      <CategoryChip icon={activity.icon} label={activity.label} onClick={onSelect} variant="dock" />
     </motion.div>
   );
 }

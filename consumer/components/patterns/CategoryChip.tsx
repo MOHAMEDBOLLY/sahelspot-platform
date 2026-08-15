@@ -7,6 +7,20 @@ type CategoryChipOwnProps = {
    * No emoji alternative: production UI carries zero emoji, enforced here
    * by this prop being the only way to put a glyph in the tile at all. */
   icon: string;
+  /** Category Button Redesign (Home) — `"surface"` (default, every
+   * pre-existing caller: Search's Popular Categories, the hidden Essential
+   * Services grid) keeps today's look byte-for-byte: opaque white tile,
+   * solid border, `shadow-sm`. `"dock"` is opt-in, used only by
+   * `DockCategoryRail` (Home's "What do you want to do?" rail) — a
+   * premium glass-*inspired* surface: translucent fill (70% white, up
+   * from an earlier 55% pass that read as barely-there against this
+   * page's flat, textureless cream background — confirmed via live
+   * computed-style inspection, not assumed) + `backdrop-blur-md`, a more
+   * visible translucent border, a soft layered shadow (elevation, not a
+   * dark drop shadow), and a faint inset top highlight so the tile reads
+   * as a thin glass surface catching light. Pressed state goes more
+   * opaque/darker, never lime. */
+  variant?: "surface" | "dock";
 };
 
 type CategoryChipProps = CategoryChipOwnProps &
@@ -24,6 +38,7 @@ type CategoryChipProps = CategoryChipOwnProps &
 export function CategoryChip({
   label,
   icon,
+  variant = "surface",
   className = "",
   ...props
 }: CategoryChipProps) {
@@ -50,8 +65,25 @@ export function CategoryChip({
       type="button"
       {...props}
     >
-      <span className="flex aspect-square w-full items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm transition-all group-hover:bg-primary-container group-active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-primary/20">
-        <Icon className="text-primary" name={icon} size={22} />
+      <span
+        className={`flex aspect-square w-full items-center justify-center border transition-all duration-150 group-focus-visible:ring-2 group-focus-visible:ring-primary/20 ${
+          variant === "dock"
+            ? // Premium glass-inspired, not "slightly lighter cream": a
+              // 70%-opacity white fill (up from 55%, the threshold where
+              // it stopped disappearing into this page's flat cream
+              // background in live testing) over `backdrop-blur-md`, a
+              // clearly-visible-but-still-translucent border, and a
+              // layered shadow — an inset top highlight (the thin-glass
+              // "catching light" cue) plus a soft navy-tinted elevation
+              // shadow, neither one a dark drop shadow or a glow.
+              // `rounded-lg` (16px, this app's own scale) stays well
+              // short of the shared tile's `rounded-xl` (24px, which
+              // reads almost circular at this size).
+              "rounded-lg border-white/70 bg-white/70 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7),0_4px_12px_-4px_rgba(13,59,102,0.18)] backdrop-blur-md group-active:scale-95 group-active:border-white/90 group-active:bg-white/90"
+            : "rounded-xl border-outline-variant/15 bg-surface-container-lowest shadow-sm group-hover:bg-primary-container group-active:scale-95"
+        }`}
+      >
+        <Icon className="text-primary" name={icon} size={variant === "dock" ? 24 : 22} />
       </span>
       {/* `min-h-[26px]` reserves room for two lines at this size/leading —
        * a one-word label (one line) and a two-word label that wraps (two

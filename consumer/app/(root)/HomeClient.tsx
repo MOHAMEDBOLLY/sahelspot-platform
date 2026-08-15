@@ -60,6 +60,16 @@ type VenueRailProps = {
    * "impact → breathing room → density" pattern the brief asks for,
    * without changing what any rail contains. */
   spacingBefore?: "default" | "lg";
+  /** Best Beaches QR Removal task — passed straight through to `VenueCard`.
+   * `false` (default) for Trending/Food Picks/Nightlife, unchanged. Only
+   * Best Beaches sets this, so its cards drop the "QR Required"/access-
+   * type pill (and the row entirely, when that pill was the only reason
+   * the row existed) without touching any other rail's cards. */
+  hideAccessType?: boolean;
+  /** Best Beaches Gradient Frame task — passed straight through to
+   * `VenueCard`. `false` (default) for every other rail, unchanged flat
+   * content strip. Only Best Beaches sets this. */
+  gradientFrame?: boolean;
 };
 
 /** Home now carries four venue rails (Best Beaches, Trending, Food Picks,
@@ -82,6 +92,8 @@ function VenueRail({
   onToggleSaved,
   featureFirst = false,
   spacingBefore = "default",
+  hideAccessType = false,
+  gradientFrame = false,
 }: VenueRailProps) {
   return (
     <Reveal className={spacingBefore === "lg" ? "mt-10" : "mt-8"}>
@@ -122,6 +134,8 @@ function VenueRail({
                 />
               ) : (
                 <VenueCard
+                  gradientFrame={gradientFrame}
+                  hideAccessType={hideAccessType}
                   key={venue.id}
                   onToggleSaved={onToggleSaved}
                   saved={isSaved(venue.id)}
@@ -255,7 +269,8 @@ export function HomeClient() {
           emptyDescription="Published beaches and beach clubs will appear here."
           emptyIcon="beach_access"
           emptyTitle="No beaches yet"
-          featureFirst
+          gradientFrame
+          hideAccessType
           isError={venues.isError}
           isLoading={venues.isLoading}
           isSaved={isSaved}
