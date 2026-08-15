@@ -27,7 +27,19 @@ export function createMarkerElement(
   const el = document.createElement("button");
   el.type = "button";
   el.setAttribute("aria-label", options.label);
-  el.style.position = "relative";
+  // Deliberately does NOT set `position` — `mapbox-gl.css` styles
+  // `.mapboxgl-marker` as `position: absolute`, and an inline `relative`
+  // here beat that stylesheet rule, dropping every marker back into normal
+  // document flow. Mapbox's `transform: translate(...)` was then applied on
+  // top of a flow offset instead of from the container origin, so each
+  // marker rendered displaced by its own index x its width: measured drift
+  // ran 0, 26, 52, 78 ... 182px across the first eight pins, i.e. only the
+  // very first marker ever landed on its real coordinate.
+  //
+  // `absolute` also establishes the containing block the head/icon below
+  // rely on, so removing the inline value changes nothing about this
+  // element's internal layout — it only stops fighting Mapbox's own
+  // positioning.
   el.style.width = `${headSize}px`;
   el.style.height = `${headSize + 8}px`;
   el.style.background = "transparent";
@@ -71,7 +83,8 @@ export function createMarkerElement(
 export function createUserLocationElement(): HTMLDivElement {
   const el = document.createElement("div");
   el.className = "user-location-pulse";
-  el.style.position = "relative";
+  // Same reason as the venue pin above — leave `position` to
+  // `mapbox-gl.css`, which needs it to be `absolute`.
   el.style.width = "16px";
   el.style.height = "16px";
   el.style.borderRadius = "9999px";

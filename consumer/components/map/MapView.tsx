@@ -14,7 +14,13 @@ import {
   MAPBOX_TOKEN,
   NORTH_COAST_BOUNDS,
 } from "@/lib/map/config";
+import { placeDestinationLabels } from "@/lib/map/placeDestinationLabels";
+import { applySahelSpotBasemap } from "@/lib/map/sahelspotBasemap";
 import { spreadOverlappingVenues } from "@/lib/map/spreadMarkers";
+import {
+  createDestinationLabelElement,
+  measureDestinationLabelWidth,
+} from "./createDestinationLabelElement";
 import { createMarkerElement, createUserLocationElement } from "./createMarkerElement";
 import { createPreviewChipElement } from "./createPreviewChipElement";
 
@@ -38,6 +44,14 @@ function markerPriority(venue: Venue): number {
   return 1;
 }
 
+/** A destination's real display coordinate — the centroid of its own
+ * mappable venues, computed by `MapClient` (the same technique its own
+ * `changeDestination` already uses to fly the camera to a destination).
+ * Not a new geometry source: no destination-level coordinate exists in
+ * the API today, so this is derived from real venue coordinates rather
+ * than inventing one. */
+export type DestinationMarker = { id: string; name: string; lat: number; lng: number };
+
 type MapViewProps = {
   venues: Venue[];
   /** Only used to re-trigger a marker render pass (see the `activeVenueId`/
@@ -48,6 +62,11 @@ type MapViewProps = {
   /** Opens Venue Details for this venue directly — the map's marker/pin
    * flow always resolves to a venue, never a destination. */
   onSelectVenue: (venueId: string) => void;
+  /** Low-Angle Oblique North Coast View — real destinations, shown as
+   * text-only labels with a leader arrow only while the map is pressed
+   * and held (see the long-press handling below). Never rendered as a
+   * permanent pin. */
+  destinations: DestinationMarker[];
 };
 
 const STYLES = ["mapbox://styles/mapbox/streets-v12", "mapbox://styles/mapbox/satellite-streets-v12"];
@@ -184,6 +203,108 @@ function applyLabelPreferences(map: mapboxgl.Map) {
   }
 }
 
+/** Far-Field Atmospheric Fade — real Mapbox fog (`map.setFog`), not a CSS
+ * overlay, gradient, or mask. Applied on every `style.load` alongside
+ * `applyLabelPreferences` so it survives the Layers FAB's `setStyle` call,
+ * which discards fog exactly like it discards custom sources/layers.
+ *
+ * Purpose is territorial, not decorative: at `MAP_PITCH = 68` the horizon
+ * inherently renders geography far beyond SahelSpot's corridor — Marsa
+ * Matruh, and past it Sidi Barrani and the Libyan coast — none of which
+ * the product covers. Fog is the Mapbox-native way to say "our map ends
+ * around Ras El Hekma" using real distance from the camera, rather than
+ * suppressing specific place labels by name (which would be a hardcoded
+ * lie about the basemap, and would silently rot as Mapbox's own data
+ * changes).
+ *
+ * `range` is in units of distance from the camera, where the second value
+ * is where fog reaches full opacity. `[2.4, 7]` was tuned against the real
+ * render at the approved camera, not taken from Mapbox's defaults: it
+ * keeps the entire corridor — Marina at ~80% of the viewport height up
+ * through Dabaa and Ras El Hekma near the top — completely clear, and only
+ * starts biting well past the corridor's northwestern end. `color` is
+ * sampled to sit between the basemap's sand and the sea/sky blues so the
+ * fade reads as atmospheric haze rather than a white wash, and
+ * `horizon-blend` is kept low so the sky itself isn't flooded. */
+function applyFarFieldFog(map: mapboxgl.Map) {
+  map.setFog({
+    range: [2.4, 7],
+    color: "#cfdcea",
+    "horizon-blend": 0.06,
+    "high-color": "#b9d2ea",
+    "space-color": "#cfe0f0",
+    "star-intensity": 0,
+  });
+}
+
+/** Label layers constrained to SahelSpot's territory below — the tiers
+ * that name a *place*, which is what read as "this map extends past where
+ * the product goes". `airport-label` is in the list because Marsa Matruh's
+ * airport ("MUH") survived the settlement filter on its own layer.
+ *
+ * Deliberately minimal: road shields, POIs, transit, and water/landform
+ * labels are left alone. Those genuinely aid orientation, the road shields
+ * along the Coastal Road are part of the approved composition, and none of
+ * them were the problem. */
+const TERRITORY_CONSTRAINED_LABEL_LAYERS = [
+  "settlement-major-label",
+  "settlement-minor-label",
+  "settlement-subdivision-label",
+  "airport-label",
+];
+
+/** Territory polygon for the `within` filter below — the same
+ * `NORTH_COAST_BOUNDS` box the camera is already clamped to, expressed as
+ * GeoJSON. Deriving it from that one constant (rather than a second
+ * hand-written box) is what keeps "where the camera may go" and "which
+ * place names belong to us" from drifting apart. */
+const TERRITORY_POLYGON: GeoJSON.Feature<GeoJSON.Polygon> = {
+  type: "Feature",
+  properties: {},
+  geometry: {
+    type: "Polygon",
+    coordinates: [
+      [
+        [NORTH_COAST_BOUNDS[0][0], NORTH_COAST_BOUNDS[0][1]],
+        [NORTH_COAST_BOUNDS[1][0], NORTH_COAST_BOUNDS[0][1]],
+        [NORTH_COAST_BOUNDS[1][0], NORTH_COAST_BOUNDS[1][1]],
+        [NORTH_COAST_BOUNDS[0][0], NORTH_COAST_BOUNDS[1][1]],
+        [NORTH_COAST_BOUNDS[0][0], NORTH_COAST_BOUNDS[0][1]],
+      ],
+    ],
+  },
+};
+
+/** Far-Field Atmospheric Fade, part two — the fog above fades the *ground*
+ * beyond the corridor, but Mapbox renders symbol labels in screen space
+ * and does not apply fog to them, so "Marsa Matruh" stayed fully crisp
+ * inside an otherwise hazed horizon (confirmed by rendering it, not
+ * assumed). This constrains the settlement-label tiers to SahelSpot's own
+ * territory so place names stop where the product does.
+ *
+ * Geographic, never name-based: the filter is Mapbox's own `within`
+ * expression evaluated against `TERRITORY_POLYGON`, so it suppresses
+ * *whatever* happens to lie outside the corridor. Hardcoding
+ * `!= "Marsa Matruh"` would have been shorter and wrong — it would leave
+ * Sidi Barrani, Tobruk and every future far-field label to be discovered
+ * one at a time.
+ *
+ * Runtime-only, on this map instance: `setFilter` mutates the loaded style
+ * in memory and never touches the Mapbox-hosted style, so nothing here is
+ * visible to any other map or product surface. Existing layer filters are
+ * preserved by `all`-combining rather than replaced. */
+function constrainLabelsToTerritory(map: mapboxgl.Map) {
+  for (const layerId of TERRITORY_CONSTRAINED_LABEL_LAYERS) {
+    if (!map.getLayer(layerId)) continue;
+    const existing = map.getFilter(layerId);
+    const territoryFilter = ["within", TERRITORY_POLYGON];
+    map.setFilter(
+      layerId,
+      (existing ? ["all", existing, territoryFilter] : territoryFilter) as never,
+    );
+  }
+}
+
 const SOURCE_ID = "venues";
 // Invisible GL layer purely so `queryRenderedFeatures` has something to
 // query — every visible pixel is still a DOM marker, never this layer's
@@ -203,6 +324,20 @@ const PIN_WIDTH_HALF = 69;
 const PIN_HEIGHT_ABOVE = 174;
 const PIN_HEIGHT_BELOW = 4;
 const CHIP_NUDGE_DURATION_MS = 200;
+/** Correction passes `ensureActiveVenueVisible` may take before giving up.
+ * Three is empirically more than enough — the residual error falls off
+ * sharply per pass at `MAP_PITCH = 68` — and the hard cap is what
+ * guarantees the loop terminates regardless of camera state. */
+const MAX_CHIP_NUDGE_PASSES = 3;
+
+/** Low-Angle Oblique North Coast View — long-press threshold for revealing
+ * destination labels, matching the approved concept's "approximately
+ * 300ms" spec exactly. `LONG_PRESS_MOVE_CANCEL_PX` is the drag-vs-hold
+ * disambiguation: a normal pan starts with real pointer movement almost
+ * immediately, so any movement past this many CSS pixels before the timer
+ * fires cancels the long-press rather than fighting the user's drag. */
+const LONG_PRESS_MS = 300;
+const LONG_PRESS_MOVE_CANCEL_PX = 8;
 
 type VenueFeatureCollection = GeoJSON.FeatureCollection<GeoJSON.Point, { id: string }>;
 
@@ -272,7 +407,7 @@ function installCustomMapLayers(map: mapboxgl.Map, venues: Venue[]) {
  * sees — pins, the preview chip — is a plain DOM element, the same
  * approach `createMarkerElement` has always used. */
 export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
-  { venues, activeCategory, onSelectVenue },
+  { venues, activeCategory, onSelectVenue, destinations },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -283,6 +418,10 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   const venuesByIdRef = useRef<Map<string, Venue>>(new Map());
   const [activeVenueId, setActiveVenueId] = useState<string | null>(null);
   const activeVenueIdRef = useRef<string | null>(null);
+  const destinationsRef = useRef<DestinationMarker[]>(destinations);
+  const destinationLabelMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressStartRef = useRef<{ x: number; y: number } | null>(null);
 
   useImperativeHandle(ref, () => ({
     flyToUser() {
@@ -328,6 +467,10 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   }, [venues]);
 
   useEffect(() => {
+    destinationsRef.current = destinations;
+  }, [destinations]);
+
+  useEffect(() => {
     if (!containerRef.current || mapRef.current || !MAPBOX_TOKEN) return;
 
     mapboxgl.accessToken = MAPBOX_TOKEN;
@@ -359,7 +502,24 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     // both Streets and Satellite Streets get the English-only labels and
     // major-label size bump without this effect needing to know which
     // style is active.
-    map.on("style.load", () => applyLabelPreferences(map));
+    map.on("style.load", () => {
+      applyLabelPreferences(map);
+      applyFarFieldFog(map);
+      constrainLabelsToTerritory(map);
+      // SahelSpot Vector Basemap — recolors Mapbox's own Streets layers
+      // (see `lib/map/sahelspotBasemap.ts`). Applied here, inside
+      // `style.load`, for the same reason everything else in this handler
+      // is: `setStyle` discards runtime style mutations, so the Layers FAB
+      // would otherwise drop the treatment the first time it round-trips
+      // through Satellite and back.
+      //
+      // Streets only. Satellite Streets is raster imagery — repainting
+      // land/water fills there would either no-op or fight the photograph,
+      // so it is deliberately left exactly as it renders today.
+      // `styleIndexRef` is already updated by `toggleStyle` before its
+      // `setStyle` call, so it reliably describes the style being loaded.
+      if (styleIndexRef.current === 0) applySahelSpotBasemap(map);
+    });
 
     // The preview chip is much wider (~220px) than an ordinary pin (32px),
     // so a venue whose anchor comfortably clears the plain-marker safe
@@ -371,22 +531,163 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     // area without moving anything for the common case.
     function ensureActiveVenueVisible(lngLat: [number, number]) {
       const { width, height } = map.getContainer().getBoundingClientRect();
-      const point = map.project(lngLat);
       const minX = MAP_SAFE_PADDING.left + PIN_WIDTH_HALF;
       const maxX = width - MAP_SAFE_PADDING.right - PIN_WIDTH_HALF;
       const minY = MAP_SAFE_PADDING.top + PIN_HEIGHT_ABOVE;
       const maxY = height - MAP_SAFE_PADDING.bottom - PIN_HEIGHT_BELOW;
-      let dx = 0;
-      let dy = 0;
-      if (point.x < minX) dx = point.x - minX;
-      else if (point.x > maxX) dx = point.x - maxX;
-      if (point.y < minY) dy = point.y - minY;
-      else if (point.y > maxY) dy = point.y - maxY;
-      if (dx === 0 && dy === 0) return;
-      const centerPoint = map.project(map.getCenter());
-      const newCenter = map.unproject([centerPoint.x + dx, centerPoint.y + dy]);
-      map.easeTo({ center: newCenter, duration: CHIP_NUDGE_DURATION_MS, pitch: MAP_PITCH, bearing: MAP_BEARING });
+
+      /** How far, in screen pixels, the chip's anchor currently sits
+       * outside the safe box. Zero on both axes means fully inside. */
+      function overflowAt(point: mapboxgl.Point) {
+        let dx = 0;
+        let dy = 0;
+        if (point.x < minX) dx = point.x - minX;
+        else if (point.x > maxX) dx = point.x - maxX;
+        if (point.y < minY) dy = point.y - minY;
+        else if (point.y > maxY) dy = point.y - maxY;
+        return { dx, dy };
+      }
+
+      const startCenter = map.getCenter();
+      let moved = false;
+
+      // One shift-the-center-by-a-screen-delta step is only exact on a
+      // near-flat camera. At `MAP_PITCH = 68` screen displacement is
+      // strongly non-uniform across ground points, so a single pass
+      // over/undershoots — measured before this fix: a venue whose pin sat
+      // at x=91 produced a chip at x=299..429 in a 390px viewport.
+      //
+      // So each pass now measures the *actual* projection after the
+      // previous one instead of trusting the first estimate, and the
+      // remaining error shrinks each time. `jumpTo` is used inside the
+      // loop specifically because it applies synchronously, which is what
+      // makes the next `map.project` read a real post-move value rather
+      // than a prediction. Bounded by `MAX_CHIP_NUDGE_PASSES`, so this can
+      // never spin: it either converges or gives up with the best camera
+      // it found.
+      for (let pass = 0; pass < MAX_CHIP_NUDGE_PASSES; pass += 1) {
+        const { dx, dy } = overflowAt(map.project(lngLat));
+        if (dx === 0 && dy === 0) break;
+        const centerPoint = map.project(map.getCenter());
+        map.jumpTo({ center: map.unproject([centerPoint.x + dx, centerPoint.y + dy]) });
+        moved = true;
+      }
+
+      if (!moved) return;
+
+      // Nothing has painted yet — Mapbox draws on rAF and the whole loop
+      // above runs inside a single task — so snapping back and easing to
+      // the solved center reads as one smooth nudge, exactly the motion
+      // the previous single-pass version produced.
+      const solvedCenter = map.getCenter();
+      map.jumpTo({ center: startCenter });
+      map.easeTo({
+        center: solvedCenter,
+        duration: CHIP_NUDGE_DURATION_MS,
+        pitch: MAP_PITCH,
+        bearing: MAP_BEARING,
+      });
     }
+
+    // Low-Angle Oblique North Coast View — destination labels are built
+    // fresh on every press (not toggled via CSS) and fully removed on
+    // release, per the approved concept: no permanent destination pins,
+    // labels visible only for the duration of the hold. Only destinations
+    // whose real (venue-centroid) coordinate currently falls inside the
+    // viewport are labeled — "currently relevant," not a fixed list.
+    function showDestinationLabels() {
+      if (destinationLabelMarkersRef.current.length > 0) return;
+      const bounds = map.getBounds();
+      if (!bounds) return;
+
+      // Project each on-screen destination's *real* coordinate once, and
+      // let `placeDestinationLabels` resolve text collisions purely in
+      // screen space. Nothing geographic is adjusted here — every marker
+      // below is still attached at `[destination.lng, destination.lat]`;
+      // only the label's offset within its own (anchor-centered) element
+      // varies, so the arrowhead stays on the true location.
+      const anchors = destinationsRef.current
+        .filter((destination) => bounds.contains([destination.lng, destination.lat]))
+        .map((destination) => {
+          const point = map.project([destination.lng, destination.lat]);
+          return { id: destination.id, name: destination.name, x: point.x, y: point.y };
+        });
+
+      // Reuse the same safe area every camera call already respects, so a
+      // label can't be pushed under the toolbar or the FAB column.
+      const { width, height } = map.getContainer().getBoundingClientRect();
+      const placements = placeDestinationLabels(anchors, measureDestinationLabelWidth, {
+        left: MAP_SAFE_PADDING.left,
+        top: MAP_SAFE_PADDING.top,
+        right: width - MAP_SAFE_PADDING.right,
+        bottom: height - MAP_SAFE_PADDING.bottom,
+      });
+      const destinationsById = new Map(destinationsRef.current.map((d) => [d.id, d]));
+
+      for (const placement of placements) {
+        const destination = destinationsById.get(placement.id);
+        if (!destination) continue;
+        const el = createDestinationLabelElement(placement.name, {
+          dx: placement.dx,
+          dy: placement.dy,
+        });
+        const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+          .setLngLat([destination.lng, destination.lat])
+          .addTo(map);
+        destinationLabelMarkersRef.current.push(marker);
+      }
+    }
+
+    function hideDestinationLabels() {
+      for (const marker of destinationLabelMarkersRef.current) marker.remove();
+      destinationLabelMarkersRef.current = [];
+    }
+
+    function clearLongPressTimer() {
+      if (longPressTimerRef.current !== null) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      pressStartRef.current = { x: event.clientX, y: event.clientY };
+      clearLongPressTimer();
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTimerRef.current = null;
+        showDestinationLabels();
+      }, LONG_PRESS_MS);
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      if (!pressStartRef.current) return;
+      const dx = event.clientX - pressStartRef.current.x;
+      const dy = event.clientY - pressStartRef.current.y;
+      if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_CANCEL_PX) {
+        // Real drag, not a hold — let Mapbox's own pan take over
+        // uninterrupted and don't reveal labels for this gesture.
+        clearLongPressTimer();
+        pressStartRef.current = null;
+      }
+    }
+
+    function handlePointerEnd() {
+      pressStartRef.current = null;
+      clearLongPressTimer();
+      hideDestinationLabels();
+    }
+
+    const mapContainer = map.getContainer();
+    // Passive, non-preventing listeners — this only ever *adds* an overlay
+    // after the hold threshold; it never calls `preventDefault`/
+    // `stopPropagation`, so Mapbox's native drag-pan and pinch-zoom keep
+    // working exactly as before, including for a gesture that started as
+    // what looked like a hold and turned into a drag.
+    mapContainer.addEventListener("pointerdown", handlePointerDown, { passive: true });
+    mapContainer.addEventListener("pointermove", handlePointerMove, { passive: true });
+    mapContainer.addEventListener("pointerup", handlePointerEnd, { passive: true });
+    mapContainer.addEventListener("pointercancel", handlePointerEnd, { passive: true });
+    mapContainer.addEventListener("pointerleave", handlePointerEnd, { passive: true });
 
     function renderVisibleFeatures() {
       // Style Toggle Custom Layer Regression fix — between `setStyle()`
@@ -430,6 +731,35 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         const venue = venuesByIdRef.current.get(venueId);
         if (!venue) continue;
 
+        // High-pitch viewport membership. `queryRenderedFeatures` is given
+        // a screen-space box, but at `MAP_PITCH = 68` the frustum slice
+        // that box implies covers an enormous stretch of ground, and it
+        // returns far more than actually falls inside it — measured before
+        // this check: 46 of 86 markers were instantiated off-screen, with
+        // projected x reaching ~657 in a 390px viewport.
+        //
+        // Re-testing each feature against the *same* box using Mapbox's
+        // own projection is what makes membership true at any pitch. This
+        // only corrects which features are off-screen; the venue set,
+        // filters, and data flow are untouched, and nothing that was
+        // genuinely visible stops rendering.
+        //
+        // The active venue is exempt: it may legitimately sit just outside
+        // the box at the moment it is selected, and
+        // `ensureActiveVenueVisible` below is what pulls it back in.
+        const isActive = venue.id === activeVenueIdRef.current;
+        if (!isActive) {
+          const point = map.project([lng, lat]);
+          if (
+            point.x < MAP_SAFE_PADDING.left ||
+            point.x > width - MAP_SAFE_PADDING.right ||
+            point.y < MAP_SAFE_PADDING.top ||
+            point.y > height - MAP_SAFE_PADDING.bottom
+          ) {
+            continue;
+          }
+        }
+
         const key = `venue:${venueId}`;
         nextKeys.add(key);
 
@@ -440,7 +770,6 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         if (existing && existing.getElement().dataset.renderKey === renderKeyFor(venue.id)) continue;
         existing?.remove();
 
-        const isActive = venue.id === activeVenueIdRef.current;
         if (isActive) ensureActiveVenueVisible([lng, lat]);
         const el = isActive
           ? createPreviewChipElement(venue, { onOpen: () => onSelectVenue(venue.id) })
@@ -532,9 +861,16 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
 
     const markers = markersRef.current;
     return () => {
+      mapContainer.removeEventListener("pointerdown", handlePointerDown);
+      mapContainer.removeEventListener("pointermove", handlePointerMove);
+      mapContainer.removeEventListener("pointerup", handlePointerEnd);
+      mapContainer.removeEventListener("pointercancel", handlePointerEnd);
+      mapContainer.removeEventListener("pointerleave", handlePointerEnd);
+      clearLongPressTimer();
       map.remove();
       mapRef.current = null;
       markers.clear();
+      destinationLabelMarkersRef.current = [];
     };
     // Mounted once — venue/category/active-chip updates flow through the
     // GeoJSON source and the render pass above, not through remounting.

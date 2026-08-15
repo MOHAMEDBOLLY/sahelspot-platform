@@ -82,6 +82,31 @@ export function MapClient() {
     [venues.data],
   );
 
+  // Low-Angle Oblique North Coast View — real destination coordinates for
+  // the press-and-hold labels, computed the same way `changeDestination`
+  // below already centers the camera on a destination: the centroid of
+  // its own mappable venues. No new geometry source and no API change —
+  // a destination with zero mappable venues simply has no coordinate to
+  // label, same as it has no camera target to fly to today.
+  const destinationMarkers = useMemo(() => {
+    const byDestination = new Map<string, { name: string; lat: number; lng: number; count: number }>();
+    for (const venue of mappableVenues) {
+      const destination = (destinations.data ?? []).find((candidate) => candidate.id === venue.destinationId);
+      if (!destination) continue;
+      const entry = byDestination.get(destination.id) ?? { name: destination.name, lat: 0, lng: 0, count: 0 };
+      entry.lat += venue.coordinates!.lat;
+      entry.lng += venue.coordinates!.lng;
+      entry.count += 1;
+      byDestination.set(destination.id, entry);
+    }
+    return Array.from(byDestination.entries()).map(([id, entry]) => ({
+      id,
+      name: entry.name,
+      lat: entry.lat / entry.count,
+      lng: entry.lng / entry.count,
+    }));
+  }, [mappableVenues, destinations.data]);
+
   // Destination-scoped, but not category-scoped — the pool every
   // category's own contextual tag options (and the destination list
   // itself) are computed against, so switching Destination narrows what
@@ -268,6 +293,7 @@ export function MapClient() {
         ) : (
           <MapView
             activeCategory="all"
+            destinations={destinationMarkers}
             onSelectVenue={(venueId) => router.push(`/venues/${venueId}`)}
             ref={mapRef}
             venues={visibleVenues}

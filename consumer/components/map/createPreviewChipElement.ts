@@ -48,7 +48,12 @@ export function createPreviewChipElement(
   const el = document.createElement("button");
   el.type = "button";
   el.setAttribute("aria-label", `${venue.name} — open`);
-  el.style.position = "relative";
+  // No inline `position` — `mapbox-gl.css` needs `.mapboxgl-marker` to stay
+  // `absolute`. An inline `relative` here put the chip into normal document
+  // flow, which is what made it render far from its own anchor and clip off
+  // the viewport edge (measured: a venue whose pin sat at x=91 produced a
+  // chip painted at x=299..429 in a 390px viewport). `absolute` still
+  // establishes the containing block the card/frame below position against.
   el.style.border = "none";
   el.style.cursor = "pointer";
   el.style.boxShadow = "0 14px 28px rgb(0 0 0 / 0.22)";
