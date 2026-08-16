@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.routes import (
     activity,
+    collections,
     destinations,
     events,
     me,
@@ -49,6 +50,7 @@ editor_router.include_router(venues.router)
 editor_router.include_router(events.router)
 editor_router.include_router(no_qr.router)
 editor_router.include_router(no_qr.places_router)
+editor_router.include_router(collections.router)
 editor_router.include_router(publish.router)
 editor_router.include_router(activity.router)
 editor_router.include_router(me.router)

@@ -462,22 +462,6 @@ class TagOut(BaseModel):
     sort_order: int
 
 
-class CollectionOut(BaseModel):
-    """`GET /editor/collections`'s response shape — Phase 1 is assignment-
-    only (no create/update/delete endpoint exists yet), so this is a plain
-    read model, not paired with a `CollectionCreate`/`CollectionUpdate`.
-    """
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    slug: str
-    name: str
-    description: str | None = None
-    is_active: bool
-    sort_order: int
-
-
 class PublishedCollectionOut(BaseModel):
     """The public read shape for a collection — sourced entirely from the
     current publish revision's frozen snapshot, same guarantee every other
@@ -608,6 +592,77 @@ class VenueRef(BaseModel):
 
     id: str
     name: str
+
+
+class CollectionVenueOut(BaseModel):
+    """HOME CURATION — one curated membership row. `venue` reuses the same
+    lightweight `VenueRef` (id+name) shape Events/No QR Places already use
+    for a resolved reference — the Venue itself stays the sole source of
+    truth for every other field."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    venue_id: str
+    sort_order: int
+    venue: VenueRef | None = None
+
+
+class CollectionOut(BaseModel):
+    """`GET /editor/collections`'s response shape. HOME CURATION —
+    extended with real CRUD (`CollectionCreate`/`CollectionUpdate` below)
+    and `venues`, the ordered membership list — previously assignment-only
+    from the Venue editor's side, per `Collection`'s own docstring
+    (api/app/db/models.py) anticipating exactly this."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    slug: str
+    name: str
+    description: str | None = None
+    is_active: bool
+    sort_order: int
+    venues: list[CollectionVenueOut] = []
+
+
+class CollectionCreate(BaseModel):
+    """`id` doubles as the collection's slug (migration 0015's own
+    convention, same as `Destination`) — caller-supplied, same reasoning
+    `VenueCreate`/`EventCreate` already give for why these aren't
+    surrogate keys."""
+
+    id: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
+    is_active: bool = True
+    sort_order: int = 0
+
+
+class CollectionUpdate(BaseModel):
+    """Save Draft payload — `id`/`slug` stay immutable after creation,
+    same as every other entity's own id field."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
+    is_active: bool | None = None
+    sort_order: int | None = None
+
+
+class CollectionMembershipCreate(BaseModel):
+    """Add-venue payload — `sort_order` is optional; omitted means append
+    to the end (resolved server-side, same "the caller doesn't have to
+    know the current max" reasoning behind most append-style APIs)."""
+
+    venue_id: str
+    sort_order: int | None = None
+
+
+class CollectionMembershipUpdate(BaseModel):
+    """Reorder-only — the venue a membership row points at is identified
+    by the URL path, not this body; there is nothing else on a membership
+    row to change."""
+
+    sort_order: int
 
 
 class EventOut(BaseModel):

@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard'
 import { QualityCenter } from './pages/QualityCenter'
 import { Venues } from './pages/Venues'
 import { NoQr } from './pages/NoQr'
+import { HomeCuration } from './pages/HomeCuration'
 import { Destinations } from './pages/Destinations'
 import { Events } from './pages/Events'
 import { Publishing } from './pages/Publishing'
@@ -39,6 +40,7 @@ function App() {
               * page or component exists for it, deliberately. */}
             <Route path="/beaches" element={<Navigate to="/venues?category=Beach+Club" replace />} />
             <Route path="/no-qr" element={<NoQr />} />
+            <Route path="/home-curation" element={<HomeCuration />} />
             <Route path="/destinations" element={<Destinations />} />
             <Route path="/events" element={<Events />} />
             <Route path="/publishing" element={<Publishing />} />
