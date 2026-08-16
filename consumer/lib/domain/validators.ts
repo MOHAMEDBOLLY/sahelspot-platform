@@ -58,3 +58,23 @@ export function toValidWhatsapp(raw: string | null): string | null {
   }
   return digits;
 }
+
+/** `instagram_handle` on the wire is usually a bare handle (`"arabica_eg"`,
+ * 100/113 populated values in the live catalog) but sometimes a full profile
+ * URL editors pasted directly (`"https://www.instagram.com/alaghaegypt"`,
+ * 13/113) — both are handled here rather than only the majority shape.
+ * A full URL is passed through `toValidUrl` unchanged; anything else is
+ * treated as a bare handle, defensively stripped of a leading `@` and any
+ * leading/trailing slashes (an editor pasting `@handle` or a partial URL
+ * fragment), then rejected if a `/` remains (an accidental partial URL
+ * paste) rather than building a broken `instagram.com/still/has/a/slash`
+ * link. Whitespace-only and empty strings resolve to `null`, same as every
+ * other validator here. */
+export function toValidInstagramUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (/^https?:\/\//i.test(trimmed)) return toValidUrl(trimmed);
+  const handle = trimmed.replace(/^@/, "").replace(/^\/+|\/+$/g, "");
+  if (!handle || handle.includes("/")) return null;
+  return `https://instagram.com/${handle}`;
+}

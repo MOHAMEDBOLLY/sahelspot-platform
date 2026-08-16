@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { TopAppBar } from "@/components/nav/TopAppBar";
 import { HomeHero } from "@/components/patterns/HomeHero";
+import { HomeHeroBackdrop } from "@/components/patterns/HomeHeroBackdrop";
 import { EditorialBreak } from "@/components/patterns/EditorialBreak";
 import { Reveal } from "@/components/patterns/Reveal";
 import { CategoryChip } from "@/components/patterns/CategoryChip";
@@ -53,14 +54,19 @@ type VenueRailProps = {
    * unchanged. */
   featureFirst?: boolean;
   /** Visual Richness / Art Direction Pass, item 5 (visual rhythm) — the
-   * space above this rail. `"lg"` (40px) for the one or two "impact"
-   * rails (Best Beaches), `"default"` (32px, the previous blanket
+   * space above this rail. `"default"` (32px, the previous blanket
    * `space-y-8` value) for the quieter standard rails — Trending, Food
-   * Picks, Nightlife. A prop rather than a wrapping `space-y-*` on `<main>`
+   * Picks, Nightlife — left unchanged. `"tight"` (UI Polish Batch,
+   * Correction Pass item 3) is Best Beaches only: sitting directly under
+   * the category rail, `"default"`'s 32px read as an oversized blank gap
+   * because it matched the *same* spacing every other rail already uses
+   * lower down the page, so Best Beaches never visually distinguished
+   * itself from "one more standard rail gap" — it just didn't feel
+   * tightened. A prop rather than a wrapping `space-y-*` on `<main>`
    * because a single uniform value can't express a rhythm; this is the
    * "impact → breathing room → density" pattern the brief asks for,
    * without changing what any rail contains. */
-  spacingBefore?: "default" | "lg";
+  spacingBefore?: "default" | "tight";
   /** Best Beaches QR Removal task — passed straight through to `VenueCard`.
    * `false` (default) for Trending/Food Picks/Nightlife, unchanged. Only
    * Best Beaches sets this, so its cards drop the "QR Required"/access-
@@ -97,7 +103,7 @@ function VenueRail({
   gradientFrame = false,
 }: VenueRailProps) {
   return (
-    <Reveal className={spacingBefore === "lg" ? "mt-10" : "mt-8"}>
+    <Reveal className={spacingBefore === "tight" ? "mt-5" : "mt-8"}>
       <section>
         <SectionHeader actionHref={actionHref} actionLabel="See All" title={title} />
         {isLoading ? (
@@ -253,15 +259,32 @@ export function HomeClient() {
   }
 
   return (
-    <>
-      <TopAppBar greeting="Good Morning" title="SahelSpot" variant="greeting" />
+    <div className="min-h-dvh">
+      {/* Hero → Category Background Fade — extends the Home Hero/Header
+        * Integration block from before: this `relative` container now
+        * spans the header, the search band, AND the "What do you want to
+        * do?" category section, with `HomeHeroBackdrop` supplying ONE
+        * continuous background image (+ top wash + bottom fade) behind all
+        * three, sized entirely by their combined in-flow height — no
+        * hardcoded container height. The category section's cards/labels
+        * are unchanged, just relocated here from `<main>` so they sit in
+        * front of the extended photograph instead of on a flat background;
+        * `px-4` moves onto the section itself since it's no longer inside
+        * `<main>`'s own `px-4`, keeping the heading/rail's horizontal
+        * position and `DockCategoryRail`'s `-mx-4` bleed pixel-identical.
+        * `overflow-hidden` here is load-bearing, not decorative: the old
+        * `HomeHero` had it on its own 176px band to clip the photo's
+        * breathing `scale(1.04)` motion, which otherwise spills a few
+        * pixels past the container's edges (transform doesn't affect
+        * layout size, so nothing else would clip it) and produces real
+        * horizontal page overflow now that the band is full-width. Doesn't
+        * interfere with `DockCategoryRail`'s own `overflow-x-auto` scroll
+        * below — an ancestor clipping visual overflow and a descendant's
+        * own internal scroll container are independent. */}
+      <div className="relative overflow-hidden">
+        <HomeHeroBackdrop imageUrl={heroImageUrl} />
 
-      {/* Visual Richness / Art Direction Pass, item 5 — `space-y-8` (a
-        * uniform 32px between every section) replaced with deliberate
-        * per-section spacing below: `VenueRail`'s `spacingBefore` prop and
-        * explicit `mt-*` on the sections defined inline here. A single
-        * value can't express a rhythm; this can. */}
-      <main className="px-4 pt-2">
+        <TopAppBar greeting="Good Morning" overlay title="SahelSpot" variant="greeting" />
         {/* The Stitch weather pill ("31°C Sunny") is live third-party data,
           * not published editorial content — showing invented numbers here
           * would be exactly the permanent mocking the architecture forbids.
@@ -269,7 +292,6 @@ export function HomeClient() {
           * proxy or an explicit decision to drop it for good; unaffected by
           * the imageless hero below, which carries no weather slot. */}
         <HomeHero
-          imageUrl={heroImageUrl}
           searchProps={{
             onChange: (event) => setQuery(event.target.value),
             onFilterClick: () => router.push("/search"),
@@ -281,13 +303,23 @@ export function HomeClient() {
           }}
         />
 
-        {/* COASTAL EDITORIAL MIGRATION — the arrival relationship. Was
-          * `mt-8`, which left the category rail floating as a separate,
-          * unrelated section below the hero; `mt-4` pulls the two into one
-          * arrival moment without removing the rail, its header, or any of
-          * its behavior (magnification, touch targets, reduced motion and
-          * routing are all untouched). */}
-        <section className="mt-4">
+        {/* UI Polish Batch, Correction Pass item 3 — the real source of the
+          * oversized category → Best Beaches gap wasn't this section's own
+          * top margin (already a modest `mt-3`/12px against the hero), it
+          * was `VenueRail`'s `spacingBefore` below: Best Beaches used
+          * `"default"` (32px), the *same* gap every standard rail
+          * (Trending, Food Picks, Nightlife) already carries lower down the
+          * page, so it read as "one more rail gap," not a tightened
+          * transition. Fixed at the source — see `spacingBefore="tight"`
+          * on the `VenueRail` call below — rather than shrinking this
+          * margin further, since that measured at only 12px. */}
+        {/* Hero Background Extension — `pb-10` (was `pb-6`) is the backdrop's
+          * own trailing coverage, not category rhythm: it doesn't touch the
+          * heading→cards→labels spacing above it, it only extends how far
+          * past the labels the wrapper (and therefore `HomeHeroBackdrop`,
+          * sized to match) reaches before the bottom fade takes over — see
+          * `.hero-category-fade` for where the fade itself now starts. */}
+        <section className="relative mt-3 px-4 pb-10">
           <SectionHeader
             actionHref="/search"
             actionLabel="See All"
@@ -304,7 +336,23 @@ export function HomeClient() {
             onSelect={(activity) => router.push(activityHref(activity))}
           />
         </section>
+      </div>
 
+      {/* Visual Richness / Art Direction Pass, item 5 — `space-y-8` (a
+        * uniform 32px between every section) replaced with deliberate
+        * per-section spacing below: `VenueRail`'s `spacingBefore` prop and
+        * explicit `mt-*` on the sections defined inline here. A single
+        * value can't express a rhythm; this can.
+        *
+        * UI Polish Batch, item 4 — `max-w-5xl` (which framed Home in a
+        * centered column with visible side margins on wide viewports) is
+        * dropped so Home's rails and hero use the full available viewport
+        * width, matching Map's existing full-bleed posture. `BottomNav` and
+        * the root `(root)/layout.tsx` shell were never the source of that
+        * frame — it lived entirely in this `<main>` — so removing it here
+        * cannot affect Map or any other root tab, none of which read this
+        * class. */}
+      <main className="w-full px-4">
         <VenueRail
           actionHref="/search?category=beach"
           emptyDescription="Published beaches and beach clubs will appear here."
@@ -317,7 +365,7 @@ export function HomeClient() {
           isSaved={isSaved}
           onRetry={() => venues.refetch()}
           onToggleSaved={toggle}
-          spacingBefore="lg"
+          spacingBefore="tight"
           title="Best Beaches"
           venues={beachVenues}
         />
@@ -556,6 +604,6 @@ export function HomeClient() {
           </section>
         )}
       </main>
-    </>
+    </div>
   );
 }

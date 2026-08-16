@@ -33,6 +33,12 @@ export type Venue = {
     whatsapp: string | null;
     website: string | null;
     mapsUrl: string | null;
+    /** Venue Details action row — surfaces `PublishedVenueDTO.instagram_handle`
+     * (already on the wire) as a full profile URL. Not previously mapped:
+     * the DTO field existed, nothing read it. Full URL, not a bare handle,
+     * so this behaves exactly like `website` at every call site — one
+     * `href`, no component re-deriving the link shape. */
+    instagram: string | null;
   };
 
   /** API_REQUIREMENTS.md §1 — no source yet. */

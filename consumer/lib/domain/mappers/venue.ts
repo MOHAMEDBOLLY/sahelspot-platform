@@ -1,7 +1,12 @@
 import type { PublishedVenueDTO } from "@/lib/api/dto";
 import type { Venue } from "@/lib/domain/venue";
 import { toVenueCategory } from "@/lib/domain/categories";
-import { toValidPhone, toValidUrl, toValidWhatsapp } from "@/lib/domain/validators";
+import {
+  toValidInstagramUrl,
+  toValidPhone,
+  toValidUrl,
+  toValidWhatsapp,
+} from "@/lib/domain/validators";
 import { isOpenAt, toOpeningHours } from "@/lib/domain/openingHours";
 
 /** `latitude`/`longitude` are `str | None` on the wire. A present-but-
@@ -49,6 +54,7 @@ export function toVenue(dto: PublishedVenueDTO): Venue {
       whatsapp: toValidWhatsapp(dto.whatsapp),
       website: toValidUrl(dto.website),
       mapsUrl: toValidUrl(dto.maps_url),
+      instagram: toValidInstagramUrl(dto.instagram_handle),
     },
 
     // API_REQUIREMENTS.md §1 — ratings have no source yet.

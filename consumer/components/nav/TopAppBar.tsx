@@ -14,6 +14,13 @@ type TopAppBarProps = {
   /** Home only. Static by design — Stitch shows "Good Morning 👋" and defines
    * no time-of-day behaviour, so none is inferred. */
   greeting?: string;
+  /** Home Hero/Header Integration — renders the bar as a transparent layer
+   * absolutely positioned over whatever sits behind it (Home's hero photo)
+   * instead of its own sticky `bg-surface` block, and switches its text/icon
+   * color to white so it stays readable over a photograph. Opt-in and used
+   * by Home only; every other screen keeps the default sticky bar
+   * unchanged. */
+  overlay?: boolean;
 };
 
 /** Sticky header for root-tab screens, matching the export exactly.
@@ -27,7 +34,7 @@ type TopAppBarProps = {
  * The two variants differ in more than text: Home's bell is navy and its
  * avatar sits on `primary-container`, while Explore's bell is grey and its
  * avatar carries a hairline ring. Both are reproduced. */
-export function TopAppBar({ variant = "title", title, greeting }: TopAppBarProps) {
+export function TopAppBar({ variant = "title", title, greeting, overlay = false }: TopAppBarProps) {
   // P0.2 (Design & Motion Audit) — replaces a raw `window.addEventListener
   // ("scroll", ...)` with Framer Motion's `useScroll`, which already backs
   // every other motion primitive in this app (`PageTransition`, `Reveal`,
@@ -46,17 +53,29 @@ export function TopAppBar({ variant = "title", title, greeting }: TopAppBarProps
 
   return (
     <header
-      className={`sticky top-0 z-40 transition-shadow duration-300 ${
-        scrolled ? "bg-surface/90 shadow-md backdrop-blur-md" : "bg-surface"
-      }`}
+      className={
+        overlay
+          ? "absolute inset-x-0 top-0 z-20 bg-transparent"
+          : `sticky top-0 z-40 transition-shadow duration-300 ${
+              scrolled ? "bg-surface/90 shadow-md backdrop-blur-md" : "bg-surface"
+            }`
+      }
     >
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
           <Avatar bordered={!isGreeting} />
           {isGreeting ? (
             <div>
-              <p className="text-xs font-medium text-on-surface-variant">{greeting}</p>
-              <h1 className="font-headline text-xl font-bold tracking-tight text-primary">{title}</h1>
+              <p
+                className={`text-xs font-medium ${overlay ? "text-white/90 [text-shadow:0_1px_3px_rgb(0_0_0_/_0.35)]" : "text-on-surface-variant"}`}
+              >
+                {greeting}
+              </p>
+              <h1
+                className={`font-headline text-xl font-bold tracking-tight ${overlay ? "text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_0.35)]" : "text-primary"}`}
+              >
+                {title}
+              </h1>
             </div>
           ) : (
             <h1 className="font-headline text-2xl font-black tracking-tight text-primary">{title}</h1>
@@ -69,7 +88,11 @@ export function TopAppBar({ variant = "title", title, greeting }: TopAppBarProps
           aria-disabled="true"
           aria-label="Notifications (not available yet)"
           className={`flex h-10 w-10 items-center justify-center rounded-full ${
-            isGreeting ? "text-primary" : "text-on-surface-variant"
+            overlay
+              ? "text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_0.35)]"
+              : isGreeting
+                ? "text-primary"
+                : "text-on-surface-variant"
           }`}
           disabled
           tabIndex={-1}

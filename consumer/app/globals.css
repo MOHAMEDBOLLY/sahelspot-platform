@@ -35,10 +35,19 @@
   /* Warm sand — image-placeholder backgrounds and any "natural" fill. */
   --color-cream: #f1ead9;
 
-  /* Surface — warm ivory, not cool-tinted white. Cards sit as white on a
-   * slightly warm-tinted page; collapsing both to #FFFFFF flattens every
-   * card in the product. */
-  --color-surface: #faf7f1;
+  /* Surface — UI Polish Batch, Correction Pass item 1: pure white page
+   * background across the whole Consumer app (was `#FAF8F3`, a warm
+   * off-white, itself a lighten of the original `#F4EFE4`). This is the one
+   * token `body` and every sticky `bg-surface` header resolve through, so
+   * changing it here is what makes Home/Explore/Saved/More/Venue Details
+   * consistently white without touching each screen individually. Cards
+   * don't rely on a page/card color *difference* for contrast — every card
+   * (`CardFrame`, category tiles) already carries its own
+   * `border-outline-variant` + shadow — so this is a safe page-level swap:
+   * `--color-surface-container-lowest` (cards, #ffffff) and every other
+   * surface token below are untouched, and card visibility was verified
+   * unaffected. */
+  --color-surface: #ffffff;
   --color-surface-container-lowest: #ffffff;
   --color-surface-container-low: #f5efe5;
   --color-surface-container: #efe6d6;
@@ -210,6 +219,19 @@ body {
     rgb(13 59 102 / 0.25) 45%,
     rgb(13 59 102 / 0.05) 75%
   );
+}
+
+/* Hero → Category background fade — SAHELSPOT CONSUMER, Hero → Category
+ * Background Fade task; stops widened in the Hero Background Extension
+ * follow-up so the image (and the fabric shadow in it) reads clearly for
+ * longer before fading. Fully transparent through the first 45% (was 30%),
+ * then ramps to fully opaque `--color-surface` by its own bottom edge — the
+ * same token the plain Home background already uses below, so there is no
+ * second color introduced at the seam. Background-only: this class never
+ * sits over the category cards/text themselves, only behind them, so
+ * nothing here touches content opacity. */
+.hero-category-fade {
+  background: linear-gradient(to bottom, transparent 0%, transparent 45%, var(--color-surface) 100%);
 }
 
 /* Grain overlay — Visual Richness / Art Direction Pass, Hero. A tiled
