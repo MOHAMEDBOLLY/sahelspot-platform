@@ -33,28 +33,39 @@ type DestinationCardProps = {
  * and all existing content (name, kilometer marker, place count) are
  * preserved unchanged; no save action, destinations still aren't saveable.
  *
- * The image hover-zoom (`group-hover:scale-110`, 400ms) is the approved
- * `hover-scale` system token (docs/consumer/DESIGN_SYSTEM.md §Motion) —
- * unchanged by this pass. */
+ * The image hover-zoom (`md:group-hover:scale-110`, 400ms) is the approved
+ * `hover-scale` system token (docs/consumer/DESIGN_SYSTEM.md §Motion). The
+ * `md:` prefix scopes it to pointer-capable viewports so a tap on touch
+ * cannot leave the image stuck zoomed via synthetic hover. */
 export function DestinationCard({ href, name, imageUrl, placeCount, kilometerMarker }: DestinationCardProps) {
   return (
-    <CardFrame className="group w-52" href={href}>
-      <div className="relative h-32 overflow-hidden bg-cream">
+    // COASTAL EDITORIAL MIGRATION — the Coverflow's visual presence. Was
+    // `w-52`/`h-32` (208x128), which measured 48px shorter than the Best
+    // Beaches rail directly above it on Home and read as a smaller,
+    // secondary moment rather than one of Home's major beats. `w-56`/`h-44`
+    // (224x176) brings the Coverflow section to parity with Best Beaches,
+    // matching the approved prototype. `DestinationCoverflow` measures the
+    // rendered card via `ResizeObserver` rather than hard-coding a size, so
+    // its perspective/rotation/spacing math adapts with no change of its
+    // own. This component has exactly one call site (Home's Coverflow), so
+    // the resize cannot affect any other surface.
+    <CardFrame className="group w-56" href={href}>
+      <div className="relative h-44 overflow-hidden bg-cream">
         {imageUrl ? (
           <Image
             alt={name}
-            className="object-cover transition-transform duration-[400ms] group-hover:scale-110"
+            className="object-cover transition-transform duration-[400ms] md:group-hover:scale-110"
             fill
-            sizes="256px"
+            sizes="224px"
             src={imageUrl}
           />
         ) : (
           <div className="h-full w-full bg-primary-container" />
         )}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(13,59,102,0)_20%,rgba(13,59,102,0.02)_35%,rgba(13,59,102,0.12)_48%,rgba(13,59,102,0.38)_62%,rgba(13,59,102,0.82)_78%,rgba(13,59,102,1)_100%)]"
-        />
+        {/* Shared Editorial grammar overlay (`app/globals.css`) — was an
+          * inline navy gradient duplicated here; the token now carries the
+          * identical stops for every Editorial card. */}
+        <div aria-hidden="true" className="editorial-overlay pointer-events-none absolute inset-0" />
         <div className="absolute inset-x-3 bottom-3 z-10">
           <h3 className="truncate text-sm leading-tight font-bold tracking-tight text-white drop-shadow-sm">
             {name}

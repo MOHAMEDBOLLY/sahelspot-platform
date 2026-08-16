@@ -53,6 +53,14 @@ import { CardCarousel } from "@/components/patterns/CardCarousel";
 const ROTATE_DEG = 14;
 const DEPTH_PX = 34;
 const CLICK_SUPPRESS_PX = 6;
+/** COASTAL EDITORIAL MIGRATION — how far off-center the Coverflow starts
+ * before settling, as a fraction of one card-spacing (not a full card), so
+ * the settle reads as "arriving" rather than "flying in". */
+const SETTLE_OFFSET = 0.6;
+/** The discoverability nudge's peak displacement, in the same units.
+ * Deliberately small: enough to read as "this responds to a pull", never
+ * enough to look like the row changed cards by itself. */
+const NUDGE_OFFSET = 0.18;
 /** Fraction of card width between each card's center — under 1 so
  * neighbors overlap the active card's edges rather than sitting fully
  * clear of it, which is what lets them visibly "peek" within the section's
@@ -130,7 +138,12 @@ export function DestinationCoverflow({ children }: { children: ReactNode }) {
   // `CoverflowCard`), so starting `pos` here is the only change needed —
   // the same offset math that centers the active card after a drag centers
   // it identically on first paint.
-  const pos = useMotionValue(Math.floor((count - 1) / 2));
+  const centerIndex = Math.floor((count - 1) / 2);
+  // COASTAL EDITORIAL MIGRATION — starts offset from `centerIndex` and is
+  // animated to it once on mount (see the settle effect below), rather than
+  // resting at center on first paint as before. The centering *target* is
+  // unchanged; only the arrival is now animated.
+  const pos = useMotionValue(centerIndex + SETTLE_OFFSET);
   const [cardWidth, setCardWidth] = useState(256);
   // Measured directly from the rendered card, not derived from width — the
   // real `DestinationCard` isn't square (image + a navy content block
@@ -146,6 +159,8 @@ export function DestinationCoverflow({ children }: { children: ReactNode }) {
     moved: number;
   } | null>(null);
   const suppressClickRef = useRef(false);
+  const hasUserInteracted = useRef(false);
+  const settleStarted = useRef(false);
 
   useEffect(() => {
     const frame = frameRef.current;
@@ -162,6 +177,46 @@ export function DestinationCoverflow({ children }: { children: ReactNode }) {
     return () => observer.disconnect();
   }, [count]);
 
+  // COASTAL EDITORIAL MIGRATION — the first-paint settle, then one single
+  // discoverability nudge. Both exist because nothing on screen otherwise
+  // signals that this row is draggable: on touch there is no hover cue to
+  // discover, so a user could reasonably read the Coverflow as a static
+  // arrangement.
+  //
+  // Both are hard-gated to fire at most once per mount (`settleStarted`),
+  // and both bail the moment a real drag begins (`hasUserInteracted`), so
+  // the scripted motion can never fight the user's own gesture or replay on
+  // scroll, re-render, or after an interaction. The nudge is chained off
+  // the settle's own promise rather than a timer or a loop, which is what
+  // makes "exactly once" structural rather than a matter of timing.
+  useEffect(() => {
+    if (reduceMotion || settleStarted.current || count === 0) return;
+    settleStarted.current = true;
+
+    const settle = animate(pos, centerIndex, {
+      type: "spring",
+      stiffness: 260,
+      damping: 30,
+      onComplete: () => {
+        if (hasUserInteracted.current) return;
+        animate(pos, centerIndex + NUDGE_OFFSET, {
+          type: "spring",
+          stiffness: 220,
+          damping: 22,
+        }).then(() => {
+          if (hasUserInteracted.current) return;
+          animate(pos, centerIndex, { type: "spring", stiffness: 220, damping: 26 });
+        });
+      },
+    });
+
+    return () => settle.stop();
+    // Mount-only on purpose: `centerIndex`/`pos` are stable for a given
+    // mounted rail, and re-running this on any later render is precisely
+    // the "replays after every interaction" behavior the brief rules out.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (reduceMotion) {
     // No transforms at all under reduced motion — the same plain scroll
     // rail every other Home carousel already uses, not a stripped-down
@@ -173,6 +228,8 @@ export function DestinationCoverflow({ children }: { children: ReactNode }) {
   const spacing = cardWidth * SPACING_RATIO;
 
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    // Cancels any settle/nudge still in flight from taking over mid-gesture.
+    hasUserInteracted.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
       id: event.pointerId,

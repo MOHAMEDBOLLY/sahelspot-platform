@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { TopAppBar } from "@/components/nav/TopAppBar";
 import { HomeHero } from "@/components/patterns/HomeHero";
+import { EditorialBreak } from "@/components/patterns/EditorialBreak";
 import { Reveal } from "@/components/patterns/Reveal";
 import { CategoryChip } from "@/components/patterns/CategoryChip";
 import { DockCategoryRail } from "@/components/patterns/DockCategoryRail";
@@ -211,6 +212,39 @@ export function HomeClient() {
     [events.data],
   );
 
+  /** COASTAL EDITORIAL MIGRATION — the two photographic moments (Hero,
+   * Editorial Break) both draw from `useVenues()`, a query this screen
+   * already runs for its rails. No new request, no new API field, no
+   * bundled asset, no change to published data.
+   *
+   * Beach venues are the source because they are the one category whose
+   * published cover images are reliably real coastal photography rather
+   * than brand logos — which is what these two slots need. Both pick the
+   * *first* beach venue with a cover image, in the catalog's own order, so
+   * the choice is deterministic across renders (no `Math.random`, nothing
+   * that could differ between server and client render).
+   *
+   * Selection is a single deterministic index on each side — the Hero
+   * takes the first, the Editorial Break the last — so exactly one image
+   * request is made per slot and the two are never the same photograph.
+   * The Break resolves to `null` (and renders nothing) when there is only
+   * one candidate to go around, rather than repeating the Hero's photo a
+   * few sections later.
+   *
+   * Deliberately no runtime "is this image good enough" probing: an
+   * earlier revision had the Hero measure each candidate's decoded width
+   * and skip past small ones, which turned out to measure the served
+   * variant rather than the source and cost five redundant image requests
+   * per load. Photo quality is a content concern (Studio publishes some
+   * low-resolution covers), not something the client can meaningfully
+   * detect. */
+  const coastalPhotos = useMemo(
+    () => beachVenues.map((venue) => venue.coverImageUrl).filter((url): url is string => url !== null),
+    [beachVenues],
+  );
+  const heroImageUrl = coastalPhotos[0] ?? null;
+  const editorialBreakImageUrl = coastalPhotos.length > 1 ? coastalPhotos[coastalPhotos.length - 1] : null;
+
   function goToSearch() {
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
@@ -235,6 +269,7 @@ export function HomeClient() {
           * proxy or an explicit decision to drop it for good; unaffected by
           * the imageless hero below, which carries no weather slot. */}
         <HomeHero
+          imageUrl={heroImageUrl}
           searchProps={{
             onChange: (event) => setQuery(event.target.value),
             onFilterClick: () => router.push("/search"),
@@ -246,7 +281,13 @@ export function HomeClient() {
           }}
         />
 
-        <section className="mt-8">
+        {/* COASTAL EDITORIAL MIGRATION — the arrival relationship. Was
+          * `mt-8`, which left the category rail floating as a separate,
+          * unrelated section below the hero; `mt-4` pulls the two into one
+          * arrival moment without removing the rail, its header, or any of
+          * its behavior (magnification, touch targets, reduced motion and
+          * routing are all untouched). */}
+        <section className="mt-4">
           <SectionHeader
             actionHref="/search"
             actionLabel="See All"
@@ -343,7 +384,20 @@ export function HomeClient() {
           venues={featuredVenues}
         />
 
-        <Reveal className="mt-10">
+        {/* COASTAL EDITORIAL MIGRATION — the Editorial Break, Home's one
+          * non-rail moment. Placed between Trending and Events, the longest
+          * previously-unbroken run of identically-shaped carousel sections.
+          * Owns its own `mt-12` and full-bleed `-mx-4` internally, so it is
+          * not wrapped in `Reveal` here (it carries its own scroll reveal)
+          * and needs no spacing wrapper. Renders nothing when no second
+          * coastal photo exists — see the component. */}
+        <EditorialBreak
+          eyebrow="The North Coast"
+          headline="Every beach, every table, every night out. One map."
+          imageUrl={editorialBreakImageUrl}
+        />
+
+        <Reveal className="mt-12">
         <section>
           <SectionHeader actionHref="/events" actionLabel="See All" title="Upcoming Events" />
           {events.isLoading ? (

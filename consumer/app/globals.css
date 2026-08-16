@@ -161,6 +161,57 @@ body {
   }
 }
 
+/* The Editorial / Discovery card grammar's overlay — COASTAL EDITORIAL
+ * MIGRATION. One definition, consumed by every card whose job is "make me
+ * want to go": `DestinationCard`, `NightlifeCard`, `VenueCard`'s
+ * `gradientFrame` variant, and `FeaturedSignatureCard`.
+ *
+ * Before this pass those four carried three *different* hand-rolled
+ * gradients (navy on Destinations, terracotta on Best Beaches, violet on
+ * Nightlife) plus `.hero-gradient` on the featured card — the same visual
+ * idea implemented four times in four hues, which the Visual Vitality audit
+ * flagged as the card system's main inconsistency. Consolidating to one
+ * token is the whole point: a single Editorial grammar, not three competing
+ * section colors.
+ *
+ * Navy (`--color-primary`, #0d3b66) is the surviving hue because it is
+ * already the app's dominant brand/content color and the one the frozen
+ * design system reserves for structural surfaces; terracotta and violet
+ * were per-section inventions with no system-level justification. Stop
+ * shape/alphas are carried over unchanged from the existing cards — only
+ * the hue is unified, so every card's photo still reads clearly across its
+ * top half and the text still sits on a fully-opaque base.
+ *
+ * Deliberately NOT merged with `.hero-gradient` below: that one darkens the
+ * top *and* bottom edges (so Venue Details' floating back/share controls
+ * stay legible over the photo) and is a different job. */
+.editorial-overlay {
+  background: linear-gradient(
+    to bottom,
+    rgb(13 59 102 / 0) 20%,
+    rgb(13 59 102 / 0.02) 35%,
+    rgb(13 59 102 / 0.12) 48%,
+    rgb(13 59 102 / 0.38) 62%,
+    rgb(13 59 102 / 0.82) 78%,
+    rgb(13 59 102 / 1) 100%
+  );
+}
+
+/* The Editorial Break's overlay — COASTAL EDITORIAL MIGRATION. Bottom-
+ * weighted only (no top darkening): this is a full-width photographic pause
+ * with no floating controls to protect, just a headline sitting in the
+ * lower third. Lighter at the bottom than `.editorial-overlay` (0.78 vs a
+ * fully-opaque 1.0) because the photograph itself is the point here — the
+ * type sits *on* the image rather than on a solid base. */
+.editorial-break-overlay {
+  background: linear-gradient(
+    to top,
+    rgb(13 59 102 / 0.78) 0%,
+    rgb(13 59 102 / 0.25) 45%,
+    rgb(13 59 102 / 0.05) 75%
+  );
+}
+
 /* Grain overlay — Visual Richness / Art Direction Pass, Hero. A tiled
  * fractal-noise SVG data URI (no image asset, no dependency), meant to sit
  * at very low opacity over a flat surface so it reads as material texture

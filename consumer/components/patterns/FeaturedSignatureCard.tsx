@@ -65,16 +65,23 @@ export function FeaturedSignatureCard({
         {imageUrl ? (
           // Same approved `hover-scale` token `DestinationCard` already uses
           // (400ms, group-hover) — reused, not a new motion invented for
-          // this variant.
+          // this variant. `md:` scoped so a tap on touch can't leave the
+          // image stuck zoomed (synthetic hover after tap).
           <Image
             alt={title}
-            className="object-cover transition-transform duration-[400ms] group-hover:scale-110"
+            className="object-cover transition-transform duration-[400ms] md:group-hover:scale-110"
             fill
             sizes="288px"
             src={imageUrl}
           />
         ) : null}
-        <div aria-hidden="true" className="hero-gradient absolute inset-0" />
+        {/* COASTAL EDITORIAL MIGRATION — was `.hero-gradient` (which darkens
+          * the top edge too, for Venue Details' floating controls; this card
+          * has none). Now the shared `.editorial-overlay` token, so the
+          * featured lead card belongs to the same Editorial grammar as the
+          * standard cards beside it in the same rail. `.hero-gradient` is
+          * untouched and still owns Venue Details' hero. */}
+        <div aria-hidden="true" className="editorial-overlay pointer-events-none absolute inset-0" />
         {saveable ? (
           <SaveButton
             onToggleSaved={saveable.onToggleSaved}
