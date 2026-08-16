@@ -248,7 +248,11 @@ export function HomeClient() {
     () => beachVenues.map((venue) => venue.coverImageUrl).filter((url): url is string => url !== null),
     [beachVenues],
   );
-  const heroImageUrl = coastalPhotos[0] ?? null;
+  /** Hero Image Correction — the approved Home Hero artwork, not a
+   * published venue cover. `coastalPhotos` (and `coastalPhotos[0]`, the
+   * previous source) is untouched below and still drives
+   * `editorialBreakImageUrl`; only the Hero's own binding changes. */
+  const heroImageUrl = "/hero-test/beach-sahelspot-home-hero.png";
   const editorialBreakImageUrl = coastalPhotos.length > 1 ? coastalPhotos[coastalPhotos.length - 1] : null;
 
   function goToSearch() {
