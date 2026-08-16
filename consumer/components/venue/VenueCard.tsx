@@ -1,3 +1,6 @@
+"use client";
+
+import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
@@ -6,6 +9,7 @@ import { StatusBadge } from "@/components/patterns/StatusBadge";
 import { Pill } from "@/components/ui/Pill";
 import { CardFrame, DateBadge, LBracketAccent, SaveButton } from "@/components/patterns/CardShell";
 import { CATEGORY_BY_VALUE } from "@/lib/domain/categories";
+import { venueQueryOptions } from "@/lib/hooks/useVenue";
 import type { Venue } from "@/lib/domain/venue";
 import type { Event, EventPhase } from "@/lib/domain/event";
 import { formatEventDateRange } from "@/lib/domain/formatEventDate";
@@ -157,6 +161,15 @@ function StandardVenueCard({
 }) {
   const isClosed = venue.isOpenNow === false;
   const { width, image, title } = STANDARD_SIZE[size];
+  // P0.1 (Design & Motion Audit) — warms the exact query `useVenue` reads on
+  // the details page, before the tap that navigates there lands. Reuses
+  // `venueQueryOptions` (same queryKey/queryFn as `useVenue`) so this can
+  // never drift into a second, subtly different cache entry.
+  // `prefetchQuery` already no-ops when a fresh entry exists and shares an
+  // in-flight promise across repeated calls (hover + focus + touch firing
+  // together), so no extra de-duplication is needed here.
+  const queryClient = useQueryClient();
+  const prefetchVenue = () => queryClient.prefetchQuery(venueQueryOptions(venue.id));
 
   // Full Image Card task — a genuinely different structure, not a themed
   // version of the flat card: the image fills the *entire* card (no
@@ -170,24 +183,21 @@ function StandardVenueCard({
   if (gradientFrame) {
     const categoryLabel = CATEGORY_BY_VALUE[venue.category]?.label ?? null;
     return (
-      <CardFrame className={`${width} ${isClosed ? "opacity-70" : ""}`} href={`/venues/${venue.id}`}>
+      <CardFrame
+        className={`${width} ${isClosed ? "opacity-70" : ""}`}
+        href={`/venues/${venue.id}`}
+        onIntentPrefetch={prefetchVenue}
+      >
         <div className={`relative h-48 bg-cream ${isClosed ? "grayscale-[30%]" : ""}`}>
           {venue.coverImageUrl ? (
             <Image alt={venue.name} className="object-cover" fill sizes="256px" src={venue.coverImageUrl} />
           ) : null}
-          {/* Transparent until 20% (the image reads clearly on its own
-            * across the top half) then builds gradually to a strong,
-            * fully-opaque `#C8633B` at the bottom — an overlay on the
-            * photo, never a separate colored block: there is no second
-            * background/div below this one. Alpha-only adjustment — the
-            * top/middle stops (20%/35%/48%) are untouched; only the
-            * bottom two stops (78%/100%) got a higher alpha so the base
-            * of the card reads richer/denser, same `rgb(200,99,59)`
-            * throughout, no new color or hue introduced. */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(200,99,59,0)_20%,rgba(200,99,59,0.02)_35%,rgba(200,99,59,0.12)_48%,rgba(200,99,59,0.38)_62%,rgba(200,99,59,0.82)_78%,rgba(200,99,59,1)_100%)]"
-          />
+          {/* COASTAL EDITORIAL MIGRATION — was this variant's own
+            * terracotta overlay (`rgb(200,99,59)`); now the shared
+            * `.editorial-overlay` token (navy, `app/globals.css`) that
+            * every Editorial/Discovery card uses. Same stop shape and
+            * alphas as before, hue unified. */}
+          <div aria-hidden="true" className="editorial-overlay pointer-events-none absolute inset-0" />
           {categoryLabel ? (
             <Pill className="absolute top-3 left-3 z-10" variant="counter">
               {categoryLabel}
@@ -214,7 +224,11 @@ function StandardVenueCard({
   }
 
   return (
-    <CardFrame className={`${width} ${isClosed ? "opacity-70" : ""}`} href={`/venues/${venue.id}`}>
+    <CardFrame
+      className={`${width} ${isClosed ? "opacity-70" : ""}`}
+      href={`/venues/${venue.id}`}
+      onIntentPrefetch={prefetchVenue}
+    >
       <div className={`relative ${image} bg-cream ${isClosed ? "grayscale-[30%]" : ""}`}>
         {venue.coverImageUrl ? (
           <Image alt={venue.name} className="object-cover" fill sizes="256px" src={venue.coverImageUrl} />
@@ -265,8 +279,17 @@ function HorizontalVenueCard({
   onToggleSaved?: (venueId: string) => void;
   areaLabel: string | null;
 }) {
+  // P0.1 — same prefetch-on-intent as `StandardVenueCard` above.
+  const queryClient = useQueryClient();
+  const prefetchVenue = () => queryClient.prefetchQuery(venueQueryOptions(venue.id));
+
   return (
-    <CardFrame bracket={false} className="flex w-full items-center gap-3 p-3" href={`/venues/${venue.id}`}>
+    <CardFrame
+      bracket={false}
+      className="flex w-full items-center gap-3 p-3"
+      href={`/venues/${venue.id}`}
+      onIntentPrefetch={prefetchVenue}
+    >
       <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl rounded-tr-none bg-cream">
         {venue.coverImageUrl ? (
           <Image alt={venue.name} className="object-cover" fill sizes="64px" src={venue.coverImageUrl} />

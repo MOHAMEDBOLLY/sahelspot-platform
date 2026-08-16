@@ -47,11 +47,22 @@ export function CardFrame({
    * "bracket sits on the photo" reading), so the frame's own full-card
    * bracket would otherwise double up above the metadata instead. */
   bracket = true,
+  /** Fires once per hover/focus/touch-start, before the tap actually lands —
+   * P0.1 (Design & Motion Audit). `CardFrame` doesn't know or care what it
+   * warms; the caller (currently only `VenueCard`) supplies the query
+   * prefetch. `onMouseEnter` covers desktop hover, `onFocus` covers
+   * keyboard navigation reaching the same link, and `onTouchStart` covers
+   * mobile — all three are "user is about to navigate here" signals that
+   * fire well before `onClick`, and none of them block or delay the tap
+   * itself. Left undefined by every other `CardFrame` caller (destination,
+   * event cards), so this adds no behavior anywhere except venue cards. */
+  onIntentPrefetch,
   children,
 }: {
   className?: string;
   href: string;
   bracket?: boolean;
+  onIntentPrefetch?: () => void;
   children: React.ReactNode;
 }) {
   return (
@@ -79,6 +90,9 @@ export function CardFrame({
       // hairline, not a stroke.
       className={`relative block shrink-0 snap-start overflow-hidden rounded-2xl rounded-tr-none border border-outline-variant/[0.16] bg-surface-container-lowest shadow-[0_1px_6px_-1px_rgb(13_59_102_/_0.08)] transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] active:scale-[0.98] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 md:hover:-translate-y-0.5 md:hover:shadow-[0_8px_20px_-6px_rgb(13_59_102_/_0.16)] ${className}`}
       href={href}
+      onFocus={onIntentPrefetch}
+      onMouseEnter={onIntentPrefetch}
+      onTouchStart={onIntentPrefetch}
     >
       {bracket ? <LBracketAccent size="lg" /> : null}
       {children}

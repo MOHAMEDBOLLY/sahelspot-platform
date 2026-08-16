@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMotionValueEvent, useScroll } from "framer-motion";
 import { Avatar } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/Icon";
 
@@ -27,14 +28,19 @@ type TopAppBarProps = {
  * avatar sits on `primary-container`, while Explore's bell is grey and its
  * avatar carries a hairline ring. Both are reproduced. */
 export function TopAppBar({ variant = "title", title, greeting }: TopAppBarProps) {
+  // P0.2 (Design & Motion Audit) — replaces a raw `window.addEventListener
+  // ("scroll", ...)` with Framer Motion's `useScroll`, which already backs
+  // every other motion primitive in this app (`PageTransition`, `Reveal`,
+  // `BottomSheet`). `useScroll()` with no target tracks the page's own
+  // scrollY, matching the previous `window.scrollY` read exactly; Framer
+  // batches the underlying listener through its own rAF-scheduled update
+  // loop instead of firing a component callback synchronously on every
+  // native scroll event, which is what made the direct listener a
+  // main-thread risk. `useMotionValueEvent` subscribes to that same batched
+  // stream without re-deriving another window listener of its own.
   const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  const { scrollY } = useScroll();
+  useMotionValueEvent(scrollY, "change", (latest) => setScrolled(latest > 10));
 
   const isGreeting = variant === "greeting";
 
