@@ -75,6 +75,23 @@ export interface PublishedCollectionDTO {
   venues: PublishedVenueDTO[];
 }
 
+/** Mirrors `PublishedHomeCollectionOut` (api/app/api/schemas.py) — the
+ * `GET /public/collections` response shape (Consumer Home Curation
+ * Integration V2). Same fields as `PublishedCollectionDTO` plus
+ * `sort_order`: this collection's 0-based position among the Home
+ * Curation collections only (not its raw DB `Collection.sort_order`,
+ * which is scoped across every collection including ones outside Home
+ * Curation) — the one piece of information the single-slug endpoint never
+ * exposed, and the reason this endpoint exists. */
+export interface PublishedHomeCollectionDTO {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  venues: PublishedVenueDTO[];
+}
+
 /** Mirrors `PublishedEventOut` (api/app/api/schemas.py) — Events Module v1.
  * `phase` ("upcoming" | "live" | "ended") is computed server-side from the
  * date/time fields, never stored and never recomputed here. */

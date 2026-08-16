@@ -25,6 +25,7 @@ import { CTAButton } from "@/components/ui/CTAButton";
 import { useVenues } from "@/lib/hooks/useVenues";
 import { useDestinations } from "@/lib/hooks/useDestinations";
 import { useEvents } from "@/lib/hooks/useEvents";
+import { useHomeCollections, type HomeCollection } from "@/lib/hooks/useHomeCollections";
 import { useSaved } from "@/lib/saved/useSaved";
 import { activityHref, ESSENTIAL_SERVICES, HOME_ACTIVITIES } from "@/lib/home/activities";
 import { getDestinationGeoMetadata, sortDestinationsGeographically } from "@/lib/home/destinationOrder";
@@ -157,6 +158,102 @@ function VenueRail({
   );
 }
 
+/** Consumer Home Curation Integration V2 — one render function per curated
+ * slug, each reproducing that section's exact pre-existing visual output
+ * (same heading/actionHref/empty copy/icon, same card component:
+ * `VenueRail` + gradient/featured-first for Best Beaches, `FoodPickCard`
+ * for Food Picks, `NightlifeCard` for Nightlife). The *only* thing this
+ * function changes versus each section's old standalone block is that
+ * `isLoading`/`isError` are no longer read from a per-section query —
+ * `HomeClient` now runs one shared `useHomeCollections()` query for all
+ * three, so loading/error are handled once, above this function, and it
+ * only ever runs once real data (however empty) is in hand. An unknown
+ * slug renders nothing rather than throwing — defensive, not expected,
+ * since the API already restricts this list server-side. */
+function renderCuratedSection(
+  section: HomeCollection,
+  spacingBefore: "tight" | "default",
+  isSaved: (venueId: string) => boolean,
+  onToggleSaved: (venueId: string) => void,
+): React.ReactNode {
+  switch (section.slug) {
+    case "best-beaches":
+      return (
+        <VenueRail
+          actionHref="/search?category=beach"
+          emptyDescription="Published beaches and beach clubs will appear here."
+          emptyIcon="beach_access"
+          emptyTitle="No beaches yet"
+          gradientFrame
+          hideAccessType
+          isError={false}
+          isLoading={false}
+          isSaved={isSaved}
+          key={section.slug}
+          onRetry={() => {}}
+          onToggleSaved={onToggleSaved}
+          spacingBefore={spacingBefore}
+          title="Best Beaches"
+          venues={section.venues}
+        />
+      );
+    case "food-picks":
+      return (
+        <Reveal className={spacingBefore === "tight" ? "mt-5" : "mt-8"} key={section.slug}>
+          <section>
+            <SectionHeader actionHref="/search?category=food" actionLabel="See All" title="Food Picks" />
+            {section.venues.length === 0 ? (
+              <EmptyState
+                description="Published restaurants will appear here."
+                icon="restaurant"
+                title="No food picks yet"
+              />
+            ) : (
+              <CardCarousel>
+                {section.venues.map((venue) => (
+                  <FoodPickCard
+                    key={venue.id}
+                    onToggleSaved={onToggleSaved}
+                    saved={isSaved(venue.id)}
+                    venue={venue}
+                  />
+                ))}
+              </CardCarousel>
+            )}
+          </section>
+        </Reveal>
+      );
+    case "nightlife":
+      return (
+        <Reveal className={spacingBefore === "tight" ? "mt-5" : "mt-8"} key={section.slug}>
+          <section>
+            <SectionHeader actionHref="/search?category=nightlife" actionLabel="See All" title="Nightlife" />
+            {section.venues.length === 0 ? (
+              <EmptyState
+                description="Published nightlife spots will appear here."
+                icon="nightlife"
+                title="No nightlife yet"
+              />
+            ) : (
+              <CardCarousel>
+                {section.venues.map((venue) => (
+                  <NightlifeCard
+                    key={venue.id}
+                    onToggleSaved={onToggleSaved}
+                    saved={isSaved(venue.id)}
+                    venue={venue}
+                  />
+                ))}
+              </CardCarousel>
+            )}
+          </section>
+        </Reveal>
+      );
+    default:
+      return null;
+  }
+}
+
 /** Home — the first complete screen, and the validation of Phases 0-3.
  *
  * Every data-backed section carries all four states (loading / error / empty
@@ -181,6 +278,19 @@ export function HomeClient() {
   const events = useEvents();
   const { isSaved, toggle } = useSaved();
 
+  /** Consumer Home Curation Integration V2 — ONE request
+   * (`GET /public/collections`) for all three curated sections
+   * (Best Beaches/Food Picks/Nightlife), replacing the three independent
+   * per-slug requests the first integration pass used. The array order
+   * *is* the Home section order — see `useHomeCollections` — so
+   * `HomeClient` renders sections by iterating `homeCollections.data`
+   * (below), not by looking up three fixed slugs in a hardcoded sequence.
+   * Trending (`featuredVenues`, below) is deliberately untouched: it isn't
+   * a Home Curation collection, so it keeps its existing `isFeatured`
+   * query exactly as before — this integration controls only the three
+   * named sections, nothing else. */
+  const homeCollections = useHomeCollections();
+
   const allVenues = useMemo(() => venues.data ?? [], [venues.data]);
 
   /** Geographic order (Alexandria -> Marsa Matrouh), not the API's default
@@ -191,23 +301,23 @@ export function HomeClient() {
     [destinations.data],
   );
 
-  /** Rails filter the already-mapped domain category — the same client-side
-   * shape `MapClient` already uses over this same `useVenues()` query, not a
-   * second filtering mechanism and not an extra request per rail. */
+  /** Trending only — the same client-side shape `MapClient` also uses over
+   * this same `useVenues()` query. Best Beaches/Food Picks/Nightlife used
+   * to filter `allVenues` the same way; they now read the published
+   * collections instead (see `homeCollections` above), so only the one
+   * rail that isn't part of Home Curation yet still derives from
+   * `allVenues` here. */
   const featuredVenues = useMemo(
     () => allVenues.filter((venue) => venue.isFeatured),
     [allVenues],
   );
+  /** Beach venues, kept for the Hero/Editorial Break photo selection below
+   * (`coastalPhotos`) only — no longer what drives the Best Beaches rail
+   * itself. Real published beach cover photography is still the best
+   * source for those two photographic moments regardless of which venues
+   * Studio has curated into the `best-beaches` collection. */
   const beachVenues = useMemo(
     () => allVenues.filter((venue) => venue.category === "beach"),
-    [allVenues],
-  );
-  const foodVenues = useMemo(
-    () => allVenues.filter((venue) => venue.category === "food"),
-    [allVenues],
-  );
-  const nightlifeVenues = useMemo(
-    () => allVenues.filter((venue) => venue.category === "nightlife"),
     [allVenues],
   );
 
@@ -357,22 +467,81 @@ export function HomeClient() {
         * cannot affect Map or any other root tab, none of which read this
         * class. */}
       <main className="w-full px-4">
-        <VenueRail
-          actionHref="/search?category=beach"
-          emptyDescription="Published beaches and beach clubs will appear here."
-          emptyIcon="beach_access"
-          emptyTitle="No beaches yet"
-          gradientFrame
-          hideAccessType
-          isError={venues.isError}
-          isLoading={venues.isLoading}
-          isSaved={isSaved}
-          onRetry={() => venues.refetch()}
-          onToggleSaved={toggle}
-          spacingBefore="tight"
-          title="Best Beaches"
-          venues={beachVenues}
-        />
+        {/* Consumer Home Curation Integration V2 — Best Beaches/Food Picks/
+          * Nightlife now render together as one Studio-ordered block,
+          * right after Categories (Best Beaches' previous position).
+          * Food Picks/Nightlife moved up here from much further down the
+          * page (they used to render after Trending/Explore Destinations/
+          * the Editorial Break) — a fixed page position per section can't
+          * represent "Nightlife first," which the brief requires be
+          * possible, so the three have to be contiguous and rendered from
+          * one ordered list. Trending/Explore Destinations/Editorial
+          * Break/Upcoming Events are themselves unmoved — their own code
+          * is untouched below — they simply now follow this block instead
+          * of mostly preceding it.
+          *
+          * One shared query, one shared loading/error state
+          * (`homeCollections`); while loading, the three sections' own
+          * pre-existing skeleton shapes render in the default
+          * best-beaches/food-picks/nightlife order (the real order isn't
+          * known until the response arrives). A fetch error shows one
+          * combined retry state rather than three, since without a
+          * response there's no section identity or order to render at
+          * all. Once loaded, `renderCuratedSection` reproduces each
+          * section's exact pre-existing visual design — nothing here
+          * changes what Best Beaches/Food Picks/Nightlife look like, only
+          * which one renders in which position. */}
+        {homeCollections.isLoading ? (
+          <>
+            <Reveal className="mt-5">
+              <section>
+                <SectionHeader actionHref="/search?category=beach" actionLabel="See All" title="Best Beaches" />
+                <CardCarousel>
+                  <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
+                  <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
+                </CardCarousel>
+              </section>
+            </Reveal>
+            <Reveal className="mt-8">
+              <section>
+                <SectionHeader actionHref="/search?category=food" actionLabel="See All" title="Food Picks" />
+                <CardCarousel>
+                  <Skeleton className="h-40 w-28 shrink-0" />
+                  <Skeleton className="h-40 w-28 shrink-0" />
+                  <Skeleton className="h-40 w-28 shrink-0" />
+                </CardCarousel>
+              </section>
+            </Reveal>
+            <Reveal className="mt-8">
+              <section>
+                <SectionHeader actionHref="/search?category=nightlife" actionLabel="See All" title="Nightlife" />
+                <CardCarousel>
+                  <Skeleton className="h-52 w-[230px] shrink-0" />
+                  <Skeleton className="h-52 w-[230px] shrink-0" />
+                </CardCarousel>
+              </section>
+            </Reveal>
+          </>
+        ) : homeCollections.isError ? (
+          <Reveal className="mt-5">
+            <section>
+              <EmptyState
+                action={
+                  <CTAButton onClick={() => homeCollections.refetch()} variant="secondary">
+                    Retry
+                  </CTAButton>
+                }
+                description="We couldn't reach SahelSpot Studio. Check your connection and try again."
+                icon="error_outline"
+                title="Something went wrong"
+              />
+            </section>
+          </Reveal>
+        ) : (
+          (homeCollections.data ?? []).map((section, index) =>
+            renderCuratedSection(section, index === 0 ? "tight" : "default", isSaved, toggle),
+          )
+        )}
 
         <Reveal className="mt-12">
         <section>
@@ -496,100 +665,6 @@ export function HomeClient() {
             </CardCarousel>
           )}
         </section>
-        </Reveal>
-
-        {/* Food Picks — logo/brand discovery. A dedicated compact square
-          * card (`FoodPickCard`, Home-only), not `VenueRail`'s standard
-          * `VenueCard`: food content here is overwhelmingly a logo with a
-          * name/destination underneath, not a photo with rating/status, so
-          * the standard card's taller stack left dead white space below the
-          * logo. Written inline rather than through `VenueRail` because the
-          * card component itself differs, not just its size. */}
-        <Reveal className="mt-8">
-          <section>
-            <SectionHeader actionHref="/search?category=food" actionLabel="See All" title="Food Picks" />
-            {venues.isLoading ? (
-              <CardCarousel>
-                <Skeleton className="h-40 w-28 shrink-0" />
-                <Skeleton className="h-40 w-28 shrink-0" />
-                <Skeleton className="h-40 w-28 shrink-0" />
-              </CardCarousel>
-            ) : venues.isError ? (
-              <EmptyState
-                action={
-                  <CTAButton onClick={() => venues.refetch()} variant="secondary">
-                    Retry
-                  </CTAButton>
-                }
-                description="We couldn't reach SahelSpot Studio. Check your connection and try again."
-                icon="error_outline"
-                title="Something went wrong"
-              />
-            ) : foodVenues.length === 0 ? (
-              <EmptyState
-                description="Published restaurants will appear here."
-                icon="restaurant"
-                title="No food picks yet"
-              />
-            ) : (
-              <CardCarousel>
-                {foodVenues.map((venue) => (
-                  <FoodPickCard
-                    key={venue.id}
-                    onToggleSaved={toggle}
-                    saved={isSaved(venue.id)}
-                    venue={venue}
-                  />
-                ))}
-              </CardCarousel>
-            )}
-          </section>
-        </Reveal>
-
-        {/* Nightlife — atmosphere/photo discovery, deliberately the visual
-          * opposite of Food Picks right above it. A dedicated moderately
-          * wide, image-first card (`NightlifeCard`, Home-only) — one card
-          * per venue, ~230px (≈64% of the mobile carousel width), with a
-          * cinematic photo dominating the card and only name/destination
-          * underneath. */}
-        <Reveal className="mt-8">
-          <section>
-            <SectionHeader actionHref="/search?category=nightlife" actionLabel="See All" title="Nightlife" />
-            {venues.isLoading ? (
-              <CardCarousel>
-                <Skeleton className="h-52 w-[230px] shrink-0" />
-                <Skeleton className="h-52 w-[230px] shrink-0" />
-              </CardCarousel>
-            ) : venues.isError ? (
-              <EmptyState
-                action={
-                  <CTAButton onClick={() => venues.refetch()} variant="secondary">
-                    Retry
-                  </CTAButton>
-                }
-                description="We couldn't reach SahelSpot Studio. Check your connection and try again."
-                icon="error_outline"
-                title="Something went wrong"
-              />
-            ) : nightlifeVenues.length === 0 ? (
-              <EmptyState
-                description="Published nightlife spots will appear here."
-                icon="nightlife"
-                title="No nightlife yet"
-              />
-            ) : (
-              <CardCarousel>
-                {nightlifeVenues.map((venue) => (
-                  <NightlifeCard
-                    key={venue.id}
-                    onToggleSaved={toggle}
-                    saved={isSaved(venue.id)}
-                    venue={venue}
-                  />
-                ))}
-              </CardCarousel>
-            )}
-          </section>
         </Reveal>
 
         {SHOW_ESSENTIAL_SERVICES && (

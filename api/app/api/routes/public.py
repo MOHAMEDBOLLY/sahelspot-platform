@@ -16,6 +16,7 @@ from app.api.schemas import (
     PublishedCollectionOut,
     PublishedDestinationOut,
     PublishedEventOut,
+    PublishedHomeCollectionOut,
     PublishedVenueOut,
     VenueRef,
 )
@@ -149,6 +150,77 @@ def list_no_qr_venues(request: Request, response: Response, db: Session = Depend
         if resolved is not None:
             results.append(resolved)
     return results
+
+
+# Consumer Home Curation Integration V2 — the fixed set of collection slugs
+# the Consumer Home screen renders as curated sections. Deliberately a
+# constant here, not a DB flag on `Collection` (which would be a schema
+# change this task's scope excludes): every other active collection
+# (`editors-choice`, `trending`, `summer-picks`, ...) is real editorial
+# content for other surfaces, not part of Home Curation, and must never
+# leak into this endpoint or the Consumer Home screen.
+HOME_CURATION_SLUGS = ("best-beaches", "food-picks", "nightlife")
+
+
+@router.get("/collections", response_model=list[PublishedHomeCollectionOut])
+def list_published_home_collections(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Consumer Home Curation Integration V2 — the one gap the single-slug
+    `GET /public/collections/{slug}` endpoint (below) couldn't close:
+    fetching three slugs independently gives Consumer no signal for which
+    of the three should render first, because that endpoint never exposed
+    `Collection.sort_order`. This endpoint returns exactly the
+    `HOME_CURATION_SLUGS` collections, already restricted to `is_active`
+    collections by `_serialize_collections` at publish time, in the
+    snapshot's own `Collection.sort_order` order — `sort_order` on each
+    response entry is that relative position among *these three only* (see
+    `PublishedHomeCollectionOut`), not the raw DB column. A disabled
+    Home Curation collection is already absent from the snapshot entirely
+    (same mechanism `get_published_collection` below relies on), so no
+    separate `is_active` check is needed here. Empty list, not a 404, when
+    no revision exists yet or none of the three are currently
+    published — matches every other `/public/*` list endpoint's contract
+    (`list_published_venues`, `list_published_destinations`, ...).
+    """
+    revision_id = get_current_revision_id(db)
+    if revision_id is None:
+        return []
+    if client_has_current_revision(request, revision_id):
+        return not_modified_response(revision_id)
+
+    revision = get_current_revision(db)
+    if revision is None:
+        return []
+
+    venues_by_id = {v["id"]: v for v in revision.snapshot.get("venues", [])}
+    destinations_by_id = {d["id"]: d for d in revision.snapshot.get("destinations", [])}
+
+    home_collections = [
+        c for c in revision.snapshot.get("collections", []) if c["slug"] in HOME_CURATION_SLUGS
+    ]
+
+    result = []
+    for sort_order, collection in enumerate(home_collections):
+        venues = []
+        for venue_id in collection["venue_ids"]:
+            venue = venues_by_id.get(venue_id)
+            if venue is None:
+                continue
+            resolved = resolve_published_venue(venue, destinations_by_id)
+            if resolved is not None:
+                venues.append(resolved)
+        result.append(
+            {
+                "id": collection["id"],
+                "slug": collection["slug"],
+                "name": collection["name"],
+                "description": collection["description"],
+                "sort_order": sort_order,
+                "venues": venues,
+            }
+        )
+
+    set_public_cache_headers(response, revision_id)
+    return result
 
 
 @router.get("/collections/{slug}", response_model=PublishedCollectionOut)

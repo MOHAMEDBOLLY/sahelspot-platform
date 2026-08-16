@@ -477,6 +477,27 @@ class PublishedCollectionOut(BaseModel):
     venues: list[PublishedVenueOut]
 
 
+class PublishedHomeCollectionOut(PublishedCollectionOut):
+    """Consumer Home Curation Integration V2 — `GET /public/collections`'s
+    response shape, one entry per Home-Curation-allowlisted collection
+    (`app/api/routes/public.py`'s `HOME_CURATION_SLUGS`). Extends
+    `PublishedCollectionOut` (same id/slug/name/description/venues) with
+    `sort_order`: the *only* piece of information the single-slug
+    `GET /public/collections/{slug}` endpoint never exposed, and the one
+    thing Consumer actually needs to stop guessing at Home section order.
+    Its value is this collection's position among the Home Curation
+    collections only (0-based, ascending, counting itself) — not its raw
+    `Collection.sort_order` DB value, which is scoped across every
+    collection (including ones outside Home Curation, e.g.
+    "editors-choice") and would carry gaps meaningless to this endpoint's
+    callers. Derived once, in route order, from the snapshot's own
+    already-`Collection.sort_order`-ordered `collections` list — no new
+    query, no change to `_serialize_collections` or the snapshot format.
+    """
+
+    sort_order: int
+
+
 class PublishedDestinationOut(BaseModel):
     """The public read shape for a destination — same relationship to
     `DestinationOut` that `PublishedVenueOut` has to `VenueOut`: no
