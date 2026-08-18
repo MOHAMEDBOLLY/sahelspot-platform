@@ -7,6 +7,7 @@ import { HomeHero } from "@/components/patterns/HomeHero";
 import { HomeHeroBackdrop } from "@/components/patterns/HomeHeroBackdrop";
 import { EditorialBreak } from "@/components/patterns/EditorialBreak";
 import { Reveal } from "@/components/patterns/Reveal";
+import { LoadingFade } from "@/components/patterns/LoadingFade";
 import { CategoryChip } from "@/components/patterns/CategoryChip";
 import { DockCategoryRail } from "@/components/patterns/DockCategoryRail";
 import { DestinationCoverflow } from "@/components/patterns/DestinationCoverflow";
@@ -107,52 +108,57 @@ function VenueRail({
     <Reveal className={spacingBefore === "tight" ? "mt-5" : "mt-8"}>
       <section>
         <SectionHeader actionHref={actionHref} actionLabel="See All" title={title} />
-        {isLoading ? (
-          <CardCarousel>
-            <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
-            <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
-          </CardCarousel>
-        ) : isError ? (
-          <EmptyState
-            action={
-              <CTAButton onClick={onRetry} variant="secondary">
-                Retry
-              </CTAButton>
-            }
-            description="We couldn't reach SahelSpot Studio. Check your connection and try again."
-            icon="error_outline"
-            title="Something went wrong"
-          />
-        ) : venues.length === 0 ? (
-          <EmptyState description={emptyDescription} icon={emptyIcon} title={emptyTitle} />
-        ) : (
-          <CardCarousel>
-            {venues.map((venue, index) =>
-              featureFirst && index === 0 ? (
-                <FeaturedSignatureCard
-                  chipLabel={CATEGORY_BY_VALUE[venue.category]?.label ?? null}
-                  href={`/venues/${venue.id}`}
-                  imageUrl={venue.coverImageUrl}
-                  key={venue.id}
-                  locationLabel={venue.destinationName}
-                  rating={venue.rating}
-                  reviewCount={venue.reviewCount}
-                  saveable={{ id: venue.id, saved: isSaved(venue.id), onToggleSaved }}
-                  title={venue.name}
-                />
-              ) : (
-                <VenueCard
-                  gradientFrame={gradientFrame}
-                  hideAccessType={hideAccessType}
-                  key={venue.id}
-                  onToggleSaved={onToggleSaved}
-                  saved={isSaved(venue.id)}
-                  venue={venue}
-                />
-              ),
-            )}
-          </CardCarousel>
-        )}
+        <LoadingFade
+          loading={isLoading}
+          skeleton={
+            <CardCarousel>
+              <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
+              <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
+            </CardCarousel>
+          }
+        >
+          {isError ? (
+            <EmptyState
+              action={
+                <CTAButton onClick={onRetry} variant="secondary">
+                  Retry
+                </CTAButton>
+              }
+              description="We couldn't reach SahelSpot Studio. Check your connection and try again."
+              icon="error_outline"
+              title="Something went wrong"
+            />
+          ) : venues.length === 0 ? (
+            <EmptyState description={emptyDescription} icon={emptyIcon} title={emptyTitle} />
+          ) : (
+            <CardCarousel>
+              {venues.map((venue, index) =>
+                featureFirst && index === 0 ? (
+                  <FeaturedSignatureCard
+                    chipLabel={CATEGORY_BY_VALUE[venue.category]?.label ?? null}
+                    href={`/venues/${venue.id}`}
+                    imageUrl={venue.coverImageUrl}
+                    key={venue.id}
+                    locationLabel={venue.destinationName}
+                    rating={venue.rating}
+                    reviewCount={venue.reviewCount}
+                    saveable={{ id: venue.id, saved: isSaved(venue.id), onToggleSaved }}
+                    title={venue.name}
+                  />
+                ) : (
+                  <VenueCard
+                    gradientFrame={gradientFrame}
+                    hideAccessType={hideAccessType}
+                    key={venue.id}
+                    onToggleSaved={onToggleSaved}
+                    saved={isSaved(venue.id)}
+                    venue={venue}
+                  />
+                ),
+              )}
+            </CardCarousel>
+          )}
+        </LoadingFade>
       </section>
     </Reveal>
   );
@@ -275,73 +281,82 @@ function renderCuratedSlot(
 ): React.ReactNode {
   const spacingClass = spacingBefore === "tight" ? "mt-5" : "mt-8";
 
-  if (homeCollections.isLoading) {
-    const skeletonBySlug: Record<string, { title: string; actionHref: string; skeletons: React.ReactNode }> = {
-      "best-beaches": {
-        actionHref: "/search?category=beach",
-        skeletons: (
-          <>
-            <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
-            <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
-          </>
-        ),
-        title: "Best Beaches",
-      },
-      "food-picks": {
-        actionHref: "/search?category=food",
-        skeletons: (
-          <>
-            <Skeleton className="h-40 w-28 shrink-0" />
-            <Skeleton className="h-40 w-28 shrink-0" />
-            <Skeleton className="h-40 w-28 shrink-0" />
-          </>
-        ),
-        title: "Food Picks",
-      },
-      nightlife: {
-        actionHref: "/search?category=nightlife",
-        skeletons: (
-          <>
-            <Skeleton className="h-52 w-[230px] shrink-0" />
-            <Skeleton className="h-52 w-[230px] shrink-0" />
-          </>
-        ),
-        title: "Nightlife",
-      },
-    };
-    const config = skeletonBySlug[slug];
-    if (!config) return null;
-    return (
-      <Reveal className={spacingClass} key={slug}>
-        <section>
-          <SectionHeader actionHref={config.actionHref} actionLabel="See All" title={config.title} />
-          <CardCarousel>{config.skeletons}</CardCarousel>
-        </section>
-      </Reveal>
-    );
-  }
+  const skeletonBySlug: Record<string, { title: string; actionHref: string; skeletons: React.ReactNode }> = {
+    "best-beaches": {
+      actionHref: "/search?category=beach",
+      skeletons: (
+        <>
+          <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
+          <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
+        </>
+      ),
+      title: "Best Beaches",
+    },
+    "food-picks": {
+      actionHref: "/search?category=food",
+      skeletons: (
+        <>
+          <Skeleton className="h-40 w-28 shrink-0" />
+          <Skeleton className="h-40 w-28 shrink-0" />
+          <Skeleton className="h-40 w-28 shrink-0" />
+        </>
+      ),
+      title: "Food Picks",
+    },
+    nightlife: {
+      actionHref: "/search?category=nightlife",
+      skeletons: (
+        <>
+          <Skeleton className="h-52 w-[230px] shrink-0" />
+          <Skeleton className="h-52 w-[230px] shrink-0" />
+        </>
+      ),
+      title: "Nightlife",
+    },
+  };
+  const config = skeletonBySlug[slug];
 
-  if (homeCollections.isError) {
-    return (
-      <Reveal className={spacingClass} key={slug}>
-        <section>
-          <EmptyState
-            action={
-              <CTAButton onClick={() => homeCollections.refetch()} variant="secondary">
-                Retry
-              </CTAButton>
-            }
-            description="We couldn't reach SahelSpot Studio. Check your connection and try again."
-            icon="error_outline"
-            title="Something went wrong"
-          />
-        </section>
-      </Reveal>
-    );
-  }
+  // Motion Pass 01 — was three independent early-returns (loading / error /
+  // success), each its own full tree; now `LoadingFade` crossfades between
+  // the loading tree and whichever of error/success tree resolves once
+  // loading finishes, reusing the same skeleton/error/success trees
+  // unchanged (only the swap between them is new).
+  const skeletonTree = config ? (
+    <Reveal className={spacingClass} key={`${slug}-skeleton`}>
+      <section>
+        <SectionHeader actionHref={config.actionHref} actionLabel="See All" title={config.title} />
+        <CardCarousel>{config.skeletons}</CardCarousel>
+      </section>
+    </Reveal>
+  ) : null;
 
-  const section = homeCollections.data?.find((candidate) => candidate.slug === slug);
-  return section ? renderCuratedSection(section, spacingBefore, isSaved, onToggleSaved) : null;
+  const resolvedTree = homeCollections.isError ? (
+    <Reveal className={spacingClass} key={`${slug}-error`}>
+      <section>
+        <EmptyState
+          action={
+            <CTAButton onClick={() => homeCollections.refetch()} variant="secondary">
+              Retry
+            </CTAButton>
+          }
+          description="We couldn't reach SahelSpot Studio. Check your connection and try again."
+          icon="error_outline"
+          title="Something went wrong"
+        />
+      </section>
+    </Reveal>
+  ) : (
+    (() => {
+      const section = homeCollections.data?.find((candidate) => candidate.slug === slug);
+      return section ? renderCuratedSection(section, spacingBefore, isSaved, onToggleSaved) : null;
+    })()
+  );
+
+  return (
+    <LoadingFade key={slug} loading={homeCollections.isLoading} skeleton={skeletonTree}>
+      {resolvedTree}
+    </LoadingFade>
+  );
 }
 
 /** Home — the first complete screen, and the validation of Phases 0-3.
@@ -570,48 +585,53 @@ export function HomeClient() {
         <Reveal className="mt-12">
         <section>
           <SectionHeader actionHref="/coming-soon?feature=destinations" actionLabel="See All" size="lg" title="Explore Destinations" />
-          {destinations.isLoading ? (
-            <CardCarousel gap="lg">
-              <Skeleton className="h-60 w-64 shrink-0" />
-              <Skeleton className="h-60 w-64 shrink-0" />
-              <Skeleton className="h-60 w-64 shrink-0" />
-            </CardCarousel>
-          ) : destinations.isError ? (
-            <EmptyState
-              action={
-                <CTAButton onClick={() => destinations.refetch()} variant="secondary">
-                  Retry
-                </CTAButton>
-              }
-              description="We couldn't reach SahelSpot Studio. Check your connection and try again."
-              icon="error_outline"
-              title="Something went wrong"
-            />
-          ) : orderedDestinations.length === 0 ? (
-            <EmptyState
-              description="Published destinations will appear here."
-              icon="map"
-              title="No destinations yet"
-            />
-          ) : (
-            // 21st.dev Coverflow Carousel integration — same
-            // `DestinationCard` elements, same data, same routes as the
-            // plain `CardCarousel` this replaced; `DestinationCoverflow`
-            // only changes how they're arranged/transformed. Falls back to
-            // that exact plain-row behavior itself under reduced motion.
-            <DestinationCoverflow>
-              {orderedDestinations.map((destination) => (
-                <DestinationCard
-                  href={`/search?destination=${destination.id}`}
-                  imageUrl={destination.coverImageUrl}
-                  key={destination.id}
-                  kilometerMarker={getDestinationGeoMetadata(destination.id)?.kilometerMarker ?? null}
-                  name={destination.name}
-                  placeCount={destination.venueCount}
-                />
-              ))}
-            </DestinationCoverflow>
-          )}
+          <LoadingFade
+            loading={destinations.isLoading}
+            skeleton={
+              <CardCarousel gap="lg">
+                <Skeleton className="h-60 w-64 shrink-0" />
+                <Skeleton className="h-60 w-64 shrink-0" />
+                <Skeleton className="h-60 w-64 shrink-0" />
+              </CardCarousel>
+            }
+          >
+            {destinations.isError ? (
+              <EmptyState
+                action={
+                  <CTAButton onClick={() => destinations.refetch()} variant="secondary">
+                    Retry
+                  </CTAButton>
+                }
+                description="We couldn't reach SahelSpot Studio. Check your connection and try again."
+                icon="error_outline"
+                title="Something went wrong"
+              />
+            ) : orderedDestinations.length === 0 ? (
+              <EmptyState
+                description="Published destinations will appear here."
+                icon="map"
+                title="No destinations yet"
+              />
+            ) : (
+              // 21st.dev Coverflow Carousel integration — same
+              // `DestinationCard` elements, same data, same routes as the
+              // plain `CardCarousel` this replaced; `DestinationCoverflow`
+              // only changes how they're arranged/transformed. Falls back to
+              // that exact plain-row behavior itself under reduced motion.
+              <DestinationCoverflow>
+                {orderedDestinations.map((destination) => (
+                  <DestinationCard
+                    href={`/search?destination=${destination.id}`}
+                    imageUrl={destination.coverImageUrl}
+                    key={destination.id}
+                    kilometerMarker={getDestinationGeoMetadata(destination.id)?.kilometerMarker ?? null}
+                    name={destination.name}
+                    placeCount={destination.venueCount}
+                  />
+                ))}
+              </DestinationCoverflow>
+            )}
+          </LoadingFade>
         </section>
         </Reveal>
 
@@ -623,49 +643,54 @@ export function HomeClient() {
         <Reveal className="mt-12">
         <section>
           <SectionHeader actionHref="/events" actionLabel="See All" title="Upcoming Events" />
-          {events.isLoading ? (
-            <CardCarousel>
-              <Skeleton className="h-72 w-[80%] min-w-[280px] shrink-0" />
-              <Skeleton className="h-72 w-[80%] min-w-[280px] shrink-0" />
-            </CardCarousel>
-          ) : events.isError ? (
-            <EmptyState
-              action={
-                <CTAButton onClick={() => events.refetch()} variant="secondary">
-                  Retry
-                </CTAButton>
-              }
-              description="We couldn't reach SahelSpot Studio. Check your connection and try again."
-              icon="error_outline"
-              title="Something went wrong"
-            />
-          ) : upcomingEvents.length === 0 ? (
-            <EmptyState
-              description="Published events will appear here."
-              icon="event"
-              title="No upcoming events"
-            />
-          ) : (
-            <CardCarousel>
-              {upcomingEvents.map((event, index) =>
-                index === 0 ? (
-                  <FeaturedSignatureCard
-                    chipLabel={formatEventDateRange(event)}
-                    chipTone="coral"
-                    href={`/events/${event.slug}`}
-                    imageUrl={event.coverImageUrl}
-                    key={event.id}
-                    locationLabel={event.venue?.name ?? event.destination?.name ?? null}
-                    title={event.title}
-                  />
-                ) : (
-                  <div className="w-[80%] min-w-[280px] shrink-0 snap-start" key={event.id}>
-                    <VenueCard event={event} variant="event" />
-                  </div>
-                ),
-              )}
-            </CardCarousel>
-          )}
+          <LoadingFade
+            loading={events.isLoading}
+            skeleton={
+              <CardCarousel>
+                <Skeleton className="h-72 w-[80%] min-w-[280px] shrink-0" />
+                <Skeleton className="h-72 w-[80%] min-w-[280px] shrink-0" />
+              </CardCarousel>
+            }
+          >
+            {events.isError ? (
+              <EmptyState
+                action={
+                  <CTAButton onClick={() => events.refetch()} variant="secondary">
+                    Retry
+                  </CTAButton>
+                }
+                description="We couldn't reach SahelSpot Studio. Check your connection and try again."
+                icon="error_outline"
+                title="Something went wrong"
+              />
+            ) : upcomingEvents.length === 0 ? (
+              <EmptyState
+                description="Published events will appear here."
+                icon="event"
+                title="No upcoming events"
+              />
+            ) : (
+              <CardCarousel>
+                {upcomingEvents.map((event, index) =>
+                  index === 0 ? (
+                    <FeaturedSignatureCard
+                      chipLabel={formatEventDateRange(event)}
+                      chipTone="coral"
+                      href={`/events/${event.slug}`}
+                      imageUrl={event.coverImageUrl}
+                      key={event.id}
+                      locationLabel={event.venue?.name ?? event.destination?.name ?? null}
+                      title={event.title}
+                    />
+                  ) : (
+                    <div className="w-[80%] min-w-[280px] shrink-0 snap-start" key={event.id}>
+                      <VenueCard event={event} variant="event" />
+                    </div>
+                  ),
+                )}
+              </CardCarousel>
+            )}
+          </LoadingFade>
         </section>
         </Reveal>
 

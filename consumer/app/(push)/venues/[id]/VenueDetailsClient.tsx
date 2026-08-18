@@ -1,6 +1,7 @@
 "use client";
 
 import { notFound, useRouter } from "next/navigation";
+import { motion, useReducedMotion } from "framer-motion";
 import { useState, type ReactNode } from "react";
 import { ChecklistRow } from "@/components/patterns/ChecklistRow";
 import { EmptyState } from "@/components/patterns/EmptyState";
@@ -151,6 +152,7 @@ function VenueActionTile({
  * and read the same id) that renders this client component underneath it. */
 export function VenueDetailsClient({ venueId }: { venueId: string }) {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const venue = useVenue(venueId);
   const allVenues = useVenues();
   const destinations = useDestinations();
@@ -372,7 +374,17 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
         </p>
       ) : null}
 
-      <div className="space-y-6 px-4 pt-6">
+      {/* Motion Pass 02 — a single, restrained entrance for the whole
+        * content block (not one per child): the hero image is the primary
+        * continuity effect, this is secondary. A short delay lets the hero
+        * lead. See `ImageGallery`'s own doc comment for why this is a
+        * mount-only settle rather than a true shared-element transition. */}
+      <motion.div
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6 px-4 pt-6"
+        initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+        transition={{ delay: reduceMotion ? 0 : 0.08, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      >
         <header className="space-y-2">
           <div>
             <h1 className="font-headline text-3xl leading-none font-bold tracking-tight text-primary">
@@ -497,7 +509,7 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
             </div>
           </section>
         ) : null}
-      </div>
+      </motion.div>
     </div>
   );
 }

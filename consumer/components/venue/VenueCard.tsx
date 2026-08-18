@@ -7,7 +7,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { RatingBadge } from "@/components/ui/RatingBadge";
 import { StatusBadge } from "@/components/patterns/StatusBadge";
 import { Pill } from "@/components/ui/Pill";
-import { CardFrame, DateBadge, LBracketAccent, SaveButton } from "@/components/patterns/CardShell";
+import { CardFrame, DateBadge, LBracketAccent, SaveButton, SaveIcon } from "@/components/patterns/CardShell";
 import { CATEGORY_BY_VALUE } from "@/lib/domain/categories";
 import { venueQueryOptions } from "@/lib/hooks/useVenue";
 import type { Venue } from "@/lib/domain/venue";
@@ -320,8 +320,8 @@ function HorizontalVenueCard({
         <IconButton
           aria-pressed={saved}
           className="h-9 w-9"
-          filled={saved}
           icon="bookmark"
+          iconElement={<SaveIcon saved={saved} size={24} />}
           label={saved ? "Remove from saved" : "Save this place"}
           onClick={(event) => {
             event.preventDefault();

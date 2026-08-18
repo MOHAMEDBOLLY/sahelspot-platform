@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { TopAppBar } from "@/components/nav/TopAppBar";
 import { EmptyState } from "@/components/patterns/EmptyState";
+import { LoadingFade } from "@/components/patterns/LoadingFade";
 import { TabBar } from "@/components/patterns/TabBar";
 import { CTAButton } from "@/components/ui/CTAButton";
 import { IconButton } from "@/components/ui/IconButton";
@@ -91,35 +92,42 @@ export function SavedClient() {
               icon="bookmark_border"
               title={activeTab === "collections" ? "No collections yet" : "Nothing on your list yet"}
             />
-          ) : venues.isLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-72 w-full" />
-              <Skeleton className="h-72 w-full" />
-            </div>
-          ) : venues.isError ? (
-            <EmptyState
-              action={
-                <CTAButton onClick={() => venues.refetch()} variant="secondary">
-                  Retry
-                </CTAButton>
-              }
-              description="We couldn't reach SahelSpot Studio. Check your connection and try again."
-              icon="error_outline"
-              title="Something went wrong"
-            />
-          ) : savedVenues.length === 0 ? (
-            <EmptyState
-              action={<CTAButton href="/explore">Explore SahelSpot</CTAButton>}
-              description="Tap the heart on any place to save it here."
-              icon="favorite_border"
-              title="No saved places yet"
-            />
           ) : (
-            <div className="space-y-4">
-              {savedVenues.map((venue) => (
-                <VenueCard key={venue.id} onToggleSaved={toggle} saved={isSaved(venue.id)} venue={venue} />
-              ))}
-            </div>
+            <LoadingFade
+              loading={venues.isLoading}
+              skeleton={
+                <div className="space-y-4">
+                  <Skeleton className="h-72 w-full" />
+                  <Skeleton className="h-72 w-full" />
+                </div>
+              }
+            >
+              {venues.isError ? (
+                <EmptyState
+                  action={
+                    <CTAButton onClick={() => venues.refetch()} variant="secondary">
+                      Retry
+                    </CTAButton>
+                  }
+                  description="We couldn't reach SahelSpot Studio. Check your connection and try again."
+                  icon="error_outline"
+                  title="Something went wrong"
+                />
+              ) : savedVenues.length === 0 ? (
+                <EmptyState
+                  action={<CTAButton href="/explore">Explore SahelSpot</CTAButton>}
+                  description="Tap the heart on any place to save it here."
+                  icon="favorite_border"
+                  title="No saved places yet"
+                />
+              ) : (
+                <div className="space-y-4">
+                  {savedVenues.map((venue) => (
+                    <VenueCard key={venue.id} onToggleSaved={toggle} saved={isSaved(venue.id)} venue={venue} />
+                  ))}
+                </div>
+              )}
+            </LoadingFade>
           )}
         </div>
       </div>

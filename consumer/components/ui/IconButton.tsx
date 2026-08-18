@@ -13,6 +13,15 @@ type IconButtonOwnProps = {
   filled?: boolean;
   href?: string;
   className?: string;
+  /** Motion Pass 01 — an already-built icon element (e.g. `SaveIcon`,
+   * `CardShell.tsx`) to render in place of the plain `<Icon>` this button
+   * would otherwise build from `icon`/`filled`. `icon` stays required even
+   * when this is set, so every `IconButton` keeps one consistent prop
+   * shape — only the rendered glyph changes. Used by every save-action
+   * `IconButton` (Venue Details' gallery, the compact list-row save) so
+   * they share the same save-confirmation motion the card `SaveButton`
+   * uses, instead of each reimplementing it. */
+  iconElement?: React.ReactNode;
 };
 
 type IconButtonProps = IconButtonOwnProps &
@@ -57,7 +66,7 @@ const VARIANTS: Record<IconButtonVariant, string> = {
 };
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { icon, label, variant = "plain", filled = false, href, className = "", ...props },
+  { icon, label, variant = "plain", filled = false, href, className = "", iconElement, ...props },
   ref,
 ) {
   const classes = [
@@ -70,7 +79,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
     .filter(Boolean)
     .join(" ");
 
-  const content = <Icon filled={filled} name={icon} />;
+  const content = iconElement ?? <Icon filled={filled} name={icon} />;
 
   if (href) {
     return (

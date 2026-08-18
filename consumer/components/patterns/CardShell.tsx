@@ -1,5 +1,54 @@
+"use client";
+
 import Link from "next/link";
+import { motion, useReducedMotion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
+
+/** Save Confirmation — Motion Pass 01. A brief spring pop (scale
+ * 1 -> ~1.14 -> 1, ~260ms total) on the bookmark glyph itself, fired only
+ * on the exact `saved: false -> true` transition — never on mount already
+ * saved, a re-render, a query refetch, or unsave (which stays a plain,
+ * immediate icon/color flip, no celebratory motion). The one shared
+ * implementation for every save surface: `SaveButton` below, Venue
+ * Details' gallery save, and the compact list-row save all render this
+ * instead of a plain `Icon`, so there is exactly one pop, not three.
+ *
+ * A `useRef` (not the `saved` prop alone) tracks the previous value so
+ * the effect can tell "just became true" apart from "already true on
+ * mount" or "still true after some unrelated re-render" — `useEffect`'s
+ * dependency array only re-runs this when `saved` itself actually
+ * changes, so scrolling, parent re-renders, and refetches that don't
+ * flip the boolean never touch it. */
+export function SaveIcon({ saved, size = 15 }: { saved: boolean; size?: number }) {
+  const reduceMotion = useReducedMotion();
+  const wasSaved = useRef(saved);
+  const [phase, setPhase] = useState<"idle" | "up" | "down">("idle");
+
+  useEffect(() => {
+    if (saved && !wasSaved.current && !reduceMotion) {
+      setPhase("up");
+    }
+    wasSaved.current = saved;
+  }, [saved, reduceMotion]);
+
+  return (
+    <motion.span
+      animate={{ scale: phase === "up" ? 1.14 : 1 }}
+      className="inline-flex"
+      onAnimationComplete={() =>
+        setPhase((current) => (current === "up" ? "down" : current === "down" ? "idle" : current))
+      }
+      transition={
+        phase === "up"
+          ? { type: "spring", stiffness: 420, damping: 12 }
+          : { type: "spring", stiffness: 320, damping: 18 }
+      }
+    >
+      <Icon filled={saved} name="bookmark" size={size} />
+    </motion.span>
+  );
+}
 
 /** The L-shaped accent bracket — SahelSpot's one signature card detail: two
  * lime border lines in a card's top-right corner. Kept unchanged by the
@@ -151,7 +200,7 @@ export function SaveButton({
           compact ? "h-7 w-7" : "h-8 w-8"
         } ${saved ? "bg-accent text-on-accent" : "bg-white/90 text-primary backdrop-blur-sm"}`}
       >
-        <Icon filled={saved} name="bookmark" size={15} />
+        <SaveIcon saved={saved} size={15} />
       </span>
     </button>
   );

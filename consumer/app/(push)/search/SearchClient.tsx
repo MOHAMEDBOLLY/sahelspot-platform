@@ -6,6 +6,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { CategoryChip } from "@/components/patterns/CategoryChip";
 import { EmptyState } from "@/components/patterns/EmptyState";
 import { FilterChip } from "@/components/patterns/FilterChip";
+import { LoadingFade } from "@/components/patterns/LoadingFade";
 import { SearchField } from "@/components/patterns/SearchField";
 import { SectionHeader } from "@/components/patterns/SectionHeader";
 import { CTAButton } from "@/components/ui/CTAButton";
@@ -385,79 +386,86 @@ function SearchPageContent() {
                     : "Results"
                 }
               />
-              {results.isLoading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-28 w-full" />
-                  <Skeleton className="h-28 w-full" />
-                  <Skeleton className="h-28 w-full" />
-                </div>
-              ) : results.isError ? (
-                <EmptyState
-                  action={
-                    <CTAButton onClick={() => results.refetch()} variant="secondary">
-                      Retry
-                    </CTAButton>
-                  }
-                  description="We couldn't reach SahelSpot Studio. Check your connection and try again."
-                  icon="error_outline"
-                  title="Something went wrong"
-                />
-              ) : (filteredResults?.length ?? 0) === 0 ? (
-                <EmptyState
-                  action={
-                    <CTAButton
-                      onClick={() => {
-                        setQuery("");
-                        setCategory("all");
-                        setAccessType("all");
-                        setSelectedTags([]);
-                        setReservationPolicy("all");
-                        // `destination` isn't local state — it's read live
-                        // from the URL each render (see its declaration
-                        // above) — so clearing it means dropping the query
-                        // string, not just resetting component state.
-                        if (destination) router.replace("/search");
-                      }}
-                      variant="secondary"
-                    >
-                      Clear Filters
-                    </CTAButton>
-                  }
-                  description={
-                    reservationPolicy === "all"
-                      ? "Try a different search term or category."
-                      : "No results match that reservation policy — try clearing a filter."
-                  }
-                  icon="search_off"
-                  title="No results found"
-                />
-              ) : (
-                // Motion & Micro-Interactions Upgrade, item 4 — "content
-                // should transition using a short fade + vertical movement"
-                // on a filter change, not a hard reload of the section.
-                // Keyed on the filter combination (not `query`, which
-                // changes per keystroke and would retrigger this on every
-                // character typed) — React remounts this `motion.div` when
-                // the key changes, replaying the enter animation for the
-                // new result set.
-                <motion.div
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-3"
-                  initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-                  key={`${category}:${accessType}:${reservationPolicy}:${selectedTags.join(",")}`}
-                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                >
-                  {filteredResults?.map((venue) => (
-                    <VenueCard
-                      key={venue.id}
-                      onToggleSaved={toggle}
-                      saved={isSaved(venue.id)}
-                      variant="horizontal-row"
-                      venue={venue}
-                    />
-                  ))}
-                </motion.div>
-              )}
+              <LoadingFade
+                loading={results.isLoading}
+                skeleton={
+                  <div className="space-y-3">
+                    <Skeleton className="h-28 w-full" />
+                    <Skeleton className="h-28 w-full" />
+                    <Skeleton className="h-28 w-full" />
+                  </div>
+                }
+              >
+                {results.isError ? (
+                  <EmptyState
+                    action={
+                      <CTAButton onClick={() => results.refetch()} variant="secondary">
+                        Retry
+                      </CTAButton>
+                    }
+                    description="We couldn't reach SahelSpot Studio. Check your connection and try again."
+                    icon="error_outline"
+                    title="Something went wrong"
+                  />
+                ) : (filteredResults?.length ?? 0) === 0 ? (
+                  <EmptyState
+                    action={
+                      <CTAButton
+                        onClick={() => {
+                          setQuery("");
+                          setCategory("all");
+                          setAccessType("all");
+                          setSelectedTags([]);
+                          setReservationPolicy("all");
+                          // `destination` isn't local state — it's read live
+                          // from the URL each render (see its declaration
+                          // above) — so clearing it means dropping the query
+                          // string, not just resetting component state.
+                          if (destination) router.replace("/search");
+                        }}
+                        variant="secondary"
+                      >
+                        Clear Filters
+                      </CTAButton>
+                    }
+                    description={
+                      reservationPolicy === "all"
+                        ? "Try a different search term or category."
+                        : "No results match that reservation policy — try clearing a filter."
+                    }
+                    icon="search_off"
+                    title="No results found"
+                  />
+                ) : (
+                  // Motion & Micro-Interactions Upgrade, item 4 — "content
+                  // should transition using a short fade + vertical movement"
+                  // on a filter change, not a hard reload of the section.
+                  // Keyed on the filter combination (not `query`, which
+                  // changes per keystroke and would retrigger this on every
+                  // character typed) — React remounts this `motion.div` when
+                  // the key changes, replaying the enter animation for the
+                  // new result set. Unaffected by `LoadingFade` above, which
+                  // only owns the loading -> settled crossfade, not this
+                  // per-filter-change replay.
+                  <motion.div
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-3"
+                    initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+                    key={`${category}:${accessType}:${reservationPolicy}:${selectedTags.join(",")}`}
+                    transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                    {filteredResults?.map((venue) => (
+                      <VenueCard
+                        key={venue.id}
+                        onToggleSaved={toggle}
+                        saved={isSaved(venue.id)}
+                        variant="horizontal-row"
+                        venue={venue}
+                      />
+                    ))}
+                  </motion.div>
+                )}
+              </LoadingFade>
             </section>
           </>
         )}
