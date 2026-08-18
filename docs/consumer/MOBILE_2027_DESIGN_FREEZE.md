@@ -1,5 +1,21 @@
 # SahelSpot Mobile 2027 — Design Freeze Report
 
+> **STATUS: SUPERSEDED (as of the Coastal Editorial Migration, landed
+> after this freeze).** The yellow-only accent (`#FFC94A`) and Space
+> Grotesk headline font this report freezes were superseded by the
+> Coastal Premium palette shipped in `consumer/app/globals.css`: navy
+> `#0D3B66` (unchanged) + clay/terracotta accent `#B9764A` + a sparse
+> muted coral `#C0503F` for Events (the "retired" coral this report
+> describes was reintroduced, deliberately, in that later pass) +
+> Fraunces headline font (not Space Grotesk). `globals.css` is the
+> current canonical source of truth for Consumer color/typography
+> tokens — read it directly rather than this report when implementing or
+> reviewing current UI. The structural rules below this notice (screen
+> IDs, layout shells, spatial rules, component grammar not tied to the
+> specific color/font values above) are not necessarily affected and may
+> still describe current behavior; verify against the live component
+> before relying on any specific claim in this document.
+
 **Status: FROZEN.** This document is the official visual-language baseline for SahelSpot Mobile 2027, effective 2026-08-06.
 
 **Consumer implementation status:** The `consumer/` Home screen (`app/(root)/HomeClient.tsx` and every component it composes — Hero, Search, Categories, Best Beaches, Explore Destinations, Trending Today, Upcoming Events, Food Picks, Nightlife) passed Home Design QA on 2026-08-06 and is now **approved and frozen as the reference implementation** for visual language, the card system, search, typography, spacing, color discipline, and component hierarchy for the rest of the application. Do not revisit it except to fix a confirmed regression. Baseline commit: `6b1a4e55bc74d656ede575e42fa9414cc4c8137a` (pre-Home-completion state; a follow-up commit captures the Home-completion changes above it). It supersedes all prior in-progress design decisions made during the Stitch exploration phase. No screen, component, token, or rule listed as "Approved" below may change without an explicit, separate unfreeze decision.

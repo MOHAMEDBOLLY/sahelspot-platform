@@ -36,7 +36,8 @@ export function FoodPickCard({ venue, saved, onToggleSaved }: FoodPickCardProps)
         ) : null}
       </div>
       <SaveButton
-        className="absolute top-2 left-2 h-7 w-7"
+        className="absolute top-0 left-0"
+        compact
         onToggleSaved={onToggleSaved}
         saved={saved}
         venueId={venue.id}

@@ -54,17 +54,24 @@ export function ImageGallery({
       </div>
       <div className="absolute top-4 right-4 flex gap-2">
         <IconButton icon="share" label="Share this place" onClick={onShare} variant="solid" />
-        {/* Navy, not lime — `variant="solid"` is a white/90 circle, and lime
-          * has ~1.2:1 contrast against it (same fix as `RatingBadge`/
-          * `SectionHeader`). Navy also keeps coral reserved for Events only,
-          * per the brief. */}
+        {/* Save Action Unification — was its own "favorite" (heart) icon in
+          * a manually-tinted `solid` circle; now the same icon, active-state
+          * color, and label semantics every card's `SaveButton` already
+          * uses (unsaved = `solid`'s white/90 circle, saved = `accent`'s
+          * filled-accent circle — see `IconButton`'s `accent` variant,
+          * built for exactly this). Still a plain `IconButton` (not
+          * `CardShell`'s `SaveButton`) because this sits in-flow in the
+          * back/share FAB row at the hero's 48px control scale, not
+          * absolutely positioned over a card photo — reusing `IconButton`
+          * here is the smaller change and keeps that trio's existing
+          * sizing untouched. */}
         <IconButton
-          className={saved ? "text-primary" : undefined}
+          aria-pressed={saved}
           filled={saved}
-          icon="favorite"
+          icon="bookmark"
           label={saved ? "Remove from saved" : "Save this place"}
           onClick={onToggleSaved}
-          variant="solid"
+          variant={saved ? "accent" : "solid"}
         />
       </div>
 

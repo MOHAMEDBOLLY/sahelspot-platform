@@ -204,7 +204,7 @@ function StandardVenueCard({
             </Pill>
           ) : null}
           <SaveButton
-            className="absolute top-3 right-3"
+            className="absolute top-1.5 right-1.5"
             onToggleSaved={onToggleSaved}
             saved={saved}
             venueId={venue.id}

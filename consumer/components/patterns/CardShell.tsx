@@ -102,37 +102,57 @@ export function CardFrame({
 
 /** The save/bookmark control — Card System Redesign. Replaces the previous
  * `BookmarkTab` (a wide accent-filled pill flush to the card's left edge)
- * with a small circular icon button, sized close to the 44×44 touch-target
- * guideline rather than a wide decorative shape. Unsaved = a plain navy
- * icon on a translucent white circle (an obvious but quiet affordance);
- * saved = a filled lime circle, the brief's own "selected/highlight state"
- * use for the accent color — the save action is the one place on a card
- * where lime is used as a fill, and only in its active state. */
+ * with a small circular icon button. Unsaved = a plain navy icon on a
+ * translucent white circle (an obvious but quiet affordance); saved = a
+ * filled accent circle, the "selected/highlight state" use for the accent
+ * color — the save action is the one place on a card where the accent is
+ * used as a fill, and only in its active state.
+ *
+ * UI Polish Batch (Save touch-target correction) — the *visible* circle
+ * (32px default, 28px `compact`) previously doubled as the interactive hit
+ * area, landing below WCAG 2.5.5's 44×44 minimum. Same technique
+ * `IconButton` already documents ("the hit area is expanded, so nothing
+ * looks redesigned"): the outer `<button>` now owns a 44×44 hit box and
+ * position, an inner `<span>` owns the unchanged-size visible circle,
+ * centered within it. Every caller's positioning offset was adjusted by
+ * exactly half the size delta (e.g. `top-2` -> `top-0.5` for the default
+ * 32px circle) so the visible circle lands at the *same* on-card pixel
+ * position as before — only the tappable area around it grew. */
 export function SaveButton({
   venueId,
   saved,
   onToggleSaved,
-  className = "absolute top-2 left-2",
+  className = "absolute top-0.5 left-0.5",
+  /** Food Picks' compact square card needs the visible circle a touch
+   * smaller (28px, previously its own `h-7 w-7` className override on this
+   * same component) — the hit area is unaffected, both sizes get the same
+   * 44×44 tap target. */
+  compact = false,
 }: {
   venueId: string;
   saved: boolean;
   onToggleSaved?: (venueId: string) => void;
   className?: string;
+  compact?: boolean;
 }) {
   return (
     <button
       aria-pressed={saved}
       aria-label={saved ? "Remove from saved" : "Save this place"}
-      className={`z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-        saved ? "bg-accent text-on-accent" : "bg-white/90 text-primary backdrop-blur-sm"
-      } ${className}`}
+      className={`group z-10 flex h-11 w-11 items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${className}`}
       onClick={(event) => {
         event.preventDefault();
         onToggleSaved?.(venueId);
       }}
       type="button"
     >
-      <Icon filled={saved} name="bookmark" size={15} />
+      <span
+        className={`flex items-center justify-center rounded-full shadow-sm transition-transform group-active:scale-90 ${
+          compact ? "h-7 w-7" : "h-8 w-8"
+        } ${saved ? "bg-accent text-on-accent" : "bg-white/90 text-primary backdrop-blur-sm"}`}
+      >
+        <Icon filled={saved} name="bookmark" size={15} />
+      </span>
     </button>
   );
 }

@@ -48,7 +48,8 @@ export function MoreClient() {
   return (
     <>
       <TopAppBar title="More" />
-      <div className="space-y-6 px-4 pt-2">
+      {/* Stage 5 (F-01) — same desktop framing as Home/Explore/Saved. */}
+      <div className="mx-auto w-full max-w-5xl space-y-6 px-4 pt-2">
         <section className="space-y-2">
           <h2 className="px-1 text-xs font-bold tracking-wide text-on-surface-variant uppercase">
             Preferences

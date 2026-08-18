@@ -41,7 +41,7 @@ export function NightlifeCard({ venue, saved, onToggleSaved }: NightlifeCardProp
         ) : null}
         <div aria-hidden="true" className="editorial-overlay pointer-events-none absolute inset-0" />
         <SaveButton
-          className="absolute top-3 right-3 left-auto"
+          className="absolute top-1.5 right-1.5 left-auto"
           onToggleSaved={onToggleSaved}
           saved={saved}
           venueId={venue.id}

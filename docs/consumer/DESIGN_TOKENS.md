@@ -1,5 +1,20 @@
 # Consumer — Design Tokens
 
+> **SUPERSEDED (as of the Coastal Editorial Migration, 2026-08).** The
+> teal/gold palette and `#F9F9FE` surface documented below predate the
+> Coastal Premium palette shipped in `consumer/app/globals.css`
+> (`@theme`, top of file), which is the current canonical source of
+> truth for Consumer color tokens. In brief, the live tokens are:
+> `--color-primary: #0D3B66` (navy, unchanged), `--color-accent: #B9764A`
+> (clay/terracotta — replaces this document's teal `#2AA198`/gold
+> `#F28705`), `--color-coral: #C0503F` (sparse Events-only accent),
+> `--color-cream: #F1EAD9`, `--color-surface: #FFFFFF` (page background —
+> replaces this document's `#F9F9FE`). Headline font is Fraunces
+> (`--font-headline`), body font is Inter (unchanged). This document is
+> kept for historical context (the Stitch-export drift it documents was
+> real at the time) but should not be used to implement or review
+> current UI — read `globals.css` directly instead.
+
 The canonical token set for the SahelSpot Consumer Website. Values are taken from
 `SahelSpot_Developer_Handoff.md` §"Design Tokens (canonical)".
 
