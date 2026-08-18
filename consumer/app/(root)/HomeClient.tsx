@@ -166,10 +166,11 @@ function VenueRail({
  * function changes versus each section's old standalone block is that
  * `isLoading`/`isError` are no longer read from a per-section query —
  * `HomeClient` now runs one shared `useHomeCollections()` query for all
- * three, so loading/error are handled once, above this function, and it
- * only ever runs once real data (however empty) is in hand. An unknown
- * slug renders nothing rather than throwing — defensive, not expected,
- * since the API already restricts this list server-side. */
+ * three, so loading/error are handled once, above this function (see
+ * `renderCuratedSlot`), and it only ever runs once real data (however
+ * empty) is in hand. An unknown slug renders nothing rather than
+ * throwing — defensive, not expected, since the API already restricts
+ * this list server-side. */
 function renderCuratedSection(
   section: HomeCollection,
   spacingBefore: "tight" | "default",
@@ -252,6 +253,95 @@ function renderCuratedSection(
     default:
       return null;
   }
+}
+
+/** Consumer Home Curation Fixed Placement — the three curated sections
+ * (Best Beaches/Food Picks/Nightlife) each render at a fixed position in
+ * the page layout (Best Beaches right after Categories, Food Picks after
+ * the Editorial Break, Nightlife right after Food Picks), not as one
+ * contiguous Studio-ordered block. Studio still controls each section's
+ * content and the order of *venues within it* (via `renderCuratedSection`
+ * above); it does not control where the section sits on the page. The
+ * shared `useHomeCollections()` query/loading/error handling is
+ * unchanged — this just looks up one slug instead of iterating the whole
+ * array, and renders that slug's own pre-existing skeleton shape while
+ * loading. */
+function renderCuratedSlot(
+  homeCollections: ReturnType<typeof useHomeCollections>,
+  slug: HomeCollection["slug"],
+  spacingBefore: "tight" | "default",
+  isSaved: (venueId: string) => boolean,
+  onToggleSaved: (venueId: string) => void,
+): React.ReactNode {
+  const spacingClass = spacingBefore === "tight" ? "mt-5" : "mt-8";
+
+  if (homeCollections.isLoading) {
+    const skeletonBySlug: Record<string, { title: string; actionHref: string; skeletons: React.ReactNode }> = {
+      "best-beaches": {
+        actionHref: "/search?category=beach",
+        skeletons: (
+          <>
+            <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
+            <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
+          </>
+        ),
+        title: "Best Beaches",
+      },
+      "food-picks": {
+        actionHref: "/search?category=food",
+        skeletons: (
+          <>
+            <Skeleton className="h-40 w-28 shrink-0" />
+            <Skeleton className="h-40 w-28 shrink-0" />
+            <Skeleton className="h-40 w-28 shrink-0" />
+          </>
+        ),
+        title: "Food Picks",
+      },
+      nightlife: {
+        actionHref: "/search?category=nightlife",
+        skeletons: (
+          <>
+            <Skeleton className="h-52 w-[230px] shrink-0" />
+            <Skeleton className="h-52 w-[230px] shrink-0" />
+          </>
+        ),
+        title: "Nightlife",
+      },
+    };
+    const config = skeletonBySlug[slug];
+    if (!config) return null;
+    return (
+      <Reveal className={spacingClass} key={slug}>
+        <section>
+          <SectionHeader actionHref={config.actionHref} actionLabel="See All" title={config.title} />
+          <CardCarousel>{config.skeletons}</CardCarousel>
+        </section>
+      </Reveal>
+    );
+  }
+
+  if (homeCollections.isError) {
+    return (
+      <Reveal className={spacingClass} key={slug}>
+        <section>
+          <EmptyState
+            action={
+              <CTAButton onClick={() => homeCollections.refetch()} variant="secondary">
+                Retry
+              </CTAButton>
+            }
+            description="We couldn't reach SahelSpot Studio. Check your connection and try again."
+            icon="error_outline"
+            title="Something went wrong"
+          />
+        </section>
+      </Reveal>
+    );
+  }
+
+  const section = homeCollections.data?.find((candidate) => candidate.slug === slug);
+  return section ? renderCuratedSection(section, spacingBefore, isSaved, onToggleSaved) : null;
 }
 
 /** Home — the first complete screen, and the validation of Phases 0-3.
@@ -467,81 +557,15 @@ export function HomeClient() {
         * cannot affect Map or any other root tab, none of which read this
         * class. */}
       <main className="w-full px-4">
-        {/* Consumer Home Curation Integration V2 — Best Beaches/Food Picks/
-          * Nightlife now render together as one Studio-ordered block,
-          * right after Categories (Best Beaches' previous position).
-          * Food Picks/Nightlife moved up here from much further down the
-          * page (they used to render after Trending/Explore Destinations/
-          * the Editorial Break) — a fixed page position per section can't
-          * represent "Nightlife first," which the brief requires be
-          * possible, so the three have to be contiguous and rendered from
-          * one ordered list. Trending/Explore Destinations/Editorial
-          * Break/Upcoming Events are themselves unmoved — their own code
-          * is untouched below — they simply now follow this block instead
-          * of mostly preceding it.
-          *
-          * One shared query, one shared loading/error state
-          * (`homeCollections`); while loading, the three sections' own
-          * pre-existing skeleton shapes render in the default
-          * best-beaches/food-picks/nightlife order (the real order isn't
-          * known until the response arrives). A fetch error shows one
-          * combined retry state rather than three, since without a
-          * response there's no section identity or order to render at
-          * all. Once loaded, `renderCuratedSection` reproduces each
-          * section's exact pre-existing visual design — nothing here
-          * changes what Best Beaches/Food Picks/Nightlife look like, only
-          * which one renders in which position. */}
-        {homeCollections.isLoading ? (
-          <>
-            <Reveal className="mt-5">
-              <section>
-                <SectionHeader actionHref="/search?category=beach" actionLabel="See All" title="Best Beaches" />
-                <CardCarousel>
-                  <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
-                  <Skeleton className="h-64 w-[80%] min-w-[240px] shrink-0" />
-                </CardCarousel>
-              </section>
-            </Reveal>
-            <Reveal className="mt-8">
-              <section>
-                <SectionHeader actionHref="/search?category=food" actionLabel="See All" title="Food Picks" />
-                <CardCarousel>
-                  <Skeleton className="h-40 w-28 shrink-0" />
-                  <Skeleton className="h-40 w-28 shrink-0" />
-                  <Skeleton className="h-40 w-28 shrink-0" />
-                </CardCarousel>
-              </section>
-            </Reveal>
-            <Reveal className="mt-8">
-              <section>
-                <SectionHeader actionHref="/search?category=nightlife" actionLabel="See All" title="Nightlife" />
-                <CardCarousel>
-                  <Skeleton className="h-52 w-[230px] shrink-0" />
-                  <Skeleton className="h-52 w-[230px] shrink-0" />
-                </CardCarousel>
-              </section>
-            </Reveal>
-          </>
-        ) : homeCollections.isError ? (
-          <Reveal className="mt-5">
-            <section>
-              <EmptyState
-                action={
-                  <CTAButton onClick={() => homeCollections.refetch()} variant="secondary">
-                    Retry
-                  </CTAButton>
-                }
-                description="We couldn't reach SahelSpot Studio. Check your connection and try again."
-                icon="error_outline"
-                title="Something went wrong"
-              />
-            </section>
-          </Reveal>
-        ) : (
-          (homeCollections.data ?? []).map((section, index) =>
-            renderCuratedSection(section, index === 0 ? "tight" : "default", isSaved, toggle),
-          )
-        )}
+        {/* Consumer Home Curation Fixed Placement — Best Beaches keeps its
+          * long-standing position right after Categories; Food Picks and
+          * Nightlife render further down, after the Editorial Break (see
+          * `renderCuratedSlot` above). The final intended Home order is
+          * Categories -> Best Beaches -> Explore Destinations -> Upcoming
+          * Events -> Trending -> Editorial Break -> Food Picks -> Nightlife
+          * — only the venues inside each curated section are Studio-ordered,
+          * not the sections' positions on the page. */}
+        {renderCuratedSlot(homeCollections, "best-beaches", "tight", isSaved, toggle)}
 
         <Reveal className="mt-12">
         <section>
@@ -591,33 +615,11 @@ export function HomeClient() {
         </section>
         </Reveal>
 
-        <VenueRail
-          actionHref="/coming-soon?feature=trending"
-          emptyDescription="Check back soon for what's popular right now."
-          emptyIcon="local_fire_department"
-          emptyTitle="Nothing trending yet"
-          isError={venues.isError}
-          isLoading={venues.isLoading}
-          isSaved={isSaved}
-          onRetry={() => venues.refetch()}
-          onToggleSaved={toggle}
-          title="Trending"
-          venues={featuredVenues}
-        />
-
-        {/* COASTAL EDITORIAL MIGRATION — the Editorial Break, Home's one
-          * non-rail moment. Placed between Trending and Events, the longest
-          * previously-unbroken run of identically-shaped carousel sections.
-          * Owns its own `mt-12` and full-bleed `-mx-4` internally, so it is
-          * not wrapped in `Reveal` here (it carries its own scroll reveal)
-          * and needs no spacing wrapper. Renders nothing when no second
-          * coastal photo exists — see the component. */}
-        <EditorialBreak
-          eyebrow="The North Coast"
-          headline="Every beach, every table, every night out. One map."
-          imageUrl={editorialBreakImageUrl}
-        />
-
+        {/* Home Section Order Correction — Upcoming Events now precedes
+          * Trending (previously the reverse), per the final intended order:
+          * Explore Destinations -> Upcoming Events -> Trending -> Editorial
+          * Break. Only this section's position moved; its own loading/
+          * error/empty/success rendering is unchanged. */}
         <Reveal className="mt-12">
         <section>
           <SectionHeader actionHref="/events" actionLabel="See All" title="Upcoming Events" />
@@ -666,6 +668,38 @@ export function HomeClient() {
           )}
         </section>
         </Reveal>
+
+        <VenueRail
+          actionHref="/coming-soon?feature=trending"
+          emptyDescription="Check back soon for what's popular right now."
+          emptyIcon="local_fire_department"
+          emptyTitle="Nothing trending yet"
+          isError={venues.isError}
+          isLoading={venues.isLoading}
+          isSaved={isSaved}
+          onRetry={() => venues.refetch()}
+          onToggleSaved={toggle}
+          title="Trending"
+          venues={featuredVenues}
+        />
+
+        {/* COASTAL EDITORIAL MIGRATION — the Editorial Break, Home's one
+          * non-rail moment. Owns its own `mt-12` and full-bleed `-mx-4`
+          * internally, so it is not wrapped in `Reveal` here (it carries
+          * its own scroll reveal) and needs no spacing wrapper. Renders
+          * nothing when no second coastal photo exists — see the
+          * component. */}
+        <EditorialBreak
+          eyebrow="The North Coast"
+          headline="Every beach, every table, every night out. One map."
+          imageUrl={editorialBreakImageUrl}
+        />
+
+        {/* Home Section Order Correction — Food Picks and Nightlife's fixed
+          * positions: Food Picks right after the Editorial Break, Nightlife
+          * right after Food Picks (see `renderCuratedSlot` above). */}
+        {renderCuratedSlot(homeCollections, "food-picks", "default", isSaved, toggle)}
+        {renderCuratedSlot(homeCollections, "nightlife", "default", isSaved, toggle)}
 
         {SHOW_ESSENTIAL_SERVICES && (
           <section className="mt-8">
