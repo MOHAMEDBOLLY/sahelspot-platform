@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Sans_Arabic, Inter } from "next/font/google";
 import "./globals.css";
+import { AnalyticsProvider } from "@/components/providers/AnalyticsProvider";
+import { PageviewTracker } from "@/components/providers/PageviewTracker";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 
 /** Inter for Latin body text, IBM Plex Sans Arabic for RTL content, Fraunces
@@ -98,7 +100,10 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased">
-        <QueryProvider>{children}</QueryProvider>
+        <AnalyticsProvider>
+          <PageviewTracker />
+          <QueryProvider>{children}</QueryProvider>
+        </AnalyticsProvider>
       </body>
     </html>
   );

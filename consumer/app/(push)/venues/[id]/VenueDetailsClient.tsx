@@ -2,7 +2,8 @@
 
 import { notFound, useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { capture } from "@/lib/analytics/analytics";
 import { ChecklistRow } from "@/components/patterns/ChecklistRow";
 import { EmptyState } from "@/components/patterns/EmptyState";
 import { InfoPill } from "@/components/patterns/InfoPill";
@@ -119,17 +120,20 @@ function VenueActionTile({
   label,
   children,
   fullWidth,
+  onClick,
 }: {
   href: string;
   icon?: string;
   label: string;
   children?: ReactNode;
   fullWidth?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <a
       className={`flex h-16 flex-col items-center justify-center gap-1 rounded-xl border-2 border-outline-variant/20 text-on-surface transition-transform active:scale-95 active:bg-surface-container ${fullWidth ? "col-span-2" : ""}`}
       href={href}
+      onClick={onClick}
       rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
       target={href.startsWith("http") ? "_blank" : undefined}
     >
@@ -158,6 +162,20 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
   const destinations = useDestinations();
   const { isSaved, toggle } = useSaved();
   const [shareState, setShareState] = useState<"idle" | "copied" | "error">("idle");
+
+  // Fires once per distinct venue actually viewed — keyed on `venue.data.id`
+  // so it doesn't refire on unrelated re-renders (save toggle, share state),
+  // and only after the real venue record has loaded, not on the skeleton.
+  useEffect(() => {
+    if (!venue.data) return;
+    capture("venue_view", {
+      venue_id: venue.data.id,
+      venue_name: venue.data.name,
+      destination: venue.data.destinationName,
+      category: venue.data.category,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venue.data?.id]);
 
   if (venue.isLoading) {
     return (
@@ -269,12 +287,14 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
   // Call surface real-time discovery and contact, Website is the venue's
   // own source, Directions is always the last step and is gated on real
   // coordinates existing (via `directionsHref`), never on `mapsUrl` alone.
+  type LinkType = "instagram" | "whatsapp" | "phone" | "website" | "maps";
   type VenueAction = {
     key: string;
     href: string;
     label: string;
     icon?: string;
     customIcon?: ReactNode;
+    linkType: LinkType;
   };
   const rawVenueActions: (VenueAction | null)[] = [
     data.contact.instagram
@@ -283,6 +303,7 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
           href: data.contact.instagram,
           label: "Instagram",
           customIcon: <InstagramIcon />,
+          linkType: "instagram",
         }
       : null,
     data.contact.whatsapp
@@ -291,19 +312,39 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
           href: `https://wa.me/${data.contact.whatsapp}`,
           label: "WhatsApp",
           customIcon: <WhatsAppIcon />,
+          linkType: "whatsapp",
         }
       : null,
     data.contact.phone
-      ? { key: "call", href: `tel:${data.contact.phone}`, label: "Call", icon: "call" }
+      ? { key: "call", href: `tel:${data.contact.phone}`, label: "Call", icon: "call", linkType: "phone" }
       : null,
     data.contact.website
-      ? { key: "website", href: data.contact.website, label: "Website", icon: "public" }
+      ? { key: "website", href: data.contact.website, label: "Website", icon: "public", linkType: "website" }
       : null,
     directionsHref
-      ? { key: "directions", href: directionsHref, label: "Directions", icon: "directions" }
+      ? { key: "directions", href: directionsHref, label: "Directions", icon: "directions", linkType: "maps" }
       : null,
   ];
   const venueActions = rawVenueActions.filter((action): action is VenueAction => action !== null);
+
+  // `tel:`/relative hrefs have no hostname to report — `target_domain` is
+  // null rather than fabricated. The full URL (which can carry query
+  // params, e.g. a maps destination's raw lat/lng) is never sent, only the
+  // host — see audit §9's "do not collect the full URL" constraint.
+  function handleVenueActionClick(action: VenueAction) {
+    let targetDomain: string | null = null;
+    try {
+      targetDomain = new URL(action.href).hostname;
+    } catch {
+      targetDomain = null;
+    }
+    capture("external_link_click", {
+      venue_id: data.id,
+      venue_name: data.name,
+      link_type: action.linkType,
+      target_domain: targetDomain,
+    });
+  }
 
   async function handleShare() {
     const shareData = { title: data.name, url: window.location.href };
@@ -432,6 +473,7 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
                 icon={action.icon}
                 key={action.key}
                 label={action.label}
+                onClick={() => handleVenueActionClick(action)}
               >
                 {action.customIcon}
               </VenueActionTile>
