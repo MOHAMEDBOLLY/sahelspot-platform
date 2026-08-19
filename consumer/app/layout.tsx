@@ -68,11 +68,15 @@ export const metadata: Metadata = {
     siteName: "SahelSpot",
     type: "website",
     locale: "en_US",
+    // Official brand asset (Brand Assets Implementation) — supplied
+    // pre-sized at 1200×630, the standard OG dimensions, unmodified.
+    images: ["/brand/exports/sahelspot-og-1200x630.png"],
   },
   twitter: {
     card: "summary_large_image",
     title: "SahelSpot",
     description: SITE_DESCRIPTION,
+    images: ["/brand/exports/sahelspot-og-1200x630.png"],
   },
 };
 
