@@ -7,10 +7,6 @@ import { posthog } from "./posthog";
  * stay typed and centralized instead of scattered `posthog.capture(...)`
  * calls with ad-hoc property bags. */
 type EventMap = {
-  page_view: {
-    pathname: string;
-    search: string;
-  };
   search: {
     query: string;
     result_count: number;
