@@ -20,6 +20,7 @@ import { useVenues } from "@/lib/hooks/useVenues";
 import { useCategoryTaxonomy } from "@/lib/hooks/useCategoryTaxonomy";
 import { useRecentSearches } from "@/lib/search/useRecentSearches";
 import { useSaved } from "@/lib/saved/useSaved";
+import { capture } from "@/lib/analytics/analytics";
 import {
   ACCESS_TYPES,
   ACCESS_TYPE_ICON,
@@ -204,9 +205,32 @@ function SearchPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function runSearch(nextQuery: string) {
+  // Fires the `search` event once the query this action actually kicked off
+  // has settled, not at submit time — `result_count` isn't known until then.
+  // Cleared after firing so a later category/filter-only refetch (no new
+  // `runSearch` call) never re-sends it.
+  const [pendingSearch, setPendingSearch] = useState<{
+    query: string;
+    source: "search_page" | "recent";
+  } | null>(null);
+
+  useEffect(() => {
+    if (!pendingSearch || !hasQuery || results.isLoading) return;
+    capture("search", {
+      query: pendingSearch.query,
+      result_count: filteredResults?.length ?? 0,
+      source: pendingSearch.source,
+    });
+    setPendingSearch(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingSearch, hasQuery, results.isLoading, filteredResults]);
+
+  function runSearch(nextQuery: string, source: "search_page" | "recent" = "search_page") {
     setQuery(nextQuery);
-    if (nextQuery.trim()) addRecentSearch(nextQuery.trim());
+    if (nextQuery.trim()) {
+      addRecentSearch(nextQuery.trim());
+      setPendingSearch({ query: nextQuery.trim(), source });
+    }
   }
 
   return (
@@ -244,7 +268,7 @@ function SearchPageContent() {
                       icon="schedule"
                       key={entry}
                       label={entry}
-                      onClick={() => runSearch(entry)}
+                      onClick={() => runSearch(entry, "recent")}
                     />
                   ))}
                 </div>
