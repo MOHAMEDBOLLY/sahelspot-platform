@@ -2,12 +2,12 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { CategoryChip } from "@/components/patterns/CategoryChip";
 import { EmptyState } from "@/components/patterns/EmptyState";
 import { FilterChip } from "@/components/patterns/FilterChip";
 import { LoadingFade } from "@/components/patterns/LoadingFade";
-import { SearchField } from "@/components/patterns/SearchField";
+import { SearchAutocomplete } from "@/components/patterns/SearchAutocomplete";
 import { SectionHeader } from "@/components/patterns/SectionHeader";
 import { CTAButton } from "@/components/ui/CTAButton";
 import { IconButton } from "@/components/ui/IconButton";
@@ -52,6 +52,17 @@ function SearchPageContent() {
   const { isSaved, toggle } = useSaved();
   const { recentSearches, addRecentSearch, clearRecentSearches } = useRecentSearches();
   const reduceMotion = useReducedMotion();
+  // Final Search UX audit — the autocomplete dropdown shows its own Recent
+  // Searches list (`SearchSuggestions`) whenever it's open and the query
+  // hasn't reached `SEARCH_MIN_QUERY_LENGTH` yet, which is exactly this
+  // page's own "!hasQuery" default state. Without this, both rendered at
+  // once: the dropdown floating over the page's own Recent Searches section
+  // showing the identical chips a few rows below. Tracked via
+  // `SearchAutocomplete`'s `onSurfaceOpenChange` rather than re-deriving the
+  // dropdown's open state here, so there's exactly one source of truth for
+  // it.
+  const [isSuggestSurfaceOpen, setIsSuggestSurfaceOpen] = useState(false);
+  const handleSuggestSurfaceOpenChange = useCallback((open: boolean) => setIsSuggestSurfaceOpen(open), []);
 
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const [category, setCategory] = useState<VenueCategory | "all">(
@@ -203,12 +214,14 @@ function SearchPageContent() {
       <header className="sticky top-0 z-10 flex items-center gap-2 bg-surface p-4">
         <IconButton icon="arrow_back" label="Go back" onClick={() => router.back()} variant="plain" />
         <div className="flex-grow">
-          <SearchField
+          <SearchAutocomplete
             autoFocus
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") runSearch(query);
-            }}
+            onChange={setQuery}
+            onSelectCategory={(value) => changeCategory(value as VenueCategory)}
+            onSelectDestination={(destinationId) => router.push(`/search?destination=${destinationId}`)}
+            onSelectVenue={(venue) => router.push(`/venues/${venue.id}`)}
+            onSubmit={runSearch}
+            onSurfaceOpenChange={handleSuggestSurfaceOpenChange}
             placeholder="Search for places, beaches, cafes..."
             value={query}
           />
@@ -218,7 +231,7 @@ function SearchPageContent() {
       <main className="space-y-8 px-4 pb-12">
         {!hasQuery ? (
           <>
-            {recentSearches.length > 0 ? (
+            {recentSearches.length > 0 && !isSuggestSurfaceOpen ? (
               <section>
                 <SectionHeader
                   actionLabel="Clear All"

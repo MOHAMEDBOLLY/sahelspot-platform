@@ -512,11 +512,19 @@ export function HomeClient() {
           * the imageless hero below, which carries no weather slot. */}
         <HomeHero
           searchProps={{
-            onChange: (event) => setQuery(event.target.value),
+            onChange: setQuery,
             onFilterClick: () => router.push("/search"),
-            onKeyDown: (event) => {
-              if (event.key === "Enter") goToSearch();
-            },
+            onSelectCategory: (value) => router.push(`/search?category=${value}`),
+            onSelectDestination: (destinationId) => router.push(`/search?destination=${destinationId}`),
+            // `goToSearch` reads `query` state directly and ignores any
+            // argument — correct for Enter (the term typed *is* `query`),
+            // but wrong for a Recent Search pick, which submits a
+            // different, previously-saved term. Given its own handler
+            // rather than falling back to `onSubmit` (`SearchAutocomplete`'s
+            // default) for that reason.
+            onSelectRecent: (term) => router.push(`/search?q=${encodeURIComponent(term)}`),
+            onSelectVenue: (venue) => router.push(`/venues/${venue.id}`),
+            onSubmit: goToSearch,
             placeholder: "Search destinations, venues & events...",
             value: query,
           }}

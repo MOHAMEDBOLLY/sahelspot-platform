@@ -16,12 +16,21 @@ async function parseJson(response: Response, path: string): Promise<unknown> {
 
 /** GET a JSON array. Every `/public/*` list endpoint returns `[]` rather than
  * an error when no publish revision exists yet — that's an empty state for
- * the UI to render, not something this layer should treat specially. */
-export async function apiGetList<T>(path: string): Promise<T[]> {
+ * the UI to render, not something this layer should treat specially.
+ *
+ * `signal` (optional) — threaded straight through to `fetch`. TanStack Query
+ * passes its own per-query `AbortSignal` into `queryFn`'s context; callers
+ * that want a superseded request actually cancelled (not just ignored) pass
+ * it down to here rather than inventing a parallel cancellation mechanism.
+ * An aborted fetch rejects with a `DOMException` named `AbortError`, which
+ * this rethrows as-is rather than wrapping in `ApiError` — TanStack treats
+ * that name specially and does not surface it as a query error. */
+export async function apiGetList<T>(path: string, signal?: AbortSignal): Promise<T[]> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`);
-  } catch {
+    response = await fetch(`${API_BASE_URL}${path}`, { signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw new ApiError(`Could not reach the API (${path}).`);
   }
 

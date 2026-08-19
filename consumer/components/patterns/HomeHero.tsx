@@ -2,10 +2,10 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import type { ComponentProps } from "react";
-import { SearchField } from "@/components/patterns/SearchField";
+import { SearchAutocomplete } from "@/components/patterns/SearchAutocomplete";
 
 type HomeHeroProps = {
-  searchProps: Omit<ComponentProps<typeof SearchField>, "variant" | "className">;
+  searchProps: Omit<ComponentProps<typeof SearchAutocomplete>, "variant" | "className">;
 };
 
 /** Home Hero — COASTAL EDITORIAL MIGRATION, then Hero→Category Background
@@ -49,7 +49,7 @@ export function HomeHero({ searchProps }: HomeHeroProps) {
           reduceMotion ? { duration: 0 } : { duration: 0.4, ease: [0.16, 1, 0.3, 1] }
         }
       >
-        <SearchField {...searchProps} />
+        <SearchAutocomplete {...searchProps} />
       </motion.div>
     </div>
   );

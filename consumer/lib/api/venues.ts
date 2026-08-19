@@ -36,7 +36,7 @@ export type VenueSearchParams = {
  * and `"Resort"`. `SearchClient` filters by the already-mapped domain
  * `Venue.category` client-side instead, the same way it already has to for
  * `reservationPolicy` (no server-side filter exists for that either). */
-export function searchVenues(params: VenueSearchParams): Promise<PublishedVenueDTO[]> {
+export function searchVenues(params: VenueSearchParams, signal?: AbortSignal): Promise<PublishedVenueDTO[]> {
   const query = new URLSearchParams();
   if (params.q) query.set("q", params.q);
   if (params.destination) query.set("destination", params.destination);
@@ -44,5 +44,5 @@ export function searchVenues(params: VenueSearchParams): Promise<PublishedVenueD
   if (params.accessType) query.set("accessType", params.accessType);
   const suffix = query.toString();
 
-  return apiGetList<PublishedVenueDTO>(`/public/search/venues${suffix ? `?${suffix}` : ""}`);
+  return apiGetList<PublishedVenueDTO>(`/public/search/venues${suffix ? `?${suffix}` : ""}`, signal);
 }
