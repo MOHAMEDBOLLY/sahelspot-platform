@@ -1,36 +1,41 @@
 @import "tailwindcss";
 
-/* Design tokens — Coastal Premium palette (SAHELSPOT CONSUMER — HOME UI
- * REFINEMENT). Replaces the prior cool-tinted / lime-accented palette with a
- * warm, restrained coastal set: ivory/sand surfaces, deep navy as the
- * dominant brand/content color, and a muted clay/terracotta accent in place
- * of the old neon lime. Same structural rule as every pass before this one:
- * literal hex only here, every component resolves color through a token,
- * never a hard-coded value.
+/* Design tokens — Warm Neutral / Mediterranean Terracotta palette (COLOR
+ * SYSTEM V2). Replaces the prior "Coastal Premium" pass's navy-as-structural-
+ * workhorse with a warm-charcoal structural neutral, so the one place navy
+ * used to compound against North Coast photography (card/hero overlays,
+ * shadows) no longer does. Same structural rule as every pass before this
+ * one: literal hex only here, every component resolves color through a
+ * token, never a hard-coded value.
  *
- *   --color-primary  (#0D3B66, navy) — the dominant brand/action color:
- *                     buttons, active states, icons, links, headline text,
- *                     nav active state.
- *   --color-primary-light / --color-primary-container — a muted, desaturated
- *                     slate-blue, not a bright sky blue. Minor supporting
- *                     token only (chip hover state, subtle tints) — never a
- *                     major fill, never a "beach blue" theme.
- *   --color-accent   (#B9764A, clay/terracotta) — the single structural
- *                     highlight (save, filter, "See All" underline, active
- *                     nav tab), replacing the old lime. Warm and restrained,
- *                     never decorative, never spread across every card.
+ *   --color-primary  (#2E2A25, warm charcoal) — the dominant structural
+ *                     dark: headline text, icons, links, nav active state,
+ *                     card/hero overlays, shadows. A neutral dark, not a
+ *                     brand hue — deliberately not brown, not navy.
+ *   --color-primary-light / --color-primary-container — a warm, desaturated
+ *                     stone tint (was slate-blue). Minor supporting token
+ *                     only (chip hover state, subtle tints) — never a major
+ *                     fill.
+ *   --color-accent   (#C1633D, terracotta) — the single brand-forward
+ *                     accent (save, filter, "See All" underline where
+ *                     contrast allows, active nav indicator dot). Used with
+ *                     restraint — an accent, never the dominant color.
+ *   --color-ochre    (#D9A441, ochre) — secondary accent, sparser still:
+ *                     small focus indicators and minor highlights only.
  *   --color-coral    (#C0503F, muted coral) — reserved for small, sparse
  *                     Events-only moments, softened to sit with the warm
  *                     palette rather than reading as a bright pop color.
  *
- * Ratio target: ~80–90% warm ivory/sand/white, ~10–15% navy, small clay/
- * coral accents. */
+ * Ratio target: ~75–85% warm ivory/sand/white + photography, ~10–15% warm
+ * charcoal structure, small terracotta/ochre accents, navy reduced to rare/
+ * semantic use (see Map's frozen marker spec, unrelated to this palette). */
 @theme {
   /* Brand */
-  --color-primary: #0d3b66;
-  --color-primary-light: #9fb0bf;
-  --color-accent: #b9764a;
+  --color-primary: #2e2a25;
+  --color-primary-light: #b5aa98;
+  --color-accent: #c1633d;
   --color-on-accent: #ffffff;
+  --color-ochre: #d9a441;
   --color-coral: #c0503f;
   /* Warm sand — image-placeholder backgrounds and any "natural" fill. */
   --color-cream: #f1ead9;
@@ -57,7 +62,7 @@
    * (rather than aliased) since Tailwind v4's `@theme` doesn't support
    * referencing one theme color from another; the two must simply agree.
    * Minor supporting surface only — e.g. `CategoryChip`'s hover state. */
-  --color-primary-container: #dde3e8;
+  --color-primary-container: #ede7da;
   --color-accent-container: #f2e2d3;
 
   /* Content */
@@ -183,13 +188,17 @@ body {
  * token is the whole point: a single Editorial grammar, not three competing
  * section colors.
  *
- * Navy (`--color-primary`, #0d3b66) is the surviving hue because it is
- * already the app's dominant brand/content color and the one the frozen
- * design system reserves for structural surfaces; terracotta and violet
- * were per-section inventions with no system-level justification. Stop
- * shape/alphas are carried over unchanged from the existing cards — only
- * the hue is unified, so every card's photo still reads clearly across its
- * top half and the text still sits on a fully-opaque base.
+ * Warm Charcoal (`--color-primary`, #2e2a25) is the surviving hue — COLOR
+ * SYSTEM V2 migration (was navy, #0d3b66). A neutral dark reads correctly
+ * against every category's photography (turquoise water, wood-lit
+ * restaurant interiors, dark nightlife scenes) without the hue-on-hue
+ * compounding navy had against blue/turquoise beach photography
+ * specifically. Stop shape is carried over from the previous pass, with one
+ * deliberate change: the previous ramp went fully opaque (alpha 1) at the
+ * card's bottom edge, which read as a flat color block rather than a
+ * legibility aid once the hue-compounding issue was investigated — every
+ * stop below is scaled so the deepest point tops out at ~0.80, not 1.0, so
+ * the photograph is never fully hidden even at the text-safety zone.
  *
  * Deliberately NOT merged with `.hero-gradient` below: that one darkens the
  * top *and* bottom edges (so Venue Details' floating back/share controls
@@ -197,27 +206,28 @@ body {
 .editorial-overlay {
   background: linear-gradient(
     to bottom,
-    rgb(13 59 102 / 0) 20%,
-    rgb(13 59 102 / 0.02) 35%,
-    rgb(13 59 102 / 0.12) 48%,
-    rgb(13 59 102 / 0.38) 62%,
-    rgb(13 59 102 / 0.82) 78%,
-    rgb(13 59 102 / 1) 100%
+    rgb(46 42 37 / 0) 20%,
+    rgb(46 42 37 / 0.02) 35%,
+    rgb(46 42 37 / 0.1) 48%,
+    rgb(46 42 37 / 0.3) 62%,
+    rgb(46 42 37 / 0.65) 78%,
+    rgb(46 42 37 / 0.8) 100%
   );
 }
 
-/* The Editorial Break's overlay — COASTAL EDITORIAL MIGRATION. Bottom-
- * weighted only (no top darkening): this is a full-width photographic pause
- * with no floating controls to protect, just a headline sitting in the
- * lower third. Lighter at the bottom than `.editorial-overlay` (0.78 vs a
- * fully-opaque 1.0) because the photograph itself is the point here — the
- * type sits *on* the image rather than on a solid base. */
+/* The Editorial Break's overlay — COASTAL EDITORIAL MIGRATION, recolored
+ * warm charcoal in COLOR SYSTEM V2 (was navy). Bottom-weighted only (no top
+ * darkening): this is a full-width photographic pause with no floating
+ * controls to protect, just a headline sitting in the lower third. Already
+ * under the ~0.80 max-opacity guideline `.editorial-overlay` was brought
+ * down to, so only the hue changes here — the photograph itself is the
+ * point here, the type sits *on* the image rather than on a solid base. */
 .editorial-break-overlay {
   background: linear-gradient(
     to top,
-    rgb(13 59 102 / 0.78) 0%,
-    rgb(13 59 102 / 0.25) 45%,
-    rgb(13 59 102 / 0.05) 75%
+    rgb(46 42 37 / 0.78) 0%,
+    rgb(46 42 37 / 0.25) 45%,
+    rgb(46 42 37 / 0.05) 75%
   );
 }
 

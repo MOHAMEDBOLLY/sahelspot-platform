@@ -67,14 +67,14 @@ export function HomeHeroBackdrop({ imageUrl = null }: HomeHeroBackdropProps) {
         <div aria-hidden="true" className="absolute inset-0 bg-cream" />
       )}
 
-      {/* Navy wash, unchanged from the previous `HomeHero` — same stops,
-        * same purpose: the top edge keeps the seam with `TopAppBar` from
+      {/* Warm charcoal wash — COLOR SYSTEM V2 (was navy). Same stops, same
+        * purpose: the top edge keeps the seam with `TopAppBar` from
         * reading as a hard cut, the bottom carries the search field. Fixed
         * to the original 176px band height so it never bleeds into the
         * category section below. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[linear-gradient(to_bottom,rgb(13_59_102_/_0.45)_0%,rgb(13_59_102_/_0.05)_40%,rgb(13_59_102_/_0.18)_68%,rgb(13_59_102_/_0.62)_100%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[linear-gradient(to_bottom,rgb(46_42_37_/_0.45)_0%,rgb(46_42_37_/_0.05)_40%,rgb(46_42_37_/_0.18)_68%,rgb(46_42_37_/_0.62)_100%)]"
       />
 
       {/* Bottom fade — see `.hero-category-fade` (globals.css) for the

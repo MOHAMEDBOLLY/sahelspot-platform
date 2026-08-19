@@ -26,10 +26,11 @@ type DestinationCardProps = {
  * km-marker/place-count content that used to live in the separate navy
  * panel now sits absolutely positioned over the darkest part of the overlay
  * instead — no separate content block remains. Same stop shape/alphas as
- * Best Beaches' terracotta overlay, only the hue changes: this reuses the
- * app's existing `--color-primary` navy (`#0d3b66` / `rgb(13,59,102)`,
- * `app/globals.css`) — the same navy the old content panel and every other
- * navy surface in this app already use — not a new or sampled color. `href`
+ * Best Beaches' overlay, only the hue changes: this reuses the app's
+ * existing `--color-primary` warm charcoal (`#2e2a25` / `rgb(46,42,37)`,
+ * `app/globals.css`, COLOR SYSTEM V2 — was navy) — the same structural dark
+ * every overlay/shadow in this app already uses — not a new or sampled
+ * color. `href`
  * and all existing content (name, kilometer marker, place count) are
  * preserved unchanged; no save action, destinations still aren't saveable.
  *

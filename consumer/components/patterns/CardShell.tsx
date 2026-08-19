@@ -130,14 +130,14 @@ export function CardFrame({
       // press state, so touch never sees a lingering "hover" after a tap.
       //
       // Visual Richness / Art Direction Pass, item 4 — the resting/hover
-      // shadows are navy-tinted (`rgb(13 59 102 / …)`), not generic black:
-      // a "physical surface" reads as sitting in *this* interface's light,
-      // not a default browser shadow. Kept soft and low-opacity on purpose
-      // (8–16% alpha, wide/soft blur) — a "richer" shadow here means more
-      // believable, not more visible. Border bumped 10% → 14% opacity for a
-      // touch more definition against the light background, still a
-      // hairline, not a stroke.
-      className={`relative block shrink-0 snap-start overflow-hidden rounded-2xl rounded-tr-none border border-outline-variant/[0.16] bg-surface-container-lowest shadow-[0_1px_6px_-1px_rgb(13_59_102_/_0.08)] transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] active:scale-[0.98] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 md:hover:-translate-y-0.5 md:hover:shadow-[0_8px_20px_-6px_rgb(13_59_102_/_0.16)] ${className}`}
+      // shadows are warm-charcoal-tinted (`rgb(46 42 37 / …)`, COLOR SYSTEM
+      // V2 — was navy), not generic black: a "physical surface" reads as
+      // sitting in *this* interface's light, not a default browser shadow.
+      // Kept soft and low-opacity on purpose (8–16% alpha, wide/soft blur) —
+      // a "richer" shadow here means more believable, not more visible.
+      // Border bumped 10% → 14% opacity for a touch more definition against
+      // the light background, still a hairline, not a stroke.
+      className={`relative block shrink-0 snap-start overflow-hidden rounded-2xl rounded-tr-none border border-outline-variant/[0.16] bg-surface-container-lowest shadow-[0_1px_6px_-1px_rgb(46_42_37_/_0.08)] transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] active:scale-[0.98] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 md:hover:-translate-y-0.5 md:hover:shadow-[0_8px_20px_-6px_rgb(46_42_37_/_0.16)] ${className}`}
       href={href}
       onFocus={onIntentPrefetch}
       onMouseEnter={onIntentPrefetch}

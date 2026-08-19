@@ -74,12 +74,13 @@ export function CategoryChip({
               // background in live testing) over `backdrop-blur-md`, a
               // clearly-visible-but-still-translucent border, and a
               // layered shadow — an inset top highlight (the thin-glass
-              // "catching light" cue) plus a soft navy-tinted elevation
-              // shadow, neither one a dark drop shadow or a glow.
+              // "catching light" cue) plus a soft warm-charcoal-tinted
+              // elevation shadow (COLOR SYSTEM V2 — was navy), neither
+              // one a dark drop shadow or a glow.
               // `rounded-lg` (16px, this app's own scale) stays well
               // short of the shared tile's `rounded-xl` (24px, which
               // reads almost circular at this size).
-              "rounded-lg border-white/70 bg-white/70 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7),0_4px_12px_-4px_rgba(13,59,102,0.18)] backdrop-blur-md group-active:scale-95 group-active:border-white/90 group-active:bg-white/90"
+              "rounded-lg border-white/70 bg-white/70 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7),0_4px_12px_-4px_rgba(46,42,37,0.18)] backdrop-blur-md group-active:scale-95 group-active:border-white/90 group-active:bg-white/90"
             : "rounded-xl border-outline-variant/15 bg-surface-container-lowest shadow-sm group-hover:bg-primary-container group-active:scale-95"
         }`}
       >

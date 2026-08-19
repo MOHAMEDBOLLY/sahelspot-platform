@@ -96,7 +96,7 @@ function CoverflowCard({
   // redesigned, only what surrounds it.
   const filter = useTransform(
     distance,
-    (d) => `drop-shadow(0 ${Math.max(2, 10 - d * 4)}px ${Math.max(4, 20 - d * 6)}px rgb(13 59 102 / ${Math.max(0.04, 0.2 - d * 0.07)}))`,
+    (d) => `drop-shadow(0 ${Math.max(2, 10 - d * 4)}px ${Math.max(4, 20 - d * 6)}px rgb(46 42 37 / ${Math.max(0.04, 0.2 - d * 0.07)}))`,
   );
 
   return (

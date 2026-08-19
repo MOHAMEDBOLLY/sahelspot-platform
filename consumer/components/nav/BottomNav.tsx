@@ -54,15 +54,16 @@ export function BottomNav() {
     <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <nav
         aria-label="Main"
-        // Visual Richness pass's navy-tinted shadow language reused here
-        // (same token family as `CardFrame`'s resting shadow) — the pill
-        // reads as one more "physical surface" in this interface, not a
-        // one-off. `max-w-full` + no fixed width: five `min-w-12` items
-        // plus gaps naturally fit 390–393px viewports with room to spare;
-        // verified at both, and on desktop where the pill just centers
-        // with more surrounding whitespace instead of stretching edge-to-
-        // edge like the previous full-bleed bar did.
-        className="flex max-w-full items-center gap-1 rounded-full border border-outline-variant/15 bg-surface-container-lowest px-2 py-2 shadow-[0_8px_28px_-6px_rgb(13_59_102_/_0.18)]"
+        // Visual Richness pass's warm-charcoal-tinted shadow language reused
+        // here (same token family as `CardFrame`'s resting shadow, COLOR
+        // SYSTEM V2 — was navy) — the pill reads as one more "physical
+        // surface" in this interface, not a one-off. `max-w-full` + no
+        // fixed width: five `min-w-12` items plus gaps naturally fit
+        // 390–393px viewports with room to spare; verified at both, and on
+        // desktop where the pill just centers with more surrounding
+        // whitespace instead of stretching edge-to-edge like the previous
+        // full-bleed bar did.
+        className="flex max-w-full items-center gap-1 rounded-full border border-outline-variant/15 bg-surface-container-lowest px-2 py-2 shadow-[0_8px_28px_-6px_rgb(46_42_37_/_0.18)]"
       >
         {ROOT_TABS.map((tab) => {
           const active = isTabActive(tab.href, pathname);

@@ -156,7 +156,7 @@ export function FilterPopover({
         >
           <span className="min-w-0 flex-1 truncate">{section.label}</span>
           {section.activeCount > 0 ? (
-            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-accent">
+            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">
               {section.activeCount}
             </span>
           ) : null}

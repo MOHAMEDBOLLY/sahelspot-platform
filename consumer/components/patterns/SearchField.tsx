@@ -38,8 +38,14 @@ export function SearchField({
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <div
+        // Focus ring is ochre, not the structural charcoal every other
+        // control's `ring-primary` uses — COLOR SYSTEM V2 §10: Search is
+        // the one place the spec calls for the sparser secondary accent
+        // rather than the primary structural dark, so its focus state
+        // reads as a distinct, deliberate accent rather than "the same
+        // dark ring everything else gets."
         className={`relative flex h-12 flex-1 items-center rounded-2xl border border-outline-variant/20 bg-surface-container-lowest shadow-sm transition-shadow ${
-          focused ? "ring-2 ring-primary/30" : ""
+          focused ? "ring-2 ring-ochre/40" : ""
         }`}
       >
         <Icon className="pointer-events-none absolute left-4 text-on-surface-variant" name="search" size={20} />

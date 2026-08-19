@@ -35,10 +35,13 @@ type FilterChipProps = FilterChipOwnProps &
   Omit<ComponentPropsWithoutRef<typeof motion.button>, keyof FilterChipOwnProps>;
 
 /** Pill filter — the Map category row ("All", "Beaches", "Food", ...) and
- * Search's category/status row. Active = navy fill with accent-yellow text
- * (docs/consumer/MOBILE_2027_COMPONENT_MAPPING.md §4 — yellow is the frozen
- * system's single accent, not white, on the active state); inactive =
- * bordered white, matching the export's `interactive_map_1` chip row. */
+ * Search's category/status row. Active = warm-charcoal fill with white text
+ * (COLOR SYSTEM V2 — was navy fill with accent text; measured contrast of
+ * terracotta-on-charcoal at this text size is ~3.5:1, short of WCAG AA's
+ * 4.5:1 for normal text, so the accessibility-safe alternative the color
+ * system itself sanctions for "selected" states — charcoal fill, white
+ * text — is used here instead of terracotta text); inactive = bordered
+ * white, matching the export's `interactive_map_1` chip row. */
 export function FilterChip({
   label,
   icon,
@@ -66,7 +69,7 @@ export function FilterChip({
       // prototype's validated values), not the color/scale fade above.
       className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 ${
         active
-          ? "scale-[1.02] bg-primary text-accent"
+          ? "scale-[1.02] bg-primary text-white"
           : "border border-outline-variant/30 bg-white text-on-surface"
       } ${className}`}
       transition={{ type: "tween", duration: 0.18, ease: "easeOut" }}
@@ -92,9 +95,7 @@ export function FilterChip({
         {badge ? (
           <motion.span
             animate={{ opacity: 1 }}
-            className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold ${
-              active ? "bg-accent text-primary" : "bg-primary text-accent"
-            }`}
+            className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-white"
             exit={{ opacity: 0 }}
             initial={{ opacity: 0 }}
             key="badge"
