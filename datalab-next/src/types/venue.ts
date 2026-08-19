@@ -45,6 +45,15 @@ export interface Venue {
   instagram_handle: string | null
   facebook_handle: string | null
   tiktok_handle: string | null
+  /** Booking CTA Fields (Phase 1) — external booking links, same plain
+   * shape as every other contact/social field above. SahelSpot is not
+   * the booking engine: Consumer will just open this URL, no internal
+   * flow. Studio gates which single field an editor sees per venue by
+   * category (Beach Club/Nightlife) or category+tag
+   * (Restaurant+'fine-dining') — see `BookingSection.tsx`. */
+  reserve_your_spot_beach_url: string | null
+  reserve_your_table_url: string | null
+  reserve_your_spot_nightlife_url: string | null
   short_description: string | null
   cover_image_url: string | null
   gallery_image_urls: string[] | null

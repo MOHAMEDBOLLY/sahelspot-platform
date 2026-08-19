@@ -32,6 +32,7 @@ import { TagsCollectionsSection } from './sections/TagsCollectionsSection'
 import { BeachDetailsSection } from './sections/BeachDetailsSection'
 import { LocationSection } from './sections/LocationSection'
 import { ContactSection } from './sections/ContactSection'
+import { BookingSection } from './sections/BookingSection'
 import { OpeningHoursSection } from './sections/OpeningHoursSection'
 import { ImagesSection } from './sections/ImagesSection'
 import { PublishingStatusSection } from './sections/PublishingStatusSection'
@@ -429,6 +430,7 @@ export function VenueWorkspace({ venueId, onDirtyChange, onDeleted }: VenueWorks
       )}
       <LocationSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} errors={fieldErrors} />
       <ContactSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} errors={fieldErrors} />
+      <BookingSection venue={displayedVenue} mode={mode} onFieldChange={handleFieldChange} />
       <OpeningHoursSection venue={displayedVenue} />
       <ImagesSection
         venue={displayedVenue}

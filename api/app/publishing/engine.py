@@ -89,6 +89,11 @@ def _serialize_venue(venue: Venue, tag_slugs: list[str]) -> dict:
         "instagram_handle": venue.instagram_handle,
         "facebook_handle": venue.facebook_handle,
         "tiktok_handle": venue.tiktok_handle,
+        # Booking CTA Fields (Phase 1) — same "plain pass-through" treatment
+        # as every other contact/social field above.
+        "reserve_your_spot_beach_url": venue.reserve_your_spot_beach_url,
+        "reserve_your_table_url": venue.reserve_your_table_url,
+        "reserve_your_spot_nightlife_url": venue.reserve_your_spot_nightlife_url,
         "short_description": venue.short_description,
         "cover_image_url": venue.cover_image_url,
         "gallery_image_urls": venue.gallery_image_urls,

@@ -123,6 +123,11 @@ class VenueOut(BaseModel):
     instagram_handle: str | None = None
     facebook_handle: str | None = None
     tiktok_handle: str | None = None
+    # Booking CTA Fields (Phase 1) — external booking links, same plain
+    # optional-string shape as every other contact/social field above.
+    reserve_your_spot_beach_url: str | None = None
+    reserve_your_table_url: str | None = None
+    reserve_your_spot_nightlife_url: str | None = None
     short_description: str | None = None
     cover_image_url: str | None = None
     gallery_image_urls: list[str] | None = None
@@ -211,6 +216,11 @@ class VenueUpdate(BaseModel):
     instagram_handle: str | None = None
     facebook_handle: str | None = None
     tiktok_handle: str | None = None
+    # Booking CTA Fields (Phase 1) — external booking links, same plain
+    # optional-string shape as every other contact/social field above.
+    reserve_your_spot_beach_url: str | None = None
+    reserve_your_table_url: str | None = None
+    reserve_your_spot_nightlife_url: str | None = None
     internal_notes: str | None = Field(default=None, max_length=2000)
     # Brand Asset Propagation — plain free text, never inferred from
     # `name`/anything else; only ever set by an explicit editor choice.
@@ -431,6 +441,13 @@ class PublishedVenueOut(BaseModel):
     instagram_handle: str | None = None
     facebook_handle: str | None = None
     tiktok_handle: str | None = None
+    # Booking CTA Fields (Phase 1) — external booking links, same plain
+    # optional-string shape as every other contact/social field above.
+    # Consumer integration (reading/rendering the CTA) is a later phase —
+    # this only makes the field reach the public snapshot.
+    reserve_your_spot_beach_url: str | None = None
+    reserve_your_table_url: str | None = None
+    reserve_your_spot_nightlife_url: str | None = None
     short_description: str | None = None
     cover_image_url: str | None = None
     gallery_image_urls: list[str] | None = None

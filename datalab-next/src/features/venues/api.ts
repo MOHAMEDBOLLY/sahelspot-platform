@@ -67,6 +67,9 @@ export type VenuePatch = Pick<
   | 'instagram_handle'
   | 'facebook_handle'
   | 'tiktok_handle'
+  | 'reserve_your_spot_beach_url'
+  | 'reserve_your_table_url'
+  | 'reserve_your_spot_nightlife_url'
   | 'internal_notes'
   | 'cover_image_url'
   | 'gallery_image_urls'
@@ -103,6 +106,9 @@ export function toVenuePatch(venue: Venue): VenuePatch {
     instagram_handle: emptyToNull(venue.instagram_handle),
     facebook_handle: emptyToNull(venue.facebook_handle),
     tiktok_handle: emptyToNull(venue.tiktok_handle),
+    reserve_your_spot_beach_url: emptyToNull(venue.reserve_your_spot_beach_url),
+    reserve_your_table_url: emptyToNull(venue.reserve_your_table_url),
+    reserve_your_spot_nightlife_url: emptyToNull(venue.reserve_your_spot_nightlife_url),
     internal_notes: emptyToNull(venue.internal_notes),
     cover_image_url: venue.cover_image_url,
     gallery_image_urls: venue.gallery_image_urls,

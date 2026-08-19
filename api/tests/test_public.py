@@ -60,6 +60,28 @@ class TestGetPublishedVenue:
         assert body["name"] == "Detail Fetch Check"
         assert body["destination"]["id"] == venue.destination_id
 
+    def test_booking_cta_urls_flow_to_the_public_snapshot(self, client, make_venue, preserve_seed_state):
+        """Booking CTA Fields (Phase 1) — confirms the three new fields
+        were actually wired into `_serialize_venue`/`PublishedVenueOut`,
+        not just `VenueOut` — a field can exist on the editor response
+        and still never reach a published snapshot if the publishing
+        engine doesn't know about it (see this module's own `_serialize_
+        venue`, which builds the snapshot by hand, field by field)."""
+        venue = make_venue(
+            status="approved",
+            category="Beach Club",
+            reserve_your_spot_beach_url="https://booking.example.com/beach",
+        )
+
+        client.post("/editor/publish")
+
+        response = client.get(f"/public/venues/{venue.id}")
+
+        assert response.status_code == 200
+        assert response.json()["reserve_your_spot_beach_url"] == "https://booking.example.com/beach"
+        assert response.json()["reserve_your_table_url"] is None
+        assert response.json()["reserve_your_spot_nightlife_url"] is None
+
     def test_unpublished_venue_returns_404(self, client, make_venue, preserve_seed_state):
         # Something has to actually be approved for /editor/publish to
         # produce a current revision at all.

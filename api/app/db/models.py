@@ -212,6 +212,26 @@ class Venue(Base):
     instagram_handle: Mapped[str | None] = mapped_column(Text, nullable=True)
     facebook_handle: Mapped[str | None] = mapped_column(Text, nullable=True)
     tiktok_handle: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Booking CTA Fields (Phase 1) — external booking links, same shape and
+    # same "plain nullable Text, no format validation" treatment as
+    # website/instagram_handle/etc above (migration 0024). SahelSpot is not
+    # the booking engine: clicking the CTA just opens this URL, no internal
+    # reservation flow, no state. Each maps to exactly one product-approved
+    # CTA/category pairing — deliberately three separate columns, not one
+    # generic "booking_url", since Beach and Nightlife share the CTA label
+    # ("Reserve Your Spot") but are different categories with independently
+    # settable links. Studio gates which single field a venue's editor sees
+    # by category (Beach Club / Nightlife) or category+tag (Restaurant +
+    # 'fine-dining') — see VenueWorkspace.tsx's BookingSection usage — but
+    # nothing here enforces that at the data layer, same as every other
+    # category-conditional field (e.g. beach_details is DB-enforced,
+    # access_type/reservation_policy are not) already varies on a
+    # case-by-case basis; these three follow the unenforced precedent since
+    # a stray value on the "wrong" category venue is harmless (Studio's UI
+    # simply never surfaces it) and the reason to prefer no CHECK constraint.
+    reserve_your_spot_beach_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reserve_your_table_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reserve_your_spot_nightlife_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     short_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     cover_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     gallery_image_urls: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
