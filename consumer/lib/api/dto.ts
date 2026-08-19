@@ -46,6 +46,15 @@ export interface PublishedVenueDTO {
   access_type: string | null;
   reservation_policy: string | null;
   tags: string[];
+  // Booking CTA Fields (Phase 1/2) — mirrors `PublishedVenueOut`
+  // (api/app/api/schemas.py) since commit e01c205. Plain external URLs, same
+  // as `website`: SahelSpot is not the booking engine, so these are never
+  // more than a link out. Exactly one is ever populated for a given venue
+  // (see `resolveBookingCta` in `lib/domain/mappers/venue.ts`), but all
+  // three are typed here since the DTO mirrors the wire shape exactly.
+  reserve_your_spot_beach_url: string | null;
+  reserve_your_table_url: string | null;
+  reserve_your_spot_nightlife_url: string | null;
 }
 
 export interface PublishedDestinationDTO {

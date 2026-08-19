@@ -71,4 +71,15 @@ export type Venue = {
   tags: string[];
   accessType: string | null;
   reservationPolicy: string | null;
+
+  /** Booking CTA Fields (Phase 2) — resolved from
+   * `reserve_your_spot_beach_url`/`reserve_your_table_url`/
+   * `reserve_your_spot_nightlife_url` by `resolveBookingCta` in
+   * `mappers/venue.ts`. At most one ever applies to a given venue (Beach
+   * Club, Nightlife, or Restaurant+`fine-dining`), mirroring Studio's own
+   * `BookingSection.tsx` — so this is a single resolved CTA, not three raw
+   * URL fields, exactly like `contact.mapsUrl` is one resolved field rather
+   * than every possible source of a maps link. `null` means either no
+   * matching category/tag or an unset/invalid URL. */
+  booking: { label: "Reserve Your Spot" | "Reserve Your Table"; url: string } | null;
 };

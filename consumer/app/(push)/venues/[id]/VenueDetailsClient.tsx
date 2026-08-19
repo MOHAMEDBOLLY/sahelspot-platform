@@ -458,6 +458,20 @@ export function VenueDetailsClient({ venueId }: { venueId: string }) {
           </div>
         ) : null}
 
+        {/* Booking CTA Fields (Phase 2) — a first-class action, not a social
+          * link, so it uses `CTAButton` (the same primary pill as
+          * onboarding's "Get Started") rather than joining the
+          * DISCOVER→CONNECT→VISIT grid below. Deliberately no click
+          * tracking and no `onClick` here — out of scope per the approved
+          * spec ("no click tracking"), unlike `handleVenueActionClick`
+          * below. Renders nothing when `data.booking` is null, exactly like
+          * every other conditional section on this page. */}
+        {data.booking ? (
+          <CTAButton fullWidth href={data.booking.url} icon="event_available">
+            {data.booking.label}
+          </CTAButton>
+        ) : null}
+
         {/* DISCOVER → CONNECT → VISIT: fixed order, Directions always last and
           * never visually distinct — every action here reflects a real
           * contact field or omits itself entirely, never a disabled

@@ -24,12 +24,44 @@ function toCoordinates(
   return { lat, lng };
 }
 
+/** Booking CTA Fields (Phase 2) — same category/tag mapping as Studio's
+ * `BookingSection.tsx` (`resolveBookingField`), translated to Consumer's
+ * already-bucketed `VenueCategory` instead of Studio's raw strings: `"beach"`
+ * only ever comes from Studio's `"Beach Club"`, `"nightlife"` only from
+ * `"Nightlife"`, and `"food"` only from `"Restaurant"` (`"Cafe"` maps to the
+ * separate `"coffee"` bucket — see `RAW_CATEGORY_MAP` in
+ * `lib/domain/categories.ts`), so checking the domain category here is
+ * equivalent to Studio's raw-string check, not an approximation of it.
+ * Exactly one of the three ever applies, matching the backend's own "at most
+ * one populated field" invariant — returns `null` the moment none match or
+ * the matching field's URL is empty/invalid. */
+function resolveBookingCta(
+  category: Venue["category"],
+  tags: string[],
+  dto: PublishedVenueDTO,
+): Venue["booking"] {
+  if (category === "beach") {
+    const url = toValidUrl(dto.reserve_your_spot_beach_url);
+    return url ? { label: "Reserve Your Spot", url } : null;
+  }
+  if (category === "nightlife") {
+    const url = toValidUrl(dto.reserve_your_spot_nightlife_url);
+    return url ? { label: "Reserve Your Spot", url } : null;
+  }
+  if (category === "food" && tags.includes("fine-dining")) {
+    const url = toValidUrl(dto.reserve_your_table_url);
+    return url ? { label: "Reserve Your Table", url } : null;
+  }
+  return null;
+}
+
 /** DTO -> Domain. The one place a gap in API_REQUIREMENTS.md becomes a `null`
  * or `[]` on the domain model — every field below traces to a numbered
  * requirement there, and filling that requirement means editing only this
  * function, never a component. */
 export function toVenue(dto: PublishedVenueDTO): Venue {
   const openingHours = toOpeningHours(dto.opening_hours);
+  const category = toVenueCategory(dto.category);
 
   return {
     id: dto.id,
@@ -38,7 +70,7 @@ export function toVenue(dto: PublishedVenueDTO): Venue {
     destinationId: dto.destination.id,
     destinationName: dto.destination.name,
     district: dto.district,
-    category: toVenueCategory(dto.category),
+    category,
     isFeatured: dto.is_featured,
     isVerified: dto.is_verified,
     coordinates: toCoordinates(dto.latitude, dto.longitude),
@@ -84,5 +116,7 @@ export function toVenue(dto: PublishedVenueDTO): Venue {
     tags: dto.tags,
     accessType: dto.access_type,
     reservationPolicy: dto.reservation_policy,
+
+    booking: resolveBookingCta(category, dto.tags, dto),
   };
 }
