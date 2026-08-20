@@ -13,6 +13,7 @@ import {
   Waves,
   QrCode,
   LayoutGrid,
+  Database,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -38,6 +39,9 @@ export const navItems: NavItem[] = [
   // the existing Collection/CollectionVenue model, api/app/db/models.py),
   // same "Studio Content Organization" cluster as Beaches/No QR above.
   { to: '/home-curation', label: 'Home Curation', icon: LayoutGrid },
+  // External Data Enrichment Workflow (Phase 1) — a staging/review layer
+  // over external research data (iSahel first), separate from Venues.
+  { to: '/external-data', label: 'External Data', icon: Database },
   { to: '/map', label: 'Map', icon: Map },
   { to: '/destinations', label: 'Destinations', icon: MapPin },
   { to: '/events', label: 'Events', icon: CalendarDays },

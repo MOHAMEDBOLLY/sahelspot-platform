@@ -632,6 +632,143 @@ class VenueRef(BaseModel):
     name: str
 
 
+class ExternalRecordOut(BaseModel):
+    """External Data Enrichment Workflow (Phase 1). `matched_venue`
+    reuses the same lightweight `VenueRef` shape everything else in this
+    file uses for a resolved reference. `raw_row` is included so the
+    review UI can always fall back to the original record for a field
+    this typed shape doesn't cover."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source: str
+    source_url: str | None = None
+    external_name: str
+    external_category: str | None = None
+    external_destination: str | None = None
+    external_description: str | None = None
+    external_amenities: list[str] = []
+    external_maps_url: str | None = None
+    external_booking_type: str | None = None
+    external_booking_url: str | None = None
+    external_image_urls: list[str] = []
+    source_review_status: str | None = None
+    raw_row: dict | None = None
+    matched_venue_id: str | None = None
+    matched_venue: VenueRef | None = None
+    match_status: str
+    match_confidence: str | None = None
+    review_status: str
+    # External Data Enrichment Workflow — Destination Mapping. Populated
+    # only when an explicit `ExternalDestinationMapping` row exists for
+    # this record's (source, external_destination) — never a fuzzy
+    # guess. The review UI shows this *before* Apply is ever attempted,
+    # so an operator can see a destination is about to be normalized
+    # through an approved mapping rather than discovering it only after
+    # a conflict/error.
+    destination_mapping: DestinationRef | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ExternalRecordSummary(BaseModel):
+    """Simple counters only — per the approved plan, no analytics beyond
+    this."""
+
+    total: int
+    by_match_status: dict[str, int]
+    by_review_status: dict[str, int]
+
+
+class ExternalRecordListOut(BaseModel):
+    items: list[ExternalRecordOut]
+    total: int
+    summary: ExternalRecordSummary
+
+
+class ExternalRecordLoadResult(BaseModel):
+    """Result of loading one detail file — never a blind bulk import;
+    reports exactly what happened per the approved "no bulk-write
+    endpoint that blindly imports all records" instruction, since even
+    an explicit load is an operator-initiated, auditable action, not
+    silent."""
+
+    created: int
+    updated: int
+    source: str
+
+
+class ExternalRecordMatchLoadResult(BaseModel):
+    matched: int
+    unmatched: int
+
+
+class ExternalRecordMatchUpdate(BaseModel):
+    """Operator override of the automated/loaded match classification —
+    `matched_venue_id` may be cleared (`null`) or repointed; the operator
+    always has the final say over what the loader computed."""
+
+    match_status: str
+    match_confidence: str | None = None
+    matched_venue_id: str | None = None
+
+
+class ExternalRecordReviewStatusUpdate(BaseModel):
+    review_status: str
+
+
+class ExternalRecordApplyRequest(BaseModel):
+    """Exactly the fields explicitly selected are applied — never "apply
+    everything". `override_conflict` is required to proceed when
+    `category`/`destination` disagree with the Venue's current value
+    (see `validation/external_records.py::check_conflict`)."""
+
+    fields: list[str]
+    override_conflict: bool = False
+
+
+class ExternalRecordApplyResult(BaseModel):
+    record: ExternalRecordOut
+    venue: VenueOut
+    fields_applied: list[str]
+
+
+class ExternalDestinationMappingOut(BaseModel):
+    """External Data Enrichment Workflow — Destination Mapping. An
+    explicit, operator-created (source, external_destination) ->
+    Studio Destination row — never fuzzy, never inferred."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source: str
+    external_destination: str
+    studio_destination_id: str
+    studio_destination: DestinationRef | None = None
+    created_at: datetime
+
+
+class ExternalDestinationMappingCreate(BaseModel):
+    source: str = Field(min_length=1, max_length=200)
+    external_destination: str = Field(min_length=1, max_length=200)
+    studio_destination_id: str
+
+
+class ExternalRecordCreateVenueRequest(BaseModel):
+    """The final confirmation payload before a new Venue is created from
+    an unmatched external record — every field is explicit and editable
+    by the operator before submission, not auto-derived silently."""
+
+    id: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=200)
+    slug: str = Field(min_length=1, max_length=200)
+    category: str
+    destination_id: str
+    short_description: str | None = Field(default=None, max_length=500)
+    maps_url: str | None = None
+
+
 class CollectionVenueOut(BaseModel):
     """HOME CURATION — one curated membership row. `venue` reuses the same
     lightweight `VenueRef` (id+name) shape Events/No QR Places already use

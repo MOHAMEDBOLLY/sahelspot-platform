@@ -5,6 +5,7 @@ from app.api.routes import (
     collections,
     destinations,
     events,
+    external_records,
     me,
     no_qr,
     public,
@@ -51,6 +52,8 @@ editor_router.include_router(events.router)
 editor_router.include_router(no_qr.router)
 editor_router.include_router(no_qr.places_router)
 editor_router.include_router(collections.router)
+editor_router.include_router(external_records.router)
+editor_router.include_router(external_records.mappings_router)
 editor_router.include_router(publish.router)
 editor_router.include_router(activity.router)
 editor_router.include_router(me.router)

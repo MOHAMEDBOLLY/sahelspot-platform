@@ -634,6 +634,142 @@ class PublishRevision(Base):
     venue_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
+MATCH_STATUSES = ("MATCH_CONFIRMED", "MATCH_PROBABLE", "REVIEW_REQUIRED", "NO_MATCH")
+MATCH_CONFIDENCES = ("HIGH", "MEDIUM", "LOW")
+EXTERNAL_REVIEW_STATUSES = (
+    "PENDING",
+    "IN_REVIEW",
+    "APPROVED",
+    "PARTIALLY_APPLIED",
+    "REJECTED",
+    "NEEDS_RESEARCH",
+)
+
+
+class ExternalRecord(Base):
+    """External Data Enrichment Workflow (Phase 1) — a staging/review row
+    for one venue-shaped record from an external research dataset (iSahel
+    being the first source; the shape is deliberately source-agnostic, no
+    iSahel-specific column or CHECK constraint exists anywhere here).
+
+    Deliberately NOT written onto `Venue` directly — per the approved
+    "External Research -> Match -> Human Review -> Field-level Approval
+    -> Apply" model, external data stays fully separate from the live
+    Venue table until an operator explicitly applies specific fields
+    (see `app/api/routes/external_records.py`'s `apply` endpoint) or
+    creates a new Venue from it. `raw_row` preserves the original record
+    verbatim (JSONB) so no external field is ever lost even if this
+    table's typed columns don't yet cover something a future source
+    sends — the review UI can always fall back to it.
+
+    `match_status`/`match_confidence` describe whether this record
+    appears to correspond to an existing Venue (`matched_venue_id`,
+    `ON DELETE SET NULL` — losing the matched Venue must never delete
+    the research record itself). `review_status` is a completely
+    separate concept: the *operator's* workflow state for this record,
+    independent of how confident the automated match was (a `NO_MATCH`
+    record can still be `REJECTED` by an operator who decides it's not
+    worth pursuing, for example).
+    """
+
+    __tablename__ = "external_records"
+    __table_args__ = (
+        CheckConstraint(f"match_status IN {MATCH_STATUSES}", name="ck_external_records_match_status"),
+        CheckConstraint(
+            f"match_confidence IS NULL OR match_confidence IN {MATCH_CONFIDENCES}",
+            name="ck_external_records_match_confidence",
+        ),
+        CheckConstraint(
+            f"review_status IN {EXTERNAL_REVIEW_STATUSES}", name="ck_external_records_review_status"
+        ),
+        Index("ix_external_records_source", "source"),
+        Index("ix_external_records_match_status", "match_status"),
+        Index("ix_external_records_review_status", "review_status"),
+        Index("ix_external_records_matched_venue_id", "matched_venue_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, Identity(always=True), primary_key=True)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_name: Mapped[str] = mapped_column(Text, nullable=False)
+    external_category: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_destination: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_amenities: Mapped[list] = mapped_column(JSONB, nullable=True, default=list)
+    external_maps_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Raw booking info only — never a direct URL destination. A source's
+    # "Reserve" button may trigger its own internal request flow (see
+    # `external_booking_type`), not a bookable link; converting that into
+    # `Venue.reserve_your_*_url` automatically would silently publish a
+    # broken or misleading CTA. Phase 1 deliberately has no Apply action
+    # for this field at all — see the validation module's own docstring.
+    external_booking_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_booking_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_image_urls: Mapped[list] = mapped_column(JSONB, nullable=True, default=list)
+    # The source dataset's own review marker (e.g. iSahel's internal
+    # extraction-QA status), if it sends one — informational only, never
+    # confused with this table's own `review_status` below (a completely
+    # separate, Studio-operator-facing workflow state).
+    source_review_status: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Full original record, verbatim — nothing this table doesn't have a
+    # typed column for is ever lost.
+    raw_row: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    matched_venue_id: Mapped[str | None] = mapped_column(
+        ForeignKey("venues.id", ondelete="SET NULL"), nullable=True
+    )
+    match_status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'REVIEW_REQUIRED'"))
+    match_confidence: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'PENDING'"))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class ExternalDestinationMapping(Base):
+    """External Data Enrichment Workflow (Phase 1) — an explicit,
+    operator-approved mapping from one external source's destination
+    name to an existing Studio `Destination`, e.g. iSahel's "El Alamein"
+    -> Studio's "New Alamein". Deliberately NOT fuzzy matching: this is a
+    real table an operator writes to explicitly (via `POST /editor/
+    external-destination-mappings`), not a similarity score computed at
+    read time. `(source, external_destination)` is unique — one
+    deterministic mapping per source's spelling of a place, never
+    inferred, never guessed; an external destination with no row here
+    simply has no mapping (see `resolve_destination` in
+    `app/validation/external_records.py`, which still requires an exact
+    `Destination.name` match as the only other resolution path — Apply
+    blocks rather than guesses when neither applies).
+
+    `ON DELETE CASCADE` on `studio_destination_id`: a mapping is
+    meaningless once its target Destination no longer exists — unlike
+    `ExternalRecord.matched_venue_id` (`SET NULL`, since the research
+    record itself is still worth keeping), a mapping *is* the row, not a
+    record with other data alongside it.
+    """
+
+    __tablename__ = "external_destination_mappings"
+    __table_args__ = (
+        UniqueConstraint(
+            "source", "external_destination", name="uq_external_destination_mappings_source_external"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, Identity(always=True), primary_key=True)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    external_destination: Mapped[str] = mapped_column(Text, nullable=False)
+    studio_destination_id: Mapped[str] = mapped_column(
+        ForeignKey("destinations.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class ActivityLogEntry(Base):
     """A single recorded editorial action — Submit for Review, Approve,
     Publish, Republish, and any future workflow/publishing action. Purely

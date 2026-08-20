@@ -6,6 +6,7 @@ import { QualityCenter } from './pages/QualityCenter'
 import { Venues } from './pages/Venues'
 import { NoQr } from './pages/NoQr'
 import { HomeCuration } from './pages/HomeCuration'
+import { ExternalDataReview } from './pages/ExternalDataReview'
 import { Destinations } from './pages/Destinations'
 import { Events } from './pages/Events'
 import { Publishing } from './pages/Publishing'
@@ -41,6 +42,7 @@ function App() {
             <Route path="/beaches" element={<Navigate to="/venues?category=Beach+Club" replace />} />
             <Route path="/no-qr" element={<NoQr />} />
             <Route path="/home-curation" element={<HomeCuration />} />
+            <Route path="/external-data" element={<ExternalDataReview />} />
             <Route path="/destinations" element={<Destinations />} />
             <Route path="/events" element={<Events />} />
             <Route path="/publishing" element={<Publishing />} />
